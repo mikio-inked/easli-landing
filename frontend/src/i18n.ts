@@ -916,5 +916,9 @@ export function t(lang: LanguageCode | null | undefined, key: UIKey): string {
 }
 
 export function getLanguage(code: LanguageCode | null | undefined): Language {
-  return LANGUAGES.find((l) => l.code === code) ?? LANGUAGES[1]; // default English (index 1 after Einfaches Deutsch)
+  return (
+    LANGUAGES.find((l) => l.code === code) ??
+    LANGUAGES.find((l) => l.code === 'en') ??
+    LANGUAGES[0]
+  );
 }
