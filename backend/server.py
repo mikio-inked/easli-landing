@@ -46,12 +46,13 @@ logger = logging.getLogger(__name__)
 # ==================== MODELS ====================
 
 LANGUAGES = {
-    "zh": "Chinese Simplified (简体中文)",
+    "de_simple": "Simple German (Einfaches Deutsch / Leichte Sprache)",
+    "en": "English",
+    "es": "Spanish (Español)",
     "vi": "Vietnamese (Tiếng Việt)",
     "tr": "Turkish (Türkçe)",
     "ru": "Russian (Русский)",
-    "en": "English",
-    "es": "Spanish (Español)",
+    "zh": "Chinese Simplified (简体中文)",
 }
 
 
@@ -165,7 +166,18 @@ def pdf_to_images_base64(pdf_bytes: bytes, max_pages: int = 5) -> List[Tuple[str
     return pages
 
 
-def build_system_prompt(target_language_label: str) -> str:
+def build_system_prompt(target_language_label: str, target_language_code: str = "") -> str:
+    extra = ""
+    if target_language_code == "de_simple":
+        extra = (
+            "\n\nSPECIAL — the target language is **German written in Leichte Sprache / Einfache Sprache**:\n"
+            "- Short sentences (ideally 8–12 words).\n"
+            "- Common everyday German words; AVOID legal, tax, medical, or bureaucratic jargon.\n"
+            "- Active voice. Concrete nouns. Address the reader with 'Sie'.\n"
+            "- When you must use a formal term (e.g. 'Mahnung', 'Beitrag', 'Versicherte'), give a one-clause explanation in parentheses.\n"
+            "- Use short bullet points where it helps clarity.\n"
+            "- Output the German text in the standard alphabet (no Fraktur, no abbreviations like z.B./bzw.).\n"
+        )
     return f"""You are KlarPost, a careful, trustworthy assistant that helps people in Germany understand German documents.
 
 Your job:
@@ -183,7 +195,7 @@ CRITICAL RULES:
 - You MUST never invent missing information.
 - For medical documents: always recommend discussing diagnosis, treatment, medication with a qualified doctor.
 - For legal/tax/immigration/housing/debt/government documents: always recommend contacting the relevant authority, qualified advisor, legal aid service, tax advisor, lawyer, or counseling center.
-- If the document could have serious consequences and the user is unsure, recommend contacting the sender.
+- If the document could have serious consequences and the user is unsure, recommend contacting the sender.{extra}
 
 Risk levels:
 - green: informational only, no urgent action detected
@@ -260,7 +272,11 @@ def extract_json_from_text(text: str) -> Optional[dict]:
     return None
 
 
-async def analyze_with_gpt(images: List[Tuple[str, str]], target_language_label: str) -> AnalysisResult:
+async def analyze_with_gpt(
+    images: List[Tuple[str, str]],
+    target_language_label: str,
+    target_language_code: str = "",
+) -> AnalysisResult:
     if not EMERGENT_LLM_KEY:
         raise HTTPException(status_code=500, detail="LLM key not configured")
     if not images:
@@ -270,7 +286,7 @@ async def analyze_with_gpt(images: List[Tuple[str, str]], target_language_label:
     chat = LlmChat(
         api_key=EMERGENT_LLM_KEY,
         session_id=session_id,
-        system_message=build_system_prompt(target_language_label),
+        system_message=build_system_prompt(target_language_label, target_language_code),
     ).with_model("openai", "gpt-5.2")
 
     image_contents = [ImageContent(image_base64=b64) for b64, _ in images]
@@ -320,7 +336,7 @@ async def analyze_with_gpt(images: List[Tuple[str, str]], target_language_label:
 
 # ==================== ROUTES ====================
 
-def build_chat_system_prompt(record: dict, target_language_label: str) -> str:
+def build_chat_system_prompt(record: dict, target_language_label: str, target_language_code: str = "") -> str:
     result = record.get("result", {}) or {}
     # Trim arrays to what's useful in the system context.
     doc_context = {
@@ -338,6 +354,15 @@ def build_chat_system_prompt(record: dict, target_language_label: str) -> str:
         "uncertainties": result.get("uncertainties", [])[:8],
     }
     doc_json = json.dumps(doc_context, ensure_ascii=False)
+    extra = ""
+    if target_language_code == "de_simple":
+        extra = (
+            "\n\nSPECIAL — write the reply in **Leichte Sprache / Einfache Sprache** (German):\n"
+            "- Short sentences (8–12 words).\n"
+            "- Common everyday German words. NO legal/bureaucratic jargon.\n"
+            "- Active voice, concrete nouns, address the user with 'Sie'.\n"
+            "- Briefly explain rare formal terms in parentheses."
+        )
     return f"""You are KlarPost's document assistant. You help ONE user understand ONE specific German document. The full structured analysis of that document is provided below.
 
 CRITICAL SCOPE — refuse anything outside it:
@@ -349,7 +374,7 @@ CRITICAL SAFETY — same rules as the rest of the app:
 4. Do NOT give legal, tax, financial or medical advice. You may explain what something means or what is commonly done, but always recommend the user contact the sender or a qualified professional (doctor, lawyer, tax advisor, counseling center, official authority) for binding decisions.
 5. Do NOT diagnose medical conditions or recommend treatment.
 6. Do NOT tell the user whether they must or must not pay.
-7. Mark uncertainty when the document is unclear — never invent missing information.
+7. Mark uncertainty when the document is unclear — never invent missing information.{extra}
 
 OUTPUT FORMAT:
 Respond ONLY with a single valid JSON object — no prose before or after, no code fences:
@@ -367,11 +392,12 @@ async def chat_about_document(
     history: List[dict],
     user_message: str,
     target_language_label: str,
+    target_language_code: str = "",
 ) -> ChatResponse:
     if not EMERGENT_LLM_KEY:
         raise HTTPException(status_code=500, detail="LLM key not configured")
 
-    system_prompt = build_chat_system_prompt(record_dict, target_language_label)
+    system_prompt = build_chat_system_prompt(record_dict, target_language_label, target_language_code)
     session_id = f"klarpost-chat-{uuid.uuid4()}"
     chat = LlmChat(
         api_key=EMERGENT_LLM_KEY,
@@ -429,13 +455,14 @@ async def chat_endpoint(analysis_id: str, req: ChatRequest):
 
     history = doc.get("messages", []) or []
     target_label = doc.get("target_language_label") or "English"
+    target_code = doc.get("target_language") or ""
 
     # Soft per-analysis cap to discourage abuse — 80 user turns.
     user_turns = sum(1 for m in history if m.get("role") == "user")
     if user_turns >= 80:
         raise HTTPException(status_code=429, detail="Chat limit for this document reached")
 
-    response = await chat_about_document(doc, history, req.message.strip(), target_label)
+    response = await chat_about_document(doc, history, req.message.strip(), target_label, target_code)
 
     user_msg = ChatMessage(role="user", content=req.message.strip()).dict()
     assistant_msg = ChatMessage(
@@ -541,7 +568,7 @@ async def analyze_document(req: AnalyzeRequest):
         raise HTTPException(status_code=400, detail="No readable pages found")
 
     # Call GPT
-    result = await analyze_with_gpt(images, target_language_label)
+    result = await analyze_with_gpt(images, target_language_label, req.target_language)
 
     record = AnalysisRecord(
         device_id=req.device_id,

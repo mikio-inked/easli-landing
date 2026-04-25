@@ -2,7 +2,7 @@
 // Source language is always German. The user picks which language to receive
 // the explanation/translation in.
 
-export type LanguageCode = 'zh' | 'vi' | 'tr' | 'ru' | 'en' | 'es';
+export type LanguageCode = 'de_simple' | 'en' | 'es' | 'vi' | 'tr' | 'ru' | 'zh';
 
 export interface Language {
   code: LanguageCode;
@@ -11,13 +11,16 @@ export interface Language {
   flag: string;
 }
 
+// Sorted alphabetically by native name (Latin scripts first, then Cyrillic,
+// then CJK — same convention iOS/macOS use).
 export const LANGUAGES: Language[] = [
-  { code: 'zh', nativeName: '简体中文', englishName: 'Chinese Simplified', flag: '🇨🇳' },
+  { code: 'de_simple', nativeName: 'Einfaches Deutsch', englishName: 'Simple German', flag: '🇩🇪' },
+  { code: 'en', nativeName: 'English', englishName: 'English', flag: '🇬🇧' },
+  { code: 'es', nativeName: 'Español', englishName: 'Spanish', flag: '🇪🇸' },
   { code: 'vi', nativeName: 'Tiếng Việt', englishName: 'Vietnamese', flag: '🇻🇳' },
   { code: 'tr', nativeName: 'Türkçe', englishName: 'Turkish', flag: '🇹🇷' },
   { code: 'ru', nativeName: 'Русский', englishName: 'Russian', flag: '🇷🇺' },
-  { code: 'en', nativeName: 'English', englishName: 'English', flag: '🇬🇧' },
-  { code: 'es', nativeName: 'Español', englishName: 'Spanish', flag: '🇪🇸' },
+  { code: 'zh', nativeName: '简体中文', englishName: 'Chinese Simplified', flag: '🇨🇳' },
 ];
 
 // UI strings translated into all supported languages so the chrome of the app
@@ -793,7 +796,119 @@ const es: UIStrings = {
   chat_starter_4: '¿Cómo puedo responder con educación?',
 };
 
-const STRINGS: Record<LanguageCode, UIStrings> = { en, zh, vi, tr, ru, es };
+// Simple German — Leichte / Einfache Sprache. Short sentences, common words,
+// no jargon. For users who only know basic German.
+const de_simple: UIStrings = {
+  app_name: 'KlarPost',
+  app_tagline: 'Verstehen Sie deutsche Briefe — einfach und ruhig.',
+  continue: 'Weiter',
+  back: 'Zurück',
+  next: 'Weiter',
+  skip: 'Überspringen',
+  done: 'Fertig',
+  cancel: 'Abbrechen',
+  delete: 'Löschen',
+  retry: 'Noch einmal',
+  choose_language: 'Wählen Sie Ihre Sprache',
+  choose_language_subtitle: 'KlarPost erklärt Briefe in dieser Sprache.',
+  home_intro: 'Machen Sie ein Foto von einem Brief. Oder laden Sie einen Brief hoch. KlarPost erklärt: Was steht im Brief? Was sollten Sie tun?',
+  scan_document: 'Brief mit Kamera scannen',
+  upload_file: 'PDF oder Bild hochladen',
+  recent_analyses: 'Letzte Briefe',
+  no_history: 'Noch kein Brief da. Machen Sie ein Foto, um zu starten.',
+  history_title: 'Verlauf',
+  settings_title: 'Einstellungen',
+  change_language: 'Sprache ändern',
+  delete_all_data: 'Alle Briefe löschen',
+  delete_account: 'Meine Daten löschen',
+  privacy: 'Datenschutz',
+  disclaimer_title: 'Wichtiger Hinweis',
+  support: 'Hilfe',
+  analyzing_title: 'KlarPost liest Ihren Brief',
+  analyzing_step_reading: 'Brief wird gelesen',
+  analyzing_step_extracting: 'Text wird erkannt',
+  analyzing_step_translating: 'Brief wird erklärt',
+  analyzing_step_checking: 'Fristen werden geprüft',
+  risk_level: 'Wichtigkeit',
+  risk_green: 'Nur eine Information',
+  risk_yellow: 'Bitte prüfen',
+  risk_red: 'Wichtig — bitte lesen',
+  summary: 'Kurze Zusammenfassung',
+  what_this_means: 'Was bedeutet das?',
+  what_to_do_next: 'Das können Sie tun',
+  deadlines: 'Fristen',
+  no_deadlines: 'Keine Frist gefunden.',
+  sender: 'Absender',
+  document_type: 'Art von Brief',
+  reply_draft: 'Antwort auf Deutsch',
+  reply_explanation: 'Was bedeutet die Antwort?',
+  questions_to_ask: 'Diese Fragen können Sie stellen',
+  uncertainties: 'Bitte selbst prüfen',
+  disclaimer_short: 'KlarPost ist keine Rechts- oder Arzt-Beratung.',
+  tips_title: 'Tipps für ein gutes Foto',
+  tip_lighting: 'Gutes Licht',
+  tip_flat: 'Brief flach hinlegen',
+  tip_full_page: 'Ganze Seite zeigen',
+  tip_no_blur: 'Hand ruhig halten',
+  open_camera: 'Kamera öffnen',
+  pick_from_library: 'Aus Bildern wählen',
+  pick_pdf: 'PDF wählen',
+  pick_image: 'Bild wählen',
+  error_generic: 'Etwas ging schief. Bitte noch einmal.',
+  error_unsupported_file: 'Dieses Format geht nicht. Bitte JPG, PNG, WEBP oder PDF.',
+  error_no_image: 'Kein Bild gewählt.',
+  confirm_delete_one: 'Diesen Brief löschen?',
+  confirm_delete_all: 'Alle Briefe löschen? Das geht nicht zurück.',
+  onb1_title: 'Briefe einfach verstehen',
+  onb1_body: 'KlarPost liest deutsche Briefe. KlarPost erklärt sie ruhig und klar.',
+  onb2_title: 'Fristen und Schritte sehen',
+  onb2_body: 'Sie sehen: Was steht im Brief? Was können Sie als Nächstes tun?',
+  onb3_title: 'Ihre Daten sind sicher',
+  onb3_body: 'KlarPost speichert keine Original-Briefe. Nur die Erklärung. Sie können alles jederzeit löschen.',
+  onb_get_started: 'Los geht es',
+  privacy_short: 'Original-Briefe werden nicht gespeichert. Sie haben die Kontrolle.',
+  disclaimer_long: 'KlarPost gibt nur allgemeine Informationen. KlarPost ist keine Rechts-, Steuer-, Geld- oder Arzt-Beratung. Bei wichtigen Fragen fragen Sie bitte den Absender oder einen Fachmann (zum Beispiel: einen Arzt, einen Anwalt, eine Beratungsstelle).',
+  copy: 'Kopieren',
+  copied: 'Kopiert',
+  home_quick_help: 'Wie können wir helfen?',
+  see_all: 'Alle zeigen',
+  analyze_again: 'Anderen Brief prüfen',
+  no_explanation: 'Keine Erklärung da.',
+  today: 'Heute',
+  yesterday: 'Gestern',
+  save_originals: 'Brief auf diesem Handy speichern',
+  save_originals_sub: 'Der Brief bleibt nur auf Ihrem Handy. Er geht nicht ins Internet.',
+  view_original: 'Brief ansehen',
+  remind_me: 'Erinnern',
+  reminder_set: 'Erinnerung gesetzt',
+  cancel_reminder: 'Erinnerung löschen',
+  pick_when_remind: 'Wann sollen wir Sie erinnern?',
+  preset_7d: '7 Tage vorher, 9 Uhr',
+  preset_3d: '3 Tage vorher, 9 Uhr',
+  preset_1d: '1 Tag vorher, 9 Uhr',
+  preset_dayof: 'Am Tag, 9 Uhr',
+  preset_custom: 'Eigene Zeit wählen',
+  past_deadline: 'Diese Zeit ist schon vorbei. Bitte wählen Sie eine spätere Zeit.',
+  permission_needed: 'Sie müssen das erlauben.',
+  notif_title: 'Eine Frist kommt',
+  notif_body: 'Vergessen Sie diese Frist nicht.',
+  pdf_view_unsupported: 'Das PDF ist gespeichert. Aber wir können es hier nicht zeigen.',
+  pages_used: '{n} Seiten gelesen',
+  multi_page_hint: 'Mehrere Seiten · weiter machen, dann „Fertig" tippen',
+  ask_question: 'Frage zum Brief stellen',
+  chat_placeholder: 'Frage zum Brief eingeben…',
+  chat_thinking: 'Denkt nach…',
+  chat_clear_confirm: 'Den Chat löschen?',
+  chat_scope_note: 'Ich helfe nur bei diesem Brief.',
+  chat_empty_title: 'Was möchten Sie wissen?',
+  chat_empty_sub: 'Ich erkläre Wörter, Fristen und was Sie tun können — aber nur bei diesem Brief.',
+  chat_starter_1: 'Erkläre den Brief in einfachen Worten',
+  chat_starter_2: 'Was soll ich jetzt machen?',
+  chat_starter_3: 'Was passiert, wenn ich die Frist verpasse?',
+  chat_starter_4: 'Wie antworte ich höflich?',
+};
+
+const STRINGS: Record<LanguageCode, UIStrings> = { en, zh, vi, tr, ru, es, de_simple };
 
 export function t(lang: LanguageCode | null | undefined, key: UIKey): string {
   const code = lang && STRINGS[lang] ? lang : 'en';
@@ -801,5 +916,5 @@ export function t(lang: LanguageCode | null | undefined, key: UIKey): string {
 }
 
 export function getLanguage(code: LanguageCode | null | undefined): Language {
-  return LANGUAGES.find((l) => l.code === code) ?? LANGUAGES[4]; // default English
+  return LANGUAGES.find((l) => l.code === code) ?? LANGUAGES[1]; // default English (index 1 after Einfaches Deutsch)
 }
