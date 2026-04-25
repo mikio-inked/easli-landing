@@ -132,7 +132,17 @@ export type UIKey =
   | 'chat_starter_1'
   | 'chat_starter_2'
   | 'chat_starter_3'
-  | 'chat_starter_4';
+  | 'chat_starter_4'
+  | 'share'
+  | 'share_as_pdf'
+  | 'share_as_text'
+  | 'share_failed'
+  | 'scam_warning_title'
+  | 'scam_warning_body'
+  | 'filter_all'
+  | 'filter_category'
+  | 'filter_no_results'
+  | 'category_label';
 
 type UIStrings = Record<UIKey, string>;
 
@@ -244,6 +254,16 @@ const en: UIStrings = {
   chat_starter_2: 'What should I do next?',
   chat_starter_3: 'What if I miss the deadline?',
   chat_starter_4: 'How can I politely reply?',
+  share: 'Share',
+  share_as_pdf: 'Share as PDF',
+  share_as_text: 'Share as text',
+  share_failed: 'Could not share. Please try again.',
+  scam_warning_title: 'Possible scam — please read carefully',
+  scam_warning_body: 'This letter has signs of a scam. Do not pay or reply before checking it carefully. If unsure, contact the official sender directly using a phone number you trust.',
+  filter_all: 'All',
+  filter_category: 'Category',
+  filter_no_results: 'No analyses match this filter.',
+  category_label: 'Category',
 };
 
 const zh: UIStrings = {
@@ -354,6 +374,16 @@ const zh: UIStrings = {
   chat_starter_2: '我接下来该做什么？',
   chat_starter_3: '如果错过截止日期会怎样？',
   chat_starter_4: '怎样礼貌地回复？',
+  share: '分享',
+  share_as_pdf: '以 PDF 分享',
+  share_as_text: '以文本分享',
+  share_failed: '无法分享，请再试一次。',
+  scam_warning_title: '可能是诈骗 — 请仔细阅读',
+  scam_warning_body: '这封信有诈骗迹象。在仔细核对之前，请不要付款或回复。如有疑问，请使用您信任的电话号码直接联系官方发件人。',
+  filter_all: '全部',
+  filter_category: '类别',
+  filter_no_results: '此类别下暂无分析。',
+  category_label: '类别',
 };
 
 const vi: UIStrings = {
@@ -464,6 +494,16 @@ const vi: UIStrings = {
   chat_starter_2: 'Tôi nên làm gì tiếp theo?',
   chat_starter_3: 'Nếu tôi lỡ hạn thì sao?',
   chat_starter_4: 'Tôi có thể trả lời lịch sự như thế nào?',
+  share: 'Chia sẻ',
+  share_as_pdf: 'Chia sẻ dưới dạng PDF',
+  share_as_text: 'Chia sẻ dạng văn bản',
+  share_failed: 'Không thể chia sẻ. Vui lòng thử lại.',
+  scam_warning_title: 'Có thể là lừa đảo — hãy đọc kỹ',
+  scam_warning_body: 'Lá thư này có dấu hiệu lừa đảo. Đừng trả tiền hoặc phản hồi trước khi kiểm tra kỹ. Nếu nghi ngờ, hãy liên hệ trực tiếp với người gửi chính thức bằng số điện thoại bạn tin tưởng.',
+  filter_all: 'Tất cả',
+  filter_category: 'Loại',
+  filter_no_results: 'Không có phân tích nào phù hợp với bộ lọc này.',
+  category_label: 'Loại',
 };
 
 const tr: UIStrings = {
@@ -574,6 +614,16 @@ const tr: UIStrings = {
   chat_starter_2: 'Şimdi ne yapmalıyım?',
   chat_starter_3: 'Son tarihi kaçırırsam ne olur?',
   chat_starter_4: 'Nasıl kibarca yanıtlayabilirim?',
+  share: 'Paylaş',
+  share_as_pdf: 'PDF olarak paylaş',
+  share_as_text: 'Metin olarak paylaş',
+  share_failed: 'Paylaşılamadı. Lütfen tekrar deneyin.',
+  scam_warning_title: 'Olası dolandırıcılık — lütfen dikkatlice okuyun',
+  scam_warning_body: 'Bu mektupta dolandırıcılık belirtileri var. Dikkatlice incelemeden ödeme yapmayın veya yanıt vermeyin. Emin değilseniz, güvendiğiniz bir telefon numarasıyla resmi göndericiye doğrudan ulaşın.',
+  filter_all: 'Tümü',
+  filter_category: 'Kategori',
+  filter_no_results: 'Bu filtreye uygun analiz yok.',
+  category_label: 'Kategori',
 };
 
 const ru: UIStrings = {
@@ -684,6 +734,16 @@ const ru: UIStrings = {
   chat_starter_2: 'Что мне делать дальше?',
   chat_starter_3: 'Что будет, если я пропущу срок?',
   chat_starter_4: 'Как вежливо ответить?',
+  share: 'Поделиться',
+  share_as_pdf: 'Поделиться как PDF',
+  share_as_text: 'Поделиться как текст',
+  share_failed: 'Не удалось поделиться. Попробуйте ещё раз.',
+  scam_warning_title: 'Возможно, мошенничество — прочитайте внимательно',
+  scam_warning_body: 'В этом письме есть признаки мошенничества. Не платите и не отвечайте, пока не проверите его внимательно. Если не уверены, свяжитесь с официальным отправителем по номеру, которому вы доверяете.',
+  filter_all: 'Все',
+  filter_category: 'Категория',
+  filter_no_results: 'Нет анализов в этой категории.',
+  category_label: 'Категория',
 };
 
 const es: UIStrings = {
@@ -794,6 +854,16 @@ const es: UIStrings = {
   chat_starter_2: '¿Qué debo hacer a continuación?',
   chat_starter_3: '¿Y si no llego al plazo?',
   chat_starter_4: '¿Cómo puedo responder con educación?',
+  share: 'Compartir',
+  share_as_pdf: 'Compartir como PDF',
+  share_as_text: 'Compartir como texto',
+  share_failed: 'No se pudo compartir. Inténtalo de nuevo.',
+  scam_warning_title: 'Posible estafa — léelo con calma',
+  scam_warning_body: 'Esta carta tiene señales de una estafa. No pagues ni respondas antes de revisarla con calma. Si dudas, contacta directamente al remitente oficial usando un número de teléfono de confianza.',
+  filter_all: 'Todos',
+  filter_category: 'Categoría',
+  filter_no_results: 'No hay análisis en esta categoría.',
+  category_label: 'Categoría',
 };
 
 // Simple German — Leichte / Einfache Sprache. Short sentences, common words,
@@ -906,6 +976,16 @@ const de_simple: UIStrings = {
   chat_starter_2: 'Was soll ich jetzt machen?',
   chat_starter_3: 'Was passiert, wenn ich die Frist verpasse?',
   chat_starter_4: 'Wie antworte ich höflich?',
+  share: 'Teilen',
+  share_as_pdf: 'Als PDF teilen',
+  share_as_text: 'Als Text teilen',
+  share_failed: 'Teilen geht nicht. Bitte noch einmal versuchen.',
+  scam_warning_title: 'Vielleicht Betrug — bitte gut lesen',
+  scam_warning_body: 'Dieser Brief sieht aus wie Betrug. Bezahlen Sie nicht. Antworten Sie nicht. Fragen Sie zuerst eine Person, der Sie vertrauen. Oder rufen Sie das Amt mit einer Nummer an, die Sie selbst gesucht haben.',
+  filter_all: 'Alle',
+  filter_category: 'Kategorie',
+  filter_no_results: 'Keine Briefe in dieser Kategorie.',
+  category_label: 'Kategorie',
 };
 
 const STRINGS: Record<LanguageCode, UIStrings> = { en, zh, vi, tr, ru, es, de_simple };
@@ -913,6 +993,165 @@ const STRINGS: Record<LanguageCode, UIStrings> = { en, zh, vi, tr, ru, es, de_si
 export function t(lang: LanguageCode | null | undefined, key: UIKey): string {
   const code = lang && STRINGS[lang] ? lang : 'en';
   return STRINGS[code][key];
+}
+
+// ---------------------------------------------------------------------------
+// Category labels (12 categories × 7 languages). Kept as a separate map
+// outside the strict UIStrings to avoid bloating UIKey typings.
+// ---------------------------------------------------------------------------
+
+export type CategoryCode =
+  | 'tax'
+  | 'insurance'
+  | 'rent'
+  | 'bank'
+  | 'health'
+  | 'government'
+  | 'court'
+  | 'utilities'
+  | 'telecom'
+  | 'work'
+  | 'education'
+  | 'other';
+
+export const CATEGORY_ORDER: CategoryCode[] = [
+  'tax',
+  'insurance',
+  'rent',
+  'bank',
+  'health',
+  'government',
+  'court',
+  'utilities',
+  'telecom',
+  'work',
+  'education',
+  'other',
+];
+
+export const CATEGORY_EMOJI: Record<CategoryCode, string> = {
+  tax: '🧾',
+  insurance: '🛡️',
+  rent: '🏠',
+  bank: '🏦',
+  health: '🩺',
+  government: '🏛️',
+  court: '⚖️',
+  utilities: '💡',
+  telecom: '📡',
+  work: '💼',
+  education: '🎓',
+  other: '📄',
+};
+
+const CATEGORY_LABELS: Record<LanguageCode, Record<CategoryCode, string>> = {
+  en: {
+    tax: 'Tax',
+    insurance: 'Insurance',
+    rent: 'Rent',
+    bank: 'Bank',
+    health: 'Health',
+    government: 'Government',
+    court: 'Court / Legal',
+    utilities: 'Utilities',
+    telecom: 'Phone & Internet',
+    work: 'Work',
+    education: 'Education',
+    other: 'Other',
+  },
+  de_simple: {
+    tax: 'Steuern',
+    insurance: 'Versicherung',
+    rent: 'Miete',
+    bank: 'Bank',
+    health: 'Gesundheit',
+    government: 'Amt',
+    court: 'Gericht',
+    utilities: 'Strom & Gas',
+    telecom: 'Telefon & Internet',
+    work: 'Arbeit',
+    education: 'Schule & Uni',
+    other: 'Sonstiges',
+  },
+  es: {
+    tax: 'Impuestos',
+    insurance: 'Seguro',
+    rent: 'Alquiler',
+    bank: 'Banco',
+    health: 'Salud',
+    government: 'Administración',
+    court: 'Justicia',
+    utilities: 'Suministros',
+    telecom: 'Teléfono e internet',
+    work: 'Trabajo',
+    education: 'Educación',
+    other: 'Otros',
+  },
+  vi: {
+    tax: 'Thuế',
+    insurance: 'Bảo hiểm',
+    rent: 'Tiền thuê',
+    bank: 'Ngân hàng',
+    health: 'Sức khỏe',
+    government: 'Cơ quan nhà nước',
+    court: 'Tòa án',
+    utilities: 'Điện nước',
+    telecom: 'Điện thoại & Internet',
+    work: 'Công việc',
+    education: 'Giáo dục',
+    other: 'Khác',
+  },
+  tr: {
+    tax: 'Vergi',
+    insurance: 'Sigorta',
+    rent: 'Kira',
+    bank: 'Banka',
+    health: 'Sağlık',
+    government: 'Resmi kurum',
+    court: 'Mahkeme',
+    utilities: 'Elektrik & Su',
+    telecom: 'Telefon & İnternet',
+    work: 'İş',
+    education: 'Eğitim',
+    other: 'Diğer',
+  },
+  ru: {
+    tax: 'Налоги',
+    insurance: 'Страховка',
+    rent: 'Аренда',
+    bank: 'Банк',
+    health: 'Здоровье',
+    government: 'Гос. орган',
+    court: 'Суд',
+    utilities: 'Коммунальные',
+    telecom: 'Телефон и интернет',
+    work: 'Работа',
+    education: 'Образование',
+    other: 'Прочее',
+  },
+  zh: {
+    tax: '税务',
+    insurance: '保险',
+    rent: '租金',
+    bank: '银行',
+    health: '医疗',
+    government: '政府机关',
+    court: '法院',
+    utilities: '水电燃气',
+    telecom: '电话与网络',
+    work: '工作',
+    education: '教育',
+    other: '其他',
+  },
+};
+
+export function categoryLabel(
+  lang: LanguageCode | null | undefined,
+  code: string | null | undefined,
+): string {
+  const safe = (CATEGORY_ORDER.includes(code as CategoryCode) ? code : 'other') as CategoryCode;
+  const lc = lang && CATEGORY_LABELS[lang] ? lang : 'en';
+  return CATEGORY_LABELS[lc][safe];
 }
 
 export function getLanguage(code: LanguageCode | null | undefined): Language {

@@ -16,6 +16,20 @@ export interface RequiredAction {
   reason: string;
 }
 
+export type Category =
+  | 'tax'
+  | 'insurance'
+  | 'rent'
+  | 'bank'
+  | 'health'
+  | 'government'
+  | 'court'
+  | 'utilities'
+  | 'telecom'
+  | 'work'
+  | 'education'
+  | 'other';
+
 export interface AnalysisResult {
   source_language: string;
   target_language: string;
@@ -33,6 +47,9 @@ export interface AnalysisResult {
   questions_to_ask: string[];
   uncertainties: string[];
   disclaimer: string;
+  category: Category;
+  scam_warning: boolean;
+  scam_reason: string;
 }
 
 export interface AnalysisRecord {
@@ -54,6 +71,8 @@ export interface AnalysisListItem {
   sender: string;
   risk_level: 'green' | 'yellow' | 'red';
   summary_translated: string;
+  category: Category;
+  scam_warning: boolean;
 }
 
 export interface ChatMessage {

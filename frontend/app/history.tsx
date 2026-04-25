@@ -1,22 +1,32 @@
 // History list — shows all stored analyses for this device.
+// Supports filtering by AI-detected category (Tax, Rent, Bank, …) and
+// surfaces a small scam-warning badge when relevant.
 
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import {
   Alert,
   FlatList,
   Pressable,
   RefreshControl,
+  ScrollView,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { ArrowLeft, ClipboardList, Trash2 } from 'lucide-react-native';
+import { ArrowLeft, ClipboardList, ShieldAlert, Trash2 } from 'lucide-react-native';
 import { Badge } from '../src/ui';
 import { ensureDeviceId, getLanguage as getStoredLanguage, setLastResult } from '../src/store';
 import { AnalysisListItem, deleteAnalysis, listAnalyses } from '../src/api';
-import { LanguageCode, t } from '../src/i18n';
+import {
+  CATEGORY_EMOJI,
+  CATEGORY_ORDER,
+  CategoryCode,
+  LanguageCode,
+  categoryLabel,
+  t,
+} from '../src/i18n';
 import { cancelAllForAnalysis } from '../src/notifications';
 import { deleteOriginal } from '../src/originals';
 import { colors, fontSize, fontWeight, radius, spacing } from '../src/theme';
@@ -35,11 +45,16 @@ function formatDate(iso: string, lang: LanguageCode): string {
   return d.toLocaleDateString();
 }
 
+function safeCategory(code: string | undefined | null): CategoryCode {
+  return (CATEGORY_ORDER.includes(code as CategoryCode) ? code : 'other') as CategoryCode;
+}
+
 export default function HistoryScreen() {
   const router = useRouter();
   const [items, setItems] = useState<AnalysisListItem[]>([]);
   const [lang, setLang] = useState<LanguageCode>('en');
   const [refreshing, setRefreshing] = useState(false);
+  const [filter, setFilter] = useState<CategoryCode | null>(null);
 
   const load = useCallback(async () => {
     const l = (await getStoredLanguage()) ?? 'en';
@@ -56,7 +71,7 @@ export default function HistoryScreen() {
   useFocusEffect(
     useCallback(() => {
       load();
-    }, [load])
+    }, [load]),
   );
 
   const onRefresh = async () => {
@@ -86,6 +101,25 @@ export default function HistoryScreen() {
     ]);
   };
 
+  // Build the chip row from categories that actually appear in the user's
+  // history (plus "All" first). Avoids overwhelming first-time users.
+  const visibleCategories = useMemo<CategoryCode[]>(() => {
+    const present = new Set<CategoryCode>();
+    items.forEach((it) => present.add(safeCategory(it.category)));
+    return CATEGORY_ORDER.filter((c) => present.has(c));
+  }, [items]);
+
+  const filtered = useMemo(() => {
+    if (!filter) return items;
+    return items.filter((it) => safeCategory(it.category) === filter);
+  }, [items, filter]);
+
+  // If the active filter no longer matches anything (e.g. last item deleted),
+  // silently fall back to "All".
+  if (filter && filtered.length === 0 && items.length > 0) {
+    // Defer this to the render of the empty state — the user gets feedback.
+  }
+
   return (
     <SafeAreaView style={styles.safe} testID="history-screen">
       <View style={styles.header}>
@@ -95,21 +129,58 @@ export default function HistoryScreen() {
         <Text style={styles.headerTitle}>{t(lang, 'history_title')}</Text>
         <View style={{ width: 26 }} />
       </View>
+
+      {visibleCategories.length > 0 ? (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.chipsRow}
+          testID="history-filter-chips"
+        >
+          <FilterChip
+            label={t(lang, 'filter_all')}
+            count={items.length}
+            active={filter === null}
+            onPress={() => setFilter(null)}
+            testID="history-filter-all"
+          />
+          {visibleCategories.map((c) => (
+            <FilterChip
+              key={c}
+              label={`${CATEGORY_EMOJI[c]} ${categoryLabel(lang, c)}`}
+              count={items.filter((it) => safeCategory(it.category) === c).length}
+              active={filter === c}
+              onPress={() => setFilter(c)}
+              testID={`history-filter-${c}`}
+            />
+          ))}
+        </ScrollView>
+      ) : null}
+
       <FlatList
-        data={items}
+        data={filtered}
         keyExtractor={(it) => it.id}
-        contentContainerStyle={[styles.content, items.length === 0 && { flexGrow: 1 }]}
+        contentContainerStyle={[styles.content, filtered.length === 0 && { flexGrow: 1 }]}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
         ListEmptyComponent={
           <View style={styles.empty} testID="history-empty">
             <ClipboardList color={colors.textMuted} size={28} strokeWidth={2.2} />
-            <Text style={styles.emptyText}>{t(lang, 'no_history')}</Text>
+            <Text style={styles.emptyText}>
+              {items.length === 0
+                ? t(lang, 'no_history')
+                : t(lang, 'filter_no_results')}
+            </Text>
           </View>
         }
         renderItem={({ item }) => {
           const variant = item.risk_level;
           const label =
-            variant === 'green' ? t(lang, 'risk_green') : variant === 'yellow' ? t(lang, 'risk_yellow') : t(lang, 'risk_red');
+            variant === 'green'
+              ? t(lang, 'risk_green')
+              : variant === 'yellow'
+                ? t(lang, 'risk_yellow')
+                : t(lang, 'risk_red');
+          const cat = safeCategory(item.category);
           return (
             <Pressable
               onPress={() => {
@@ -129,8 +200,21 @@ export default function HistoryScreen() {
                 <Text style={styles.itemSummary} numberOfLines={2}>
                   {item.summary_translated || item.sender || ''}
                 </Text>
-                <View style={{ marginTop: 4 }}>
+                <View style={styles.itemMeta}>
+                  <View style={styles.categoryChip}>
+                    <Text style={styles.categoryChipText}>
+                      {CATEGORY_EMOJI[cat]} {categoryLabel(lang, cat)}
+                    </Text>
+                  </View>
                   <Badge label={label} variant={variant} />
+                  {item.scam_warning ? (
+                    <View style={styles.scamChip} testID={`history-scam-${item.id}`}>
+                      <ShieldAlert color={colors.red.text} size={12} strokeWidth={2.6} />
+                      <Text style={styles.scamChipText} numberOfLines={1}>
+                        {t(lang, 'scam_warning_title').split('—')[0].trim()}
+                      </Text>
+                    </View>
+                  ) : null}
                 </View>
               </View>
               <Pressable
@@ -149,6 +233,33 @@ export default function HistoryScreen() {
   );
 }
 
+function FilterChip({
+  label,
+  count,
+  active,
+  onPress,
+  testID,
+}: {
+  label: string;
+  count: number;
+  active: boolean;
+  onPress: () => void;
+  testID?: string;
+}) {
+  return (
+    <Pressable
+      onPress={onPress}
+      testID={testID}
+      style={[styles.chip, active && styles.chipActive]}
+      hitSlop={6}
+    >
+      <Text style={[styles.chipText, active && styles.chipTextActive]} numberOfLines={1}>
+        {label} <Text style={[styles.chipCount, active && styles.chipCountActive]}>({count})</Text>
+      </Text>
+    </Pressable>
+  );
+}
+
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.background },
   header: {
@@ -164,8 +275,45 @@ const styles = StyleSheet.create({
     fontWeight: fontWeight.bold,
     color: colors.textPrimary,
   },
+  chipsRow: {
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
+    gap: 8,
+    alignItems: 'center',
+  },
+  chip: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 999,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.borderLight,
+    minHeight: 36,
+    justifyContent: 'center',
+  },
+  chipActive: {
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
+  },
+  chipText: {
+    fontSize: fontSize.sm,
+    fontWeight: fontWeight.semibold,
+    color: colors.textPrimary,
+  },
+  chipTextActive: {
+    color: '#FFFFFF',
+  },
+  chipCount: {
+    fontSize: fontSize.xs,
+    color: colors.textMuted,
+    fontWeight: fontWeight.semibold,
+  },
+  chipCountActive: {
+    color: 'rgba(255,255,255,0.85)',
+  },
   content: {
     padding: spacing.lg,
+    paddingTop: spacing.sm,
     gap: spacing.sm,
   },
   empty: {
@@ -212,6 +360,41 @@ const styles = StyleSheet.create({
     fontSize: fontSize.sm,
     color: colors.textSecondary,
     lineHeight: 20,
+  },
+  itemMeta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginTop: 4,
+  },
+  categoryChip: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 999,
+    backgroundColor: colors.primarySoft,
+  },
+  categoryChipText: {
+    fontSize: fontSize.xs,
+    fontWeight: fontWeight.semibold,
+    color: colors.primary,
+  },
+  scamChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 999,
+    backgroundColor: colors.red.bg,
+    borderWidth: 1,
+    borderColor: colors.red.border,
+  },
+  scamChipText: {
+    fontSize: fontSize.xs,
+    fontWeight: fontWeight.bold,
+    color: colors.red.text,
+    maxWidth: 120,
   },
   itemDelete: {
     width: 32,

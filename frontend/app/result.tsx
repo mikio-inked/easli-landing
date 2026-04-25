@@ -30,6 +30,7 @@ import {
   MessageCircle,
   Reply,
   RotateCcw,
+  Share2,
   ShieldAlert,
   Sparkles,
   Trash2,
@@ -43,7 +44,8 @@ import {
   getLanguage as getStoredLanguage,
 } from '../src/store';
 import { AnalysisRecord, deleteAnalysis, getAnalysis } from '../src/api';
-import { LanguageCode, t } from '../src/i18n';
+import { LanguageCode, categoryLabel, t } from '../src/i18n';
+import { shareAnalysisAsPdf, shareAnalysisAsText } from '../src/share';
 import {
   cancelAllForAnalysis,
   cancelReminder,
@@ -210,6 +212,20 @@ export default function ResultScreen() {
     ]);
   };
 
+  const onShare = () => {
+    Alert.alert(
+      t(lang, 'share'),
+      undefined,
+      [
+        { text: t(lang, 'share_as_pdf'), onPress: () => shareAnalysisAsPdf(record, lang) },
+        { text: t(lang, 'share_as_text'), onPress: () => shareAnalysisAsText(record, lang) },
+        { text: t(lang, 'cancel'), style: 'cancel' },
+      ],
+      { cancelable: true },
+    );
+  };
+
+
   return (
     <SafeAreaView style={styles.safe} testID="result-screen">
       <View style={styles.header}>
@@ -229,6 +245,9 @@ export default function ResultScreen() {
               <Eye color={colors.primary} size={22} strokeWidth={2.4} />
             </Pressable>
           ) : null}
+          <Pressable onPress={onShare} testID="result-share" hitSlop={12}>
+            <Share2 color={colors.primary} size={22} strokeWidth={2.4} />
+          </Pressable>
           <Pressable onPress={onDelete} testID="result-delete" hitSlop={12}>
             <Trash2 color={colors.textSecondary} size={22} strokeWidth={2.2} />
           </Pressable>
@@ -236,6 +255,32 @@ export default function ResultScreen() {
       </View>
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        {/* Scam warning — surfaces the highest-priority safety signal first */}
+        {r.scam_warning ? (
+          <View style={styles.scamCard} testID="scam-warning-card">
+            <View style={styles.scamRow}>
+              <View style={styles.scamIcon}>
+                <ShieldAlert color={colors.red.text} size={26} strokeWidth={2.4} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.scamTitle}>{t(lang, 'scam_warning_title')}</Text>
+                <Text style={styles.scamBody}>
+                  {r.scam_reason || t(lang, 'scam_warning_body')}
+                </Text>
+              </View>
+            </View>
+          </View>
+        ) : null}
+
+        {/* Category pill (compact, glanceable) */}
+        {r.category ? (
+          <View style={styles.categoryPill} testID="result-category-pill">
+            <Text style={styles.categoryPillText}>
+              {t(lang, 'category_label')}: {categoryLabel(lang, r.category)}
+            </Text>
+          </View>
+        ) : null}
+
         {/* Risk level */}
         <View
           style={[
@@ -535,6 +580,51 @@ const styles = StyleSheet.create({
   },
   loadingWrap: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing.md, paddingHorizontal: spacing.lg },
   errorText: { fontSize: fontSize.base, color: colors.textSecondary, textAlign: 'center' },
+  scamCard: {
+    borderRadius: radius.xxl,
+    padding: spacing.lg,
+    borderWidth: 1.5,
+    backgroundColor: colors.red.bg,
+    borderColor: colors.red.border,
+  },
+  scamRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: spacing.md,
+  },
+  scamIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: radius.lg,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255,255,255,0.7)',
+  },
+  scamTitle: {
+    fontSize: fontSize.base,
+    fontWeight: fontWeight.bold,
+    color: colors.red.text,
+    marginBottom: 4,
+  },
+  scamBody: {
+    fontSize: fontSize.sm,
+    lineHeight: 20,
+    color: colors.red.text,
+  },
+  categoryPill: {
+    alignSelf: 'flex-start',
+    paddingHorizontal: spacing.md,
+    paddingVertical: 6,
+    borderRadius: 999,
+    backgroundColor: colors.primarySoft,
+  },
+  categoryPillText: {
+    fontSize: fontSize.xs,
+    fontWeight: fontWeight.semibold,
+    color: colors.primary,
+    letterSpacing: 0.3,
+  },
+
   riskCard: {
     borderRadius: radius.xxl,
     padding: spacing.lg,
