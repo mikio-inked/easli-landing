@@ -24,7 +24,7 @@ import {
   HelpCircle,
   Info,
   ListTodo,
-  MailReply,
+  Reply,
   RotateCcw,
   ShieldAlert,
   Sparkles,
@@ -292,7 +292,7 @@ export default function ResultScreen() {
         {/* German reply draft */}
         {r.german_reply_draft ? (
           <Card testID="reply-card">
-            <SectionRow icon={<MailReply color={colors.primary} size={18} strokeWidth={2.5} />} title={t(lang, 'reply_draft')} />
+            <SectionRow icon={<Reply color={colors.primary} size={18} strokeWidth={2.5} />} title={t(lang, 'reply_draft')} />
             <View style={styles.replyBox}>
               <Text style={styles.replyText}>{r.german_reply_draft}</Text>
             </View>
