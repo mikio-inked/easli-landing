@@ -101,3 +101,48 @@
 #====================================================================================================
 # Testing Data - Main Agent and testing sub agent both should log testing data below this section
 #====================================================================================================
+
+user_problem_statement: "Test KlarPost backend AnalysisResult schema additions: category enum, scam_warning bool, scam_reason string. Also verify /api/analyses list returns category and scam_warning per item."
+
+backend:
+  - task: "AnalysisResult schema: category, scam_warning, scam_reason fields on /api/analyze"
+    implemented: true
+    working: "NA"
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+        -working: "NA"
+        -agent: "testing"
+        -comment: "Could not validate end-to-end. Code review confirms schema is correctly extended (server.py lines 88-107): `category` is a Literal enum over the exact 12 values requested (tax, insurance, rent, bank, health, government, court, utilities, telecom, work, education, other), `scam_warning: bool = False`, `scam_reason: str = \"\"`. The system prompt (build_system_prompt) explicitly instructs GPT-5.2 to fill these fields, includes detailed category rubric and scam red-flag rules, and the JSON schema in the prompt lists the three new fields. Pydantic validation via `AnalysisResult(**parsed)` will reject any out-of-enum category at runtime. HOWEVER live testing against https://klarpost-mvp.preview.emergentagent.com/api FAILED with HTTP 502 for both the benign Krankenkasse image and the obvious-scam image: backend returned `AI analysis failed: Failed to generate chat completion: litellm.BadRequestError: OpenAIException - Budget has been exceeded! Current cost: 1.0816072500228882, Max budget: 1.001`. This is an EMERGENT_LLM_KEY budget exhaustion (litellm/OpenAI), not a code bug. Main agent must top up / rotate the LLM key before this can be re-validated. backend_test.py is in place and ready to re-run as soon as the LLM budget is restored."
+
+  - task: "GET /api/analyses returns category and scam_warning per item"
+    implemented: true
+    working: "NA"
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+        -working: "NA"
+        -agent: "testing"
+        -comment: "Code review confirms the projection at server.py:644-674 includes `result.category` and `result.scam_warning`, and AnalysisListItem (lines 157-167) declares both fields with safe defaults (`category=\"other\"`, `scam_warning=False`). Live test returned HTTP 200 with an empty list because the two preceding /api/analyze calls failed due to the LLM budget exhaustion (no records were stored). Endpoint shape itself is correct; needs re-test once /api/analyze succeeds."
+
+metadata:
+  created_by: "testing_agent"
+  version: "1.0"
+  test_sequence: 1
+  run_ui: false
+
+test_plan:
+  current_focus:
+    - "AnalysisResult schema: category, scam_warning, scam_reason fields on /api/analyze"
+    - "GET /api/analyses returns category and scam_warning per item"
+  stuck_tasks: []
+  test_all: false
+  test_priority: "high_first"
+
+agent_communication:
+    -agent: "testing"
+    -message: "BLOCKED on EMERGENT_LLM_KEY budget. Two /api/analyze calls (benign Krankenkasse PIL image + obvious scam PIL image with Nigerian IBAN, BTC wallet, threats of arrest, gift-card demand, gmail authority address) both returned HTTP 502 with: 'Budget has been exceeded! Current cost: 1.0816, Max budget: 1.001'. Schema additions look correct on inspection (Pydantic Literal enum + bool + str defaults; system prompt and JSON schema both reference the new fields; GET /api/analyses projection includes category & scam_warning). Please refresh/raise the LLM key budget, then re-trigger this test — `python /app/backend_test.py` will run all 4 tests automatically (normal doc, scam doc, list endpoint, validation). Do NOT modify the schema; it already matches the spec. Health check (GET /api/) and DELETE /api/analyses both work."

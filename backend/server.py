@@ -85,6 +85,26 @@ class AnalysisResult(BaseModel):
     questions_to_ask: List[str] = []
     uncertainties: List[str] = []
     disclaimer: str = ""
+    # NEW — high-level category used for filtering & sorting in history.
+    category: Literal[
+        "tax",
+        "insurance",
+        "rent",
+        "bank",
+        "health",
+        "government",
+        "court",
+        "utilities",
+        "telecom",
+        "work",
+        "education",
+        "other",
+    ] = "other"
+    # NEW — scam / phishing detection. When True, the UI surfaces a prominent
+    # warning so vulnerable users (elderly, recent immigrants) can pause
+    # before paying or replying.
+    scam_warning: bool = False
+    scam_reason: str = ""
 
 
 class AnalyzeRequest(BaseModel):
@@ -143,6 +163,8 @@ class AnalysisListItem(BaseModel):
     sender: str
     risk_level: str
     summary_translated: str
+    category: str = "other"
+    scam_warning: bool = False
 
 
 # ==================== HELPERS ====================
@@ -202,6 +224,33 @@ Risk levels:
 - yellow: may require action, review, payment, appointment, document submission, or follow-up
 - red: contains a deadline, payment demand, warning, cancellation, legal/official consequence, missing document request, health-related urgency, or other time-sensitive issue
 
+Category — pick the SINGLE best match for `category`:
+- "tax": Finanzamt, Steuerbescheid, ELSTER, tax-related notices, Lohnsteuer.
+- "insurance": Krankenkasse, gesetzliche/private Versicherung, Haftpflicht, KFZ-Versicherung, Lebens-/Renten-/Hausratversicherung.
+- "rent": landlord/Vermieter letters, Mietvertrag, Mieterhöhung, Nebenkostenabrechnung, Kündigung der Wohnung, Heizungsrechnung an Mieter.
+- "bank": bank statements, Überweisung-Belege, Kontoeröffnung, Kreditkarten-/Darlehensbriefe, SEPA Mandate.
+- "health": doctor letters, Arztbrief, Befund, Rezept, Krankenhausrechnung, Reha, Heil-/Hilfsmittelverordnung. Health-related from a Krankenkasse can still be "insurance" if the letter is about coverage/membership; choose the dominant theme.
+- "government": Behörde / Amt / Bürgeramt / Ausländerbehörde / Jobcenter / Familienkasse / Bundesagentur für Arbeit / Rentenversicherung / Meldebescheinigung / Anmeldung. Also Bußgeldbescheid (administrative fines) when issued by an Ordnungsamt.
+- "court": Gericht, Anwalt, Mahnbescheid via Amtsgericht, gerichtliche Vorladung, Strafverfahren, Pfändung, Inkasso letters that reference court proceedings.
+- "utilities": Strom, Gas, Wasser, Heizöl, Müll, Schornsteinfeger, Stadtwerke. Use this only when issued directly by the utility provider (not when forwarded by a landlord — that's "rent").
+- "telecom": phone, mobile, internet, Vodafone, Telekom, O2, 1&1, GEZ/Rundfunkbeitrag (treat Rundfunkbeitrag as "telecom" for filtering purposes).
+- "work": payroll, Arbeitgeber letters, Arbeitsvertrag, Lohnabrechnung, betriebliche Mitteilungen, work-related certifications.
+- "education": Schule, Universität, Kita, BAföG, Ausbildung, Zeugnis, Schulbescheinigung.
+- "other": anything that does not clearly fit the categories above (advertising, donation request, package notification, neighbour/community letter, personal mail).
+If multiple categories apply, pick the strongest one. NEVER invent a new category.
+
+Scam / phishing detection — set `scam_warning` to true ONLY when at least ONE strong red flag is present:
+- Asks the user to send money to a foreign IBAN (non-DE/AT/CH) that does NOT match the supposed sender, or to a personal account when the sender claims to be a public authority.
+- Threatens arrest, deportation, account closure, public shaming, or other extreme consequences within hours/days unless payment is made.
+- Impersonates a German authority (Finanzamt, Bundespolizei, Zoll, GEZ/Rundfunkbeitrag, Krankenkasse, Bank) but uses sloppy German, wrong logos, gmail/web.de/yahoo addresses, or non-official URLs.
+- Demands payment via gift cards, vouchers, cryptocurrency, Western Union, MoneyGram, prepaid cards, or asks for the user's full bank login/TAN/PIN.
+- Sends a "Paketzustellung / Zoll / DHL / Hermes" SMS-style request for a tiny fee with a suspicious link, especially shortened/foreign domain.
+- Sends a fake "Bußgeldbescheid" or "Mahnung" without a recognisable Aktenzeichen or sender address, or with an obviously cloned look.
+- Asks the user to install software, share screen, or hand over remote access.
+- Phishing links that mimic banking/Behörde domains (typosquatting).
+Do NOT mark as scam just because it is uncomfortable, demanding, or in legalese. Real Mahnungen, Inkassos, and tax letters are usually NOT scams.
+When `scam_warning` is true, set `scam_reason` to a short calm sentence in {target_language_label} explaining WHY (e.g. "Die Zahlungsaufforderung verlangt eine Krypto-Überweisung — das ist sehr ungewöhnlich für Behörden."). When false, leave `scam_reason` empty.
+
 If the image does NOT appear to be a German document or text is unreadable:
 - Set document_type to "Unbekannt / Unknown" (or equivalent)
 - Set risk_level to "yellow"
@@ -239,7 +288,10 @@ JSON Schema:
   "reply_draft_explanation_translated": "short explanation in {target_language_label} of what the reply draft says",
   "questions_to_ask": ["helpful, neutral questions the user could ask the sender or a qualified advisor — in {target_language_label}"],
   "uncertainties": ["clearly note anything uncertain, unreadable, or low-confidence — in {target_language_label}"],
-  "disclaimer": "short disclaimer in {target_language_label} stating: KlarPost does not provide legal, tax, financial or medical advice; always confirm with a qualified professional or the sender."
+  "disclaimer": "short disclaimer in {target_language_label} stating: KlarPost does not provide legal, tax, financial or medical advice; always confirm with a qualified professional or the sender.",
+  "category": "tax|insurance|rent|bank|health|government|court|utilities|telecom|work|education|other",
+  "scam_warning": false,
+  "scam_reason": "string in {target_language_label} — only when scam_warning is true, otherwise empty"
 }}
 
 Use ONLY the {target_language_label} for translated fields. Keep document_type concise. Be conservative with deadlines and risk levels. If unsure, say so in uncertainties.
@@ -601,6 +653,8 @@ async def list_analyses(device_id: str):
             "result.sender": 1,
             "result.risk_level": 1,
             "result.summary_translated": 1,
+            "result.category": 1,
+            "result.scam_warning": 1,
         },
     ).sort("created_at", -1).limit(200)
     items: List[AnalysisListItem] = []
@@ -615,6 +669,8 @@ async def list_analyses(device_id: str):
             sender=result.get("sender", ""),
             risk_level=result.get("risk_level", "green"),
             summary_translated=result.get("summary_translated", ""),
+            category=result.get("category", "other"),
+            scam_warning=bool(result.get("scam_warning", False)),
         ))
     return items
 
