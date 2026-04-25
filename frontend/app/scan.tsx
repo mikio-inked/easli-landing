@@ -21,35 +21,9 @@ export default function ScanScreen() {
     getStoredLanguage().then((l) => setLang(l ?? 'en'));
   }, []);
 
-  const openCamera = async () => {
+  const openCamera = () => {
     if (busy) return;
-    setBusy(true);
-    try {
-      const perm = await ImagePicker.requestCameraPermissionsAsync();
-      if (!perm.granted) {
-        Alert.alert(t(lang, 'error_generic'), 'Camera permission is required.');
-        return;
-      }
-      const res = await ImagePicker.launchCameraAsync({
-        mediaTypes: ['images'],
-        quality: 0.7,
-        base64: true,
-        allowsEditing: false,
-      });
-      if (res.canceled || !res.assets || res.assets.length === 0) return;
-      const a = res.assets[0];
-      if (!a.base64) {
-        Alert.alert(t(lang, 'error_generic'), t(lang, 'error_no_image'));
-        return;
-      }
-      const mime = (a.mimeType || 'image/jpeg').toLowerCase();
-      setPendingAnalysis({ base64: a.base64, mimeType: mime });
-      router.replace('/analyzing');
-    } catch (e: any) {
-      Alert.alert(t(lang, 'error_generic'), e?.message || '');
-    } finally {
-      setBusy(false);
-    }
+    router.push('/camera');
   };
 
   const openLibrary = async () => {
