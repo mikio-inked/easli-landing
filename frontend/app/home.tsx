@@ -1,0 +1,427 @@
+// Home: two large action buttons + recent analyses, plus header chips for
+// language, history, and settings.
+
+import { useCallback, useState } from 'react';
+import {
+  Image,
+  Pressable,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
+import { useFocusEffect, useRouter } from 'expo-router';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import {
+  Camera,
+  ClipboardList,
+  FileUp,
+  History,
+  Settings as SettingsIcon,
+  ShieldCheck,
+} from 'lucide-react-native';
+import { Badge } from '../src/ui';
+import { listAnalyses, AnalysisListItem } from '../src/api';
+import {
+  LanguageCode,
+  getLanguage as getLanguageMeta,
+  t,
+} from '../src/i18n';
+import { ensureDeviceId, getLanguage as getStoredLanguage } from '../src/store';
+import { colors, fontSize, fontWeight, radius, shadows, spacing } from '../src/theme';
+
+function riskBadgeProps(level: 'green' | 'yellow' | 'red', lang: LanguageCode) {
+  return {
+    label: t(lang, level === 'green' ? 'risk_green' : level === 'yellow' ? 'risk_yellow' : 'risk_red'),
+    variant: level,
+  } as const;
+}
+
+function formatDate(iso: string, lang: LanguageCode): string {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return '';
+  const now = new Date();
+  const isToday = d.toDateString() === now.toDateString();
+  const yesterday = new Date(now);
+  yesterday.setDate(now.getDate() - 1);
+  const isYesterday = d.toDateString() === yesterday.toDateString();
+  if (isToday) return t(lang, 'today');
+  if (isYesterday) return t(lang, 'yesterday');
+  return d.toLocaleDateString();
+}
+
+export default function Home() {
+  const router = useRouter();
+  const [lang, setLang] = useState<LanguageCode>('en');
+  const [items, setItems] = useState<AnalysisListItem[]>([]);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const load = useCallback(async () => {
+    const l = (await getStoredLanguage()) ?? 'en';
+    setLang(l);
+    const id = await ensureDeviceId();
+    try {
+      const data = await listAnalyses(id);
+      setItems(data);
+    } catch {
+      setItems([]);
+    }
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      load();
+    }, [load])
+  );
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await load();
+    setRefreshing(false);
+  };
+
+  const langMeta = getLanguageMeta(lang);
+
+  return (
+    <SafeAreaView style={styles.safe} testID="home-screen">
+      <View style={styles.topBar}>
+        <View style={styles.brandRow}>
+          <View style={styles.brandLogo}>
+            <ShieldCheck color={colors.primary} size={22} strokeWidth={2.6} />
+          </View>
+          <Text style={styles.brandText}>KlarPost</Text>
+        </View>
+        <View style={styles.topActions}>
+          <Pressable
+            onPress={() => router.push('/language')}
+            style={styles.iconChip}
+            testID="home-language-chip"
+            hitSlop={6}
+          >
+            <Text style={styles.iconChipFlag}>{langMeta.flag}</Text>
+            <Text style={styles.iconChipLabel}>{langMeta.nativeName}</Text>
+          </Pressable>
+          <Pressable
+            onPress={() => router.push('/history')}
+            style={styles.iconBtn}
+            testID="home-history-btn"
+            hitSlop={6}
+          >
+            <History color={colors.textPrimary} size={22} strokeWidth={2.4} />
+          </Pressable>
+          <Pressable
+            onPress={() => router.push('/settings')}
+            style={styles.iconBtn}
+            testID="home-settings-btn"
+            hitSlop={6}
+          >
+            <SettingsIcon color={colors.textPrimary} size={22} strokeWidth={2.4} />
+          </Pressable>
+        </View>
+      </View>
+
+      <ScrollView
+        contentContainerStyle={styles.content}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+        showsVerticalScrollIndicator={false}
+      >
+        <Text style={styles.heroTitle}>{t(lang, 'home_quick_help')}</Text>
+        <Text style={styles.heroBody}>{t(lang, 'home_intro')}</Text>
+
+        <Pressable
+          onPress={() => router.push('/scan')}
+          style={({ pressed }) => [styles.heroButton, pressed && { opacity: 0.95 }]}
+          testID="home-scan-btn"
+        >
+          <View style={styles.heroIconWrap}>
+            <Camera color={colors.white} size={28} strokeWidth={2.5} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.heroButtonTitle}>{t(lang, 'scan_document')}</Text>
+            <Text style={styles.heroButtonSubtitle}>
+              {t(lang, 'tip_full_page')}
+            </Text>
+          </View>
+        </Pressable>
+
+        <Pressable
+          onPress={() => router.push('/upload')}
+          style={({ pressed }) => [styles.heroButtonAlt, pressed && { opacity: 0.95 }]}
+          testID="home-upload-btn"
+        >
+          <View style={styles.heroIconWrapAlt}>
+            <FileUp color={colors.primary} size={28} strokeWidth={2.5} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.heroButtonTitleAlt}>{t(lang, 'upload_file')}</Text>
+            <Text style={styles.heroButtonSubtitleAlt}>PDF · JPG · PNG · WEBP</Text>
+          </View>
+        </Pressable>
+
+        <View style={styles.privacyRow}>
+          <ShieldCheck color={colors.green.solid} size={16} strokeWidth={2.6} />
+          <Text style={styles.privacyText}>{t(lang, 'privacy_short')}</Text>
+        </View>
+
+        <View style={styles.recentHeader}>
+          <Text style={styles.recentTitle}>{t(lang, 'recent_analyses')}</Text>
+          {items.length > 0 ? (
+            <Pressable onPress={() => router.push('/history')} testID="home-see-all">
+              <Text style={styles.recentLink}>{t(lang, 'see_all')}</Text>
+            </Pressable>
+          ) : null}
+        </View>
+
+        {items.length === 0 ? (
+          <View style={styles.emptyCard} testID="home-empty">
+            <ClipboardList color={colors.textMuted} size={24} strokeWidth={2.2} />
+            <Text style={styles.emptyText}>{t(lang, 'no_history')}</Text>
+          </View>
+        ) : (
+          <View style={{ gap: spacing.sm }}>
+            {items.slice(0, 3).map((it) => {
+              const badge = riskBadgeProps(it.risk_level, lang);
+              return (
+                <Pressable
+                  key={it.id}
+                  onPress={() => router.push(`/result?id=${encodeURIComponent(it.id)}`)}
+                  style={styles.recentItem}
+                  testID={`home-recent-${it.id}`}
+                >
+                  <View style={{ flex: 1, gap: 6 }}>
+                    <View style={styles.recentHeaderRow}>
+                      <Text style={styles.recentItemTitle} numberOfLines={1}>
+                        {it.document_type || it.sender || t(lang, 'document_type')}
+                      </Text>
+                      <Text style={styles.recentItemDate}>
+                        {formatDate(it.created_at, lang)}
+                      </Text>
+                    </View>
+                    <Text style={styles.recentItemSummary} numberOfLines={2}>
+                      {it.summary_translated || it.sender || ''}
+                    </Text>
+                    <View style={{ marginTop: 4 }}>
+                      <Badge label={badge.label} variant={badge.variant} />
+                    </View>
+                  </View>
+                </Pressable>
+              );
+            })}
+          </View>
+        )}
+
+        <View style={{ height: spacing.xl }} />
+      </ScrollView>
+    </SafeAreaView>
+  );
+}
+
+const styles = StyleSheet.create({
+  safe: { flex: 1, backgroundColor: colors.background },
+  topBar: {
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.sm,
+    paddingBottom: spacing.sm,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  brandRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  brandLogo: {
+    width: 36,
+    height: 36,
+    borderRadius: radius.md,
+    backgroundColor: colors.primarySoft,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  brandText: {
+    fontSize: fontSize.xl,
+    fontWeight: fontWeight.extrabold,
+    color: colors.textPrimary,
+    letterSpacing: -0.4,
+  },
+  topActions: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  iconChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    borderRadius: radius.full,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  iconChipFlag: { fontSize: 18 },
+  iconChipLabel: {
+    fontSize: fontSize.sm,
+    color: colors.textPrimary,
+    fontWeight: fontWeight.semibold,
+    maxWidth: 80,
+  },
+  iconBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: radius.full,
+    backgroundColor: colors.surface,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  content: {
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.md,
+    gap: spacing.lg,
+  },
+  heroTitle: {
+    fontSize: fontSize['3xl'],
+    fontWeight: fontWeight.extrabold,
+    color: colors.textPrimary,
+    letterSpacing: -0.6,
+  },
+  heroBody: {
+    fontSize: fontSize.base,
+    color: colors.textSecondary,
+    lineHeight: 22,
+    marginTop: -spacing.sm,
+  },
+  heroButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    backgroundColor: colors.primary,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.lg,
+    borderRadius: radius.xxl,
+    minHeight: 96,
+    ...shadows.button,
+  },
+  heroIconWrap: {
+    width: 56,
+    height: 56,
+    borderRadius: radius.lg,
+    backgroundColor: 'rgba(255,255,255,0.18)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  heroButtonTitle: {
+    color: colors.white,
+    fontSize: fontSize.xl,
+    fontWeight: fontWeight.extrabold,
+    letterSpacing: -0.2,
+  },
+  heroButtonSubtitle: {
+    color: 'rgba(255,255,255,0.85)',
+    fontSize: fontSize.sm,
+    marginTop: 4,
+  },
+  heroButtonAlt: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    backgroundColor: colors.surface,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.lg,
+    borderRadius: radius.xxl,
+    minHeight: 96,
+    borderWidth: 2,
+    borderColor: colors.border,
+  },
+  heroIconWrapAlt: {
+    width: 56,
+    height: 56,
+    borderRadius: radius.lg,
+    backgroundColor: colors.primarySoft,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  heroButtonTitleAlt: {
+    color: colors.textPrimary,
+    fontSize: fontSize.xl,
+    fontWeight: fontWeight.extrabold,
+    letterSpacing: -0.2,
+  },
+  heroButtonSubtitleAlt: {
+    color: colors.textSecondary,
+    fontSize: fontSize.sm,
+    marginTop: 4,
+  },
+  privacyRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 4,
+  },
+  privacyText: {
+    fontSize: fontSize.sm,
+    color: colors.textSecondary,
+    flex: 1,
+  },
+  recentHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: spacing.sm,
+  },
+  recentTitle: {
+    fontSize: fontSize.lg,
+    fontWeight: fontWeight.bold,
+    color: colors.textPrimary,
+  },
+  recentLink: {
+    fontSize: fontSize.sm,
+    color: colors.primary,
+    fontWeight: fontWeight.semibold,
+  },
+  emptyCard: {
+    backgroundColor: colors.surface,
+    borderRadius: radius.xxl,
+    padding: spacing.lg,
+    borderWidth: 1,
+    borderStyle: 'dashed' as const,
+    borderColor: colors.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.sm,
+  },
+  emptyText: {
+    fontSize: fontSize.base,
+    color: colors.textSecondary,
+    textAlign: 'center',
+    lineHeight: 22,
+  },
+  recentItem: {
+    backgroundColor: colors.surface,
+    borderRadius: radius.xl,
+    padding: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.borderLight,
+    ...shadows.card,
+  },
+  recentHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: 8,
+  },
+  recentItemTitle: {
+    flex: 1,
+    fontSize: fontSize.base,
+    fontWeight: fontWeight.bold,
+    color: colors.textPrimary,
+  },
+  recentItemDate: {
+    fontSize: fontSize.xs,
+    color: colors.textMuted,
+    fontWeight: fontWeight.semibold,
+  },
+  recentItemSummary: {
+    fontSize: fontSize.sm,
+    color: colors.textSecondary,
+    lineHeight: 20,
+  },
+});

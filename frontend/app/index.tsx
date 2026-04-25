@@ -1,16 +1,34 @@
-import { Text, View, StyleSheet, Image } from "react-native";
+// Gateway: decides whether to send the user to onboarding, language picker, or home.
 
-const EXPO_PUBLIC_BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL;
+import { useEffect } from 'react';
+import { ActivityIndicator, StyleSheet, View } from 'react-native';
+import { useRouter } from 'expo-router';
+import { ensureDeviceId, getLanguage, isOnboarded } from '../src/store';
+import { colors } from '../src/theme';
 
 export default function Index() {
-  console.log(EXPO_PUBLIC_BACKEND_URL, "EXPO_PUBLIC_BACKEND_URL");
+  const router = useRouter();
+
+  useEffect(() => {
+    (async () => {
+      await ensureDeviceId();
+      const onboarded = await isOnboarded();
+      if (!onboarded) {
+        router.replace('/onboarding');
+        return;
+      }
+      const lang = await getLanguage();
+      if (!lang) {
+        router.replace('/language?from=gateway');
+        return;
+      }
+      router.replace('/home');
+    })();
+  }, [router]);
 
   return (
     <View style={styles.container}>
-      <Image
-        source={require("../assets/images/app-image.png")}
-        style={styles.image}
-      />
+      <ActivityIndicator color={colors.primary} size="large" />
     </View>
   );
 }
@@ -18,13 +36,8 @@ export default function Index() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#0c0c0c",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  image: {
-    width: "100%",
-    height: "100%",
-    resizeMode: "contain",
+    backgroundColor: colors.background,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });

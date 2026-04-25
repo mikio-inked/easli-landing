@@ -1,22 +1,31 @@
 {
   "expo": {
-    "name": "frontend",
-    "slug": "frontend",
+    "name": "KlarPost",
+    "slug": "klarpost",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "frontend",
-    "userInterfaceStyle": "automatic",
+    "scheme": "klarpost",
+    "userInterfaceStyle": "light",
     "newArchEnabled": true,
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.klarpost.app",
+      "infoPlist": {
+        "NSCameraUsageDescription": "Scan German documents to translate and explain them.",
+        "NSPhotoLibraryUsageDescription": "Pick a photo of a German document to analyze.",
+        "NSPhotoLibraryAddUsageDescription": "Save analyzed documents to your library.",
+        "NSMicrophoneUsageDescription": "Not used. Microphone access is not required."
+      }
     },
     "android": {
+      "package": "com.klarpost.app",
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
-        "backgroundColor": "#000"
+        "backgroundColor": "#F8FAFC"
       },
-      "edgeToEdgeEnabled": true
+      "edgeToEdgeEnabled": true,
+      "permissions": ["CAMERA", "READ_EXTERNAL_STORAGE", "READ_MEDIA_IMAGES"]
     },
     "web": {
       "bundler": "metro",
@@ -26,12 +35,25 @@
     "plugins": [
       "expo-router",
       [
+        "expo-camera",
+        {
+          "cameraPermission": "Scan German documents to translate and explain them."
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Pick a photo of a German document to analyze.",
+          "cameraPermission": "Scan German documents to translate and explain them."
+        }
+      ],
+      [
         "expo-splash-screen",
         {
           "image": "./assets/images/splash-icon.png",
           "imageWidth": 200,
           "resizeMode": "contain",
-          "backgroundColor": "#000"
+          "backgroundColor": "#F8FAFC"
         }
       ]
     ],

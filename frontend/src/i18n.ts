@@ -1,0 +1,595 @@
+// Supported target languages for KlarPost.
+// Source language is always German. The user picks which language to receive
+// the explanation/translation in.
+
+export type LanguageCode = 'zh' | 'vi' | 'tr' | 'ru' | 'en' | 'es';
+
+export interface Language {
+  code: LanguageCode;
+  nativeName: string;
+  englishName: string;
+  flag: string;
+}
+
+export const LANGUAGES: Language[] = [
+  { code: 'zh', nativeName: '简体中文', englishName: 'Chinese Simplified', flag: '🇨🇳' },
+  { code: 'vi', nativeName: 'Tiếng Việt', englishName: 'Vietnamese', flag: '🇻🇳' },
+  { code: 'tr', nativeName: 'Türkçe', englishName: 'Turkish', flag: '🇹🇷' },
+  { code: 'ru', nativeName: 'Русский', englishName: 'Russian', flag: '🇷🇺' },
+  { code: 'en', nativeName: 'English', englishName: 'English', flag: '🇬🇧' },
+  { code: 'es', nativeName: 'Español', englishName: 'Spanish', flag: '🇪🇸' },
+];
+
+// UI strings translated into all supported languages so the chrome of the app
+// also feels native. Every key must exist for every language.
+export type UIKey =
+  | 'app_name'
+  | 'app_tagline'
+  | 'continue'
+  | 'back'
+  | 'next'
+  | 'skip'
+  | 'done'
+  | 'cancel'
+  | 'delete'
+  | 'retry'
+  | 'choose_language'
+  | 'choose_language_subtitle'
+  | 'home_intro'
+  | 'scan_document'
+  | 'upload_file'
+  | 'recent_analyses'
+  | 'no_history'
+  | 'history_title'
+  | 'settings_title'
+  | 'change_language'
+  | 'delete_all_data'
+  | 'delete_account'
+  | 'privacy'
+  | 'disclaimer_title'
+  | 'support'
+  | 'analyzing_title'
+  | 'analyzing_step_reading'
+  | 'analyzing_step_extracting'
+  | 'analyzing_step_translating'
+  | 'analyzing_step_checking'
+  | 'risk_level'
+  | 'risk_green'
+  | 'risk_yellow'
+  | 'risk_red'
+  | 'summary'
+  | 'what_this_means'
+  | 'what_to_do_next'
+  | 'deadlines'
+  | 'no_deadlines'
+  | 'sender'
+  | 'document_type'
+  | 'reply_draft'
+  | 'reply_explanation'
+  | 'questions_to_ask'
+  | 'uncertainties'
+  | 'disclaimer_short'
+  | 'tips_title'
+  | 'tip_lighting'
+  | 'tip_flat'
+  | 'tip_full_page'
+  | 'tip_no_blur'
+  | 'open_camera'
+  | 'pick_from_library'
+  | 'pick_pdf'
+  | 'pick_image'
+  | 'error_generic'
+  | 'error_unsupported_file'
+  | 'error_no_image'
+  | 'confirm_delete_one'
+  | 'confirm_delete_all'
+  | 'onb1_title'
+  | 'onb1_body'
+  | 'onb2_title'
+  | 'onb2_body'
+  | 'onb3_title'
+  | 'onb3_body'
+  | 'onb_get_started'
+  | 'privacy_short'
+  | 'disclaimer_long'
+  | 'copy'
+  | 'copied'
+  | 'home_quick_help'
+  | 'see_all'
+  | 'analyze_again'
+  | 'no_explanation'
+  | 'today'
+  | 'yesterday';
+
+type UIStrings = Record<UIKey, string>;
+
+const en: UIStrings = {
+  app_name: 'KlarPost',
+  app_tagline: 'Understand German letters before they become a problem.',
+  continue: 'Continue',
+  back: 'Back',
+  next: 'Next',
+  skip: 'Skip',
+  done: 'Done',
+  cancel: 'Cancel',
+  delete: 'Delete',
+  retry: 'Try again',
+  choose_language: 'Choose your language',
+  choose_language_subtitle: 'KlarPost will explain German documents in this language.',
+  home_intro: 'Take a photo or upload a German letter, and KlarPost will explain what it means and what you may need to do.',
+  scan_document: 'Scan German document',
+  upload_file: 'Upload PDF or image',
+  recent_analyses: 'Recent analyses',
+  no_history: 'No analyses yet. Scan or upload a document to get started.',
+  history_title: 'History',
+  settings_title: 'Settings',
+  change_language: 'Change language',
+  delete_all_data: 'Delete all analyses',
+  delete_account: 'Delete my data',
+  privacy: 'Privacy',
+  disclaimer_title: 'Important notice',
+  support: 'Help & support',
+  analyzing_title: 'Analyzing your document',
+  analyzing_step_reading: 'Reading the document',
+  analyzing_step_extracting: 'Extracting German text',
+  analyzing_step_translating: 'Translating and explaining',
+  analyzing_step_checking: 'Checking deadlines and actions',
+  risk_level: 'Risk level',
+  risk_green: 'Information only',
+  risk_yellow: 'May need action',
+  risk_red: 'Important — please review',
+  summary: 'Summary',
+  what_this_means: 'What this means',
+  what_to_do_next: 'What you can do next',
+  deadlines: 'Deadlines',
+  no_deadlines: 'No deadlines detected.',
+  sender: 'Sender',
+  document_type: 'Document type',
+  reply_draft: 'German reply draft',
+  reply_explanation: 'What this reply says',
+  questions_to_ask: 'Questions you can ask',
+  uncertainties: 'Things to double-check',
+  disclaimer_short: 'KlarPost is not legal, tax, financial or medical advice.',
+  tips_title: 'Tips for a clear scan',
+  tip_lighting: 'Use good lighting',
+  tip_flat: 'Place the document on a flat surface',
+  tip_full_page: 'Make sure the full page is visible',
+  tip_no_blur: 'Hold steady to avoid blur',
+  open_camera: 'Open camera',
+  pick_from_library: 'Choose from library',
+  pick_pdf: 'Choose a PDF',
+  pick_image: 'Choose an image',
+  error_generic: 'Something went wrong. Please try again.',
+  error_unsupported_file: 'This file type is not supported. Use JPG, PNG, WEBP or PDF.',
+  error_no_image: 'No image selected.',
+  confirm_delete_one: 'Delete this analysis?',
+  confirm_delete_all: 'Delete all analyses? This cannot be undone.',
+  onb1_title: 'Understand German letters',
+  onb1_body: 'KlarPost reads your German documents and explains them in your language — calmly and clearly.',
+  onb2_title: 'Find deadlines and next steps',
+  onb2_body: 'See what the letter is asking, when, and what you can do next.',
+  onb3_title: 'Your privacy comes first',
+  onb3_body: 'KlarPost does not save your original documents. Only the analysis is stored, and you can delete it any time.',
+  onb_get_started: 'Get started',
+  privacy_short: 'Original documents are not stored. You stay in control.',
+  disclaimer_long: 'KlarPost provides general information only. It does not give legal, tax, financial or medical advice. For important matters, please contact the sender or a qualified professional.',
+  copy: 'Copy',
+  copied: 'Copied',
+  home_quick_help: 'How can we help you today?',
+  see_all: 'See all',
+  analyze_again: 'Analyze another document',
+  no_explanation: 'No explanation available.',
+  today: 'Today',
+  yesterday: 'Yesterday',
+};
+
+const zh: UIStrings = {
+  app_name: 'KlarPost',
+  app_tagline: '在德语信件成为麻烦之前先看懂它。',
+  continue: '继续',
+  back: '返回',
+  next: '下一步',
+  skip: '跳过',
+  done: '完成',
+  cancel: '取消',
+  delete: '删除',
+  retry: '重试',
+  choose_language: '选择您的语言',
+  choose_language_subtitle: 'KlarPost 将用此语言为您解释德语文件。',
+  home_intro: '拍照或上传德语信件，KlarPost 会告诉您它的含义以及您可能需要做的事情。',
+  scan_document: '扫描德语文件',
+  upload_file: '上传 PDF 或图片',
+  recent_analyses: '最近的分析',
+  no_history: '还没有分析。扫描或上传一份文件即可开始。',
+  history_title: '历史记录',
+  settings_title: '设置',
+  change_language: '更换语言',
+  delete_all_data: '删除所有分析',
+  delete_account: '删除我的数据',
+  privacy: '隐私',
+  disclaimer_title: '重要提示',
+  support: '帮助与支持',
+  analyzing_title: '正在分析您的文件',
+  analyzing_step_reading: '正在读取文件',
+  analyzing_step_extracting: '正在提取德语文本',
+  analyzing_step_translating: '正在翻译和解释',
+  analyzing_step_checking: '正在检查截止日期和操作',
+  risk_level: '风险等级',
+  risk_green: '仅供参考',
+  risk_yellow: '可能需要操作',
+  risk_red: '重要 — 请仔细查看',
+  summary: '摘要',
+  what_this_means: '这是什么意思',
+  what_to_do_next: '您接下来可以做什么',
+  deadlines: '截止日期',
+  no_deadlines: '未发现截止日期。',
+  sender: '发件人',
+  document_type: '文件类型',
+  reply_draft: '德语回信草稿',
+  reply_explanation: '这封回信的意思',
+  questions_to_ask: '您可以提的问题',
+  uncertainties: '需要再次核实的内容',
+  disclaimer_short: 'KlarPost 不提供法律、税务、财务或医疗建议。',
+  tips_title: '清晰扫描的小提示',
+  tip_lighting: '光线充足',
+  tip_flat: '把文件放在平整的表面上',
+  tip_full_page: '确保整页都在画面里',
+  tip_no_blur: '保持稳定，避免模糊',
+  open_camera: '打开相机',
+  pick_from_library: '从相册选择',
+  pick_pdf: '选择 PDF',
+  pick_image: '选择图片',
+  error_generic: '出了点问题，请再试一次。',
+  error_unsupported_file: '不支持此文件类型。请使用 JPG、PNG、WEBP 或 PDF。',
+  error_no_image: '未选择图片。',
+  confirm_delete_one: '删除此分析？',
+  confirm_delete_all: '删除所有分析？此操作无法撤销。',
+  onb1_title: '看懂德语信件',
+  onb1_body: 'KlarPost 会读取您的德语文件，并用您的语言冷静、清晰地解释它。',
+  onb2_title: '找出截止日期和下一步',
+  onb2_body: '看清这封信在问什么、什么时候、以及您接下来可以做什么。',
+  onb3_title: '您的隐私最重要',
+  onb3_body: 'KlarPost 不保存您的原始文件。只保存分析结果，您随时可以删除。',
+  onb_get_started: '开始使用',
+  privacy_short: '原始文件不会被保存。您始终掌握控制权。',
+  disclaimer_long: 'KlarPost 仅提供一般信息，不提供法律、税务、财务或医疗建议。对于重要事项，请联系发件人或合格的专业人士。',
+  copy: '复制',
+  copied: '已复制',
+  home_quick_help: '今天我们能帮您做什么？',
+  see_all: '查看全部',
+  analyze_again: '分析另一份文件',
+  no_explanation: '暂无解释。',
+  today: '今天',
+  yesterday: '昨天',
+};
+
+const vi: UIStrings = {
+  app_name: 'KlarPost',
+  app_tagline: 'Hiểu thư tiếng Đức trước khi chúng trở thành rắc rối.',
+  continue: 'Tiếp tục',
+  back: 'Quay lại',
+  next: 'Tiếp',
+  skip: 'Bỏ qua',
+  done: 'Xong',
+  cancel: 'Huỷ',
+  delete: 'Xoá',
+  retry: 'Thử lại',
+  choose_language: 'Chọn ngôn ngữ của bạn',
+  choose_language_subtitle: 'KlarPost sẽ giải thích tài liệu tiếng Đức bằng ngôn ngữ này.',
+  home_intro: 'Chụp ảnh hoặc tải lên một bức thư tiếng Đức, KlarPost sẽ giải thích nội dung và những việc bạn có thể cần làm.',
+  scan_document: 'Quét tài liệu tiếng Đức',
+  upload_file: 'Tải lên PDF hoặc ảnh',
+  recent_analyses: 'Phân tích gần đây',
+  no_history: 'Chưa có phân tích nào. Hãy quét hoặc tải lên một tài liệu để bắt đầu.',
+  history_title: 'Lịch sử',
+  settings_title: 'Cài đặt',
+  change_language: 'Đổi ngôn ngữ',
+  delete_all_data: 'Xoá tất cả phân tích',
+  delete_account: 'Xoá dữ liệu của tôi',
+  privacy: 'Quyền riêng tư',
+  disclaimer_title: 'Thông báo quan trọng',
+  support: 'Trợ giúp & hỗ trợ',
+  analyzing_title: 'Đang phân tích tài liệu của bạn',
+  analyzing_step_reading: 'Đang đọc tài liệu',
+  analyzing_step_extracting: 'Đang trích xuất văn bản tiếng Đức',
+  analyzing_step_translating: 'Đang dịch và giải thích',
+  analyzing_step_checking: 'Đang kiểm tra hạn chót và hành động',
+  risk_level: 'Mức độ rủi ro',
+  risk_green: 'Chỉ thông tin',
+  risk_yellow: 'Có thể cần hành động',
+  risk_red: 'Quan trọng — vui lòng xem kỹ',
+  summary: 'Tóm tắt',
+  what_this_means: 'Điều này có nghĩa là gì',
+  what_to_do_next: 'Bạn có thể làm gì tiếp theo',
+  deadlines: 'Hạn chót',
+  no_deadlines: 'Không phát hiện hạn chót.',
+  sender: 'Người gửi',
+  document_type: 'Loại tài liệu',
+  reply_draft: 'Bản nháp trả lời bằng tiếng Đức',
+  reply_explanation: 'Bản trả lời này nói gì',
+  questions_to_ask: 'Câu hỏi bạn có thể đặt',
+  uncertainties: 'Điều cần kiểm tra lại',
+  disclaimer_short: 'KlarPost không phải là tư vấn pháp lý, thuế, tài chính hoặc y tế.',
+  tips_title: 'Mẹo để có ảnh quét rõ',
+  tip_lighting: 'Ánh sáng đầy đủ',
+  tip_flat: 'Đặt tài liệu trên bề mặt phẳng',
+  tip_full_page: 'Đảm bảo nhìn thấy cả trang',
+  tip_no_blur: 'Giữ chắc tay để không bị mờ',
+  open_camera: 'Mở máy ảnh',
+  pick_from_library: 'Chọn từ thư viện',
+  pick_pdf: 'Chọn tệp PDF',
+  pick_image: 'Chọn ảnh',
+  error_generic: 'Đã có lỗi xảy ra. Vui lòng thử lại.',
+  error_unsupported_file: 'Loại tệp này không được hỗ trợ. Hãy dùng JPG, PNG, WEBP hoặc PDF.',
+  error_no_image: 'Chưa chọn ảnh.',
+  confirm_delete_one: 'Xoá phân tích này?',
+  confirm_delete_all: 'Xoá tất cả phân tích? Không thể hoàn tác.',
+  onb1_title: 'Hiểu các bức thư tiếng Đức',
+  onb1_body: 'KlarPost đọc tài liệu tiếng Đức của bạn và giải thích bằng ngôn ngữ của bạn — bình tĩnh và rõ ràng.',
+  onb2_title: 'Tìm hạn chót và bước tiếp theo',
+  onb2_body: 'Xem rõ bức thư đang yêu cầu gì, khi nào, và bạn có thể làm gì tiếp.',
+  onb3_title: 'Quyền riêng tư của bạn là trên hết',
+  onb3_body: 'KlarPost không lưu tài liệu gốc. Chỉ lưu kết quả phân tích, và bạn có thể xoá bất cứ lúc nào.',
+  onb_get_started: 'Bắt đầu',
+  privacy_short: 'Tài liệu gốc không được lưu. Bạn luôn kiểm soát.',
+  disclaimer_long: 'KlarPost chỉ cung cấp thông tin chung. Đây không phải là tư vấn pháp lý, thuế, tài chính hoặc y tế. Với những vấn đề quan trọng, hãy liên hệ với người gửi hoặc một chuyên gia có chuyên môn.',
+  copy: 'Sao chép',
+  copied: 'Đã sao chép',
+  home_quick_help: 'Hôm nay chúng tôi có thể giúp gì?',
+  see_all: 'Xem tất cả',
+  analyze_again: 'Phân tích tài liệu khác',
+  no_explanation: 'Chưa có giải thích.',
+  today: 'Hôm nay',
+  yesterday: 'Hôm qua',
+};
+
+const tr: UIStrings = {
+  app_name: 'KlarPost',
+  app_tagline: 'Almanca mektupları sorun olmadan önce anlayın.',
+  continue: 'Devam',
+  back: 'Geri',
+  next: 'İleri',
+  skip: 'Atla',
+  done: 'Tamam',
+  cancel: 'İptal',
+  delete: 'Sil',
+  retry: 'Tekrar dene',
+  choose_language: 'Dilinizi seçin',
+  choose_language_subtitle: 'KlarPost Almanca belgeleri bu dilde açıklayacak.',
+  home_intro: 'Bir Almanca mektubun fotoğrafını çekin veya yükleyin; KlarPost size ne anlama geldiğini ve ne yapmanız gerekebileceğini anlatsın.',
+  scan_document: 'Almanca belge tara',
+  upload_file: 'PDF veya resim yükle',
+  recent_analyses: 'Son analizler',
+  no_history: 'Henüz analiz yok. Başlamak için bir belge tarayın veya yükleyin.',
+  history_title: 'Geçmiş',
+  settings_title: 'Ayarlar',
+  change_language: 'Dili değiştir',
+  delete_all_data: 'Tüm analizleri sil',
+  delete_account: 'Verilerimi sil',
+  privacy: 'Gizlilik',
+  disclaimer_title: 'Önemli bilgi',
+  support: 'Yardım ve destek',
+  analyzing_title: 'Belgeniz analiz ediliyor',
+  analyzing_step_reading: 'Belge okunuyor',
+  analyzing_step_extracting: 'Almanca metin çıkarılıyor',
+  analyzing_step_translating: 'Çevriliyor ve açıklanıyor',
+  analyzing_step_checking: 'Son tarihler ve işlemler kontrol ediliyor',
+  risk_level: 'Risk seviyesi',
+  risk_green: 'Yalnızca bilgi',
+  risk_yellow: 'İşlem gerekebilir',
+  risk_red: 'Önemli — lütfen inceleyin',
+  summary: 'Özet',
+  what_this_means: 'Bu ne anlama geliyor',
+  what_to_do_next: 'Bundan sonra ne yapabilirsiniz',
+  deadlines: 'Son tarihler',
+  no_deadlines: 'Son tarih bulunamadı.',
+  sender: 'Gönderen',
+  document_type: 'Belge türü',
+  reply_draft: 'Almanca yanıt taslağı',
+  reply_explanation: 'Bu yanıt ne diyor',
+  questions_to_ask: 'Sorabileceğiniz sorular',
+  uncertainties: 'Bir kez daha kontrol edilmesi gerekenler',
+  disclaimer_short: 'KlarPost hukuki, vergi, finansal veya tıbbi tavsiye sunmaz.',
+  tips_title: 'Net tarama için ipuçları',
+  tip_lighting: 'İyi ışık kullanın',
+  tip_flat: 'Belgeyi düz bir yüzeye koyun',
+  tip_full_page: 'Tüm sayfanın göründüğünden emin olun',
+  tip_no_blur: 'Bulanıklık olmaması için sabit tutun',
+  open_camera: 'Kamerayı aç',
+  pick_from_library: 'Galeriden seç',
+  pick_pdf: 'PDF seç',
+  pick_image: 'Resim seç',
+  error_generic: 'Bir şeyler ters gitti. Lütfen tekrar deneyin.',
+  error_unsupported_file: 'Bu dosya türü desteklenmiyor. JPG, PNG, WEBP veya PDF kullanın.',
+  error_no_image: 'Resim seçilmedi.',
+  confirm_delete_one: 'Bu analiz silinsin mi?',
+  confirm_delete_all: 'Tüm analizler silinsin mi? Bu geri alınamaz.',
+  onb1_title: 'Almanca mektupları anlayın',
+  onb1_body: 'KlarPost Almanca belgelerinizi okur ve sizin dilinizde sakin ve net şekilde açıklar.',
+  onb2_title: 'Son tarihleri ve adımları görün',
+  onb2_body: 'Mektubun ne istediğini, ne zaman ve sonraki adımı net görün.',
+  onb3_title: 'Gizliliğiniz önce gelir',
+  onb3_body: 'KlarPost orijinal belgelerinizi saklamaz. Sadece analiz saklanır ve istediğiniz zaman silebilirsiniz.',
+  onb_get_started: 'Başla',
+  privacy_short: 'Orijinal belgeler saklanmaz. Kontrol sizde.',
+  disclaimer_long: 'KlarPost yalnızca genel bilgi sağlar. Hukuki, vergi, finansal veya tıbbi tavsiye vermez. Önemli konularda lütfen göndericiye veya yetkili bir uzmana danışın.',
+  copy: 'Kopyala',
+  copied: 'Kopyalandı',
+  home_quick_help: 'Bugün size nasıl yardımcı olabiliriz?',
+  see_all: 'Tümünü gör',
+  analyze_again: 'Başka bir belgeyi analiz et',
+  no_explanation: 'Açıklama yok.',
+  today: 'Bugün',
+  yesterday: 'Dün',
+};
+
+const ru: UIStrings = {
+  app_name: 'KlarPost',
+  app_tagline: 'Поймите немецкие письма, прежде чем они станут проблемой.',
+  continue: 'Продолжить',
+  back: 'Назад',
+  next: 'Далее',
+  skip: 'Пропустить',
+  done: 'Готово',
+  cancel: 'Отмена',
+  delete: 'Удалить',
+  retry: 'Повторить',
+  choose_language: 'Выберите ваш язык',
+  choose_language_subtitle: 'KlarPost будет объяснять немецкие документы на этом языке.',
+  home_intro: 'Сфотографируйте или загрузите немецкое письмо, и KlarPost объяснит, что оно значит и что вам, возможно, нужно сделать.',
+  scan_document: 'Сканировать немецкий документ',
+  upload_file: 'Загрузить PDF или изображение',
+  recent_analyses: 'Недавние анализы',
+  no_history: 'Пока нет анализов. Отсканируйте или загрузите документ, чтобы начать.',
+  history_title: 'История',
+  settings_title: 'Настройки',
+  change_language: 'Сменить язык',
+  delete_all_data: 'Удалить все анализы',
+  delete_account: 'Удалить мои данные',
+  privacy: 'Конфиденциальность',
+  disclaimer_title: 'Важная информация',
+  support: 'Помощь и поддержка',
+  analyzing_title: 'Анализируем ваш документ',
+  analyzing_step_reading: 'Читаем документ',
+  analyzing_step_extracting: 'Извлекаем немецкий текст',
+  analyzing_step_translating: 'Переводим и объясняем',
+  analyzing_step_checking: 'Проверяем сроки и действия',
+  risk_level: 'Уровень риска',
+  risk_green: 'Только информация',
+  risk_yellow: 'Возможно, нужны действия',
+  risk_red: 'Важно — внимательно прочитайте',
+  summary: 'Кратко',
+  what_this_means: 'Что это значит',
+  what_to_do_next: 'Что можно сделать дальше',
+  deadlines: 'Сроки',
+  no_deadlines: 'Сроки не найдены.',
+  sender: 'Отправитель',
+  document_type: 'Тип документа',
+  reply_draft: 'Черновик ответа на немецком',
+  reply_explanation: 'Что говорит этот ответ',
+  questions_to_ask: 'Вопросы, которые можно задать',
+  uncertainties: 'Что стоит уточнить',
+  disclaimer_short: 'KlarPost не является юридической, налоговой, финансовой или медицинской консультацией.',
+  tips_title: 'Советы для чёткого скана',
+  tip_lighting: 'Хорошее освещение',
+  tip_flat: 'Положите документ на ровную поверхность',
+  tip_full_page: 'Вся страница должна быть видна',
+  tip_no_blur: 'Держите ровно, чтобы не было размытия',
+  open_camera: 'Открыть камеру',
+  pick_from_library: 'Выбрать из галереи',
+  pick_pdf: 'Выбрать PDF',
+  pick_image: 'Выбрать изображение',
+  error_generic: 'Что-то пошло не так. Пожалуйста, попробуйте ещё раз.',
+  error_unsupported_file: 'Этот тип файла не поддерживается. Используйте JPG, PNG, WEBP или PDF.',
+  error_no_image: 'Изображение не выбрано.',
+  confirm_delete_one: 'Удалить этот анализ?',
+  confirm_delete_all: 'Удалить все анализы? Это нельзя отменить.',
+  onb1_title: 'Понимайте немецкие письма',
+  onb1_body: 'KlarPost читает ваши немецкие документы и объясняет их на вашем языке — спокойно и понятно.',
+  onb2_title: 'Найдите сроки и следующие шаги',
+  onb2_body: 'Понимайте, о чём спрашивает письмо, когда и что вы можете сделать дальше.',
+  onb3_title: 'Ваша приватность важна',
+  onb3_body: 'KlarPost не сохраняет оригиналы документов. Сохраняется только анализ, и вы можете удалить его в любой момент.',
+  onb_get_started: 'Начать',
+  privacy_short: 'Оригиналы не сохраняются. Контроль остаётся за вами.',
+  disclaimer_long: 'KlarPost предоставляет только общую информацию. Это не юридическая, налоговая, финансовая или медицинская консультация. По важным вопросам обратитесь к отправителю или квалифицированному специалисту.',
+  copy: 'Копировать',
+  copied: 'Скопировано',
+  home_quick_help: 'Чем мы можем помочь сегодня?',
+  see_all: 'Все',
+  analyze_again: 'Анализировать другой документ',
+  no_explanation: 'Объяснение недоступно.',
+  today: 'Сегодня',
+  yesterday: 'Вчера',
+};
+
+const es: UIStrings = {
+  app_name: 'KlarPost',
+  app_tagline: 'Entiende las cartas alemanas antes de que se conviertan en un problema.',
+  continue: 'Continuar',
+  back: 'Atrás',
+  next: 'Siguiente',
+  skip: 'Omitir',
+  done: 'Listo',
+  cancel: 'Cancelar',
+  delete: 'Eliminar',
+  retry: 'Reintentar',
+  choose_language: 'Elige tu idioma',
+  choose_language_subtitle: 'KlarPost te explicará los documentos alemanes en este idioma.',
+  home_intro: 'Toma una foto o sube una carta alemana y KlarPost te explicará lo que significa y lo que podrías necesitar hacer.',
+  scan_document: 'Escanear documento alemán',
+  upload_file: 'Subir PDF o imagen',
+  recent_analyses: 'Análisis recientes',
+  no_history: 'Aún no hay análisis. Escanea o sube un documento para empezar.',
+  history_title: 'Historial',
+  settings_title: 'Ajustes',
+  change_language: 'Cambiar idioma',
+  delete_all_data: 'Eliminar todos los análisis',
+  delete_account: 'Eliminar mis datos',
+  privacy: 'Privacidad',
+  disclaimer_title: 'Aviso importante',
+  support: 'Ayuda y soporte',
+  analyzing_title: 'Analizando tu documento',
+  analyzing_step_reading: 'Leyendo el documento',
+  analyzing_step_extracting: 'Extrayendo el texto alemán',
+  analyzing_step_translating: 'Traduciendo y explicando',
+  analyzing_step_checking: 'Revisando plazos y acciones',
+  risk_level: 'Nivel de riesgo',
+  risk_green: 'Solo información',
+  risk_yellow: 'Puede requerir acción',
+  risk_red: 'Importante — revísalo con calma',
+  summary: 'Resumen',
+  what_this_means: 'Qué significa esto',
+  what_to_do_next: 'Qué puedes hacer a continuación',
+  deadlines: 'Plazos',
+  no_deadlines: 'No se han detectado plazos.',
+  sender: 'Remitente',
+  document_type: 'Tipo de documento',
+  reply_draft: 'Borrador de respuesta en alemán',
+  reply_explanation: 'Qué dice esta respuesta',
+  questions_to_ask: 'Preguntas que puedes hacer',
+  uncertainties: 'Cosas que conviene comprobar',
+  disclaimer_short: 'KlarPost no es asesoría legal, fiscal, financiera ni médica.',
+  tips_title: 'Consejos para un escaneo claro',
+  tip_lighting: 'Buena iluminación',
+  tip_flat: 'Coloca el documento sobre una superficie plana',
+  tip_full_page: 'Asegúrate de ver toda la página',
+  tip_no_blur: 'Mantén firme para evitar borrosidad',
+  open_camera: 'Abrir cámara',
+  pick_from_library: 'Elegir de la galería',
+  pick_pdf: 'Elegir un PDF',
+  pick_image: 'Elegir una imagen',
+  error_generic: 'Algo salió mal. Inténtalo de nuevo.',
+  error_unsupported_file: 'Este tipo de archivo no es compatible. Usa JPG, PNG, WEBP o PDF.',
+  error_no_image: 'No se ha elegido una imagen.',
+  confirm_delete_one: '¿Eliminar este análisis?',
+  confirm_delete_all: '¿Eliminar todos los análisis? Esto no se puede deshacer.',
+  onb1_title: 'Entiende las cartas alemanas',
+  onb1_body: 'KlarPost lee tus documentos alemanes y los explica en tu idioma con calma y claridad.',
+  onb2_title: 'Encuentra plazos y próximos pasos',
+  onb2_body: 'Ve qué pide la carta, cuándo y qué puedes hacer a continuación.',
+  onb3_title: 'Tu privacidad es lo primero',
+  onb3_body: 'KlarPost no guarda tus documentos originales. Solo se guarda el análisis y puedes borrarlo cuando quieras.',
+  onb_get_started: 'Empezar',
+  privacy_short: 'Los documentos originales no se guardan. Tú tienes el control.',
+  disclaimer_long: 'KlarPost solo proporciona información general. No es asesoría legal, fiscal, financiera ni médica. Para asuntos importantes, contacta al remitente o a un profesional cualificado.',
+  copy: 'Copiar',
+  copied: 'Copiado',
+  home_quick_help: '¿En qué podemos ayudarte hoy?',
+  see_all: 'Ver todo',
+  analyze_again: 'Analizar otro documento',
+  no_explanation: 'No hay explicación.',
+  today: 'Hoy',
+  yesterday: 'Ayer',
+};
+
+const STRINGS: Record<LanguageCode, UIStrings> = { en, zh, vi, tr, ru, es };
+
+export function t(lang: LanguageCode | null | undefined, key: UIKey): string {
+  const code = lang && STRINGS[lang] ? lang : 'en';
+  return STRINGS[code][key];
+}
+
+export function getLanguage(code: LanguageCode | null | undefined): Language {
+  return LANGUAGES.find((l) => l.code === code) ?? LANGUAGES[4]; // default English
+}
