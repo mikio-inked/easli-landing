@@ -230,6 +230,17 @@ const en: UIStrings = {
   pdf_view_unsupported: 'PDFs are stored on this device but cannot be previewed yet.',
   pages_used: 'Read {n} page(s)',
   multi_page_hint: 'Multi-page · keep going, then tap Done',
+  ask_question: 'Ask about this document',
+  chat_placeholder: 'Ask a question about this letter…',
+  chat_thinking: 'Thinking…',
+  chat_clear_confirm: 'Clear this conversation?',
+  chat_scope_note: 'I can only help with this document.',
+  chat_empty_title: 'Ask anything about this letter',
+  chat_empty_sub: 'I can explain words, deadlines, what to do, and how to phrase a reply — but only for this document.',
+  chat_starter_1: 'Explain this letter in simple words',
+  chat_starter_2: 'What should I do next?',
+  chat_starter_3: 'What if I miss the deadline?',
+  chat_starter_4: 'How can I politely reply?',
 };
 
 const zh: UIStrings = {

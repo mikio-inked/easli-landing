@@ -82,7 +82,7 @@ export default function ChatScreen() {
 
   const send = async (text: string) => {
     if (!id) return;
-    const trimmed = text.trim();
+    const trimmed = (text ?? '').trim();
     if (!trimmed || sending) return;
     setInput('');
     setSending(true);

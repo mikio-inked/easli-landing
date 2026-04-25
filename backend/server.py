@@ -456,9 +456,9 @@ async def list_messages(analysis_id: str, device_id: str):
         raise HTTPException(status_code=400, detail="device_id is required")
     doc = await db.analyses.find_one(
         {"id": analysis_id, "device_id": device_id},
-        {"_id": 0, "messages": 1},
+        {"_id": 0, "id": 1, "messages": 1},
     )
-    if not doc:
+    if doc is None:
         raise HTTPException(status_code=404, detail="Analysis not found")
     raw = doc.get("messages", []) or []
     return [ChatMessage(**m) for m in raw]
