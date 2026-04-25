@@ -1,0 +1,74 @@
+{
+  "theme_archetype": {
+    "theme": "Light Theme",
+    "archetype": "Archetype 1: Organic & Earthy (Modified for Trust/Utility: Trust Blue & Soft White)",
+    "rationale": "Elderly-friendly app for the German market. Needs high trust, clinical clarity, and calmness. Blue and white provides safety and clarity without being overly playful or confusing."
+  },
+  "color_system": {
+    "background": "bg-slate-50",
+    "surface": "bg-white",
+    "primary": "bg-blue-700",
+    "primary_hover": "hover:bg-blue-800",
+    "text_primary": "text-slate-900",
+    "text_secondary": "text-slate-600",
+    "border": "border-slate-200",
+    "status": {
+      "green": "bg-emerald-100 text-emerald-800 border-emerald-200",
+      "yellow": "bg-amber-100 text-amber-800 border-amber-200",
+      "red": "bg-red-100 text-red-800 border-red-200"
+    }
+  },
+  "typography": {
+    "font_heading": "Manrope",
+    "font_body": "IBM Plex Sans",
+    "h1": "text-3xl md:text-4xl font-extrabold tracking-tight text-slate-900",
+    "h2": "text-2xl font-bold tracking-tight text-slate-900",
+    "h3": "text-xl font-semibold text-slate-900",
+    "body": "text-lg text-slate-700 leading-relaxed",
+    "small": "text-sm text-slate-500 font-medium"
+  },
+  "spacing_and_layout": {
+    "mobile_container": "max-w-md mx-auto min-h-screen bg-slate-50 shadow-2xl overflow-x-hidden flex flex-col relative",
+    "padding": "p-6",
+    "gap": "gap-6",
+    "card_radius": "rounded-2xl"
+  },
+  "components": {
+    "button_primary": "h-14 w-full rounded-2xl bg-blue-700 text-white text-lg font-bold hover:bg-blue-800 transition-colors shadow-sm flex items-center justify-center gap-3",
+    "button_secondary": "h-14 w-full rounded-2xl bg-white text-blue-700 border-2 border-slate-200 text-lg font-bold hover:border-blue-700 hover:bg-blue-50 transition-colors flex items-center justify-center gap-3",
+    "card": "bg-white p-6 rounded-2xl border-2 border-slate-100 shadow-sm flex flex-col gap-4",
+    "badge": "px-3 py-1 rounded-full text-sm font-bold border"
+  },
+  "media": {
+    "onboarding_secure": {
+      "url": "https://static.prod-images.emergentagent.com/jobs/1f0c6f21-2efe-4a5b-950e-770baf187f4d/images/dfb7c0cde2961f6522cce0622e0475893ae84c46d863f8c6ae0ec4c4ad6b1fdc.png",
+      "description": "3D clay illustration of a secure document folder with a shield."
+    },
+    "onboarding_translate": {
+      "url": "https://static.prod-images.emergentagent.com/jobs/1f0c6f21-2efe-4a5b-950e-770baf187f4d/images/f3c1092a5553559a52b9fee5cc730259954d0c214aa2c13e238cb266c39fa787.png",
+      "description": "3D clay illustration of a checkmark over a translated document."
+    },
+    "onboarding_scan": {
+      "url": "https://static.prod-images.emergentagent.com/jobs/1f0c6f21-2efe-4a5b-950e-770baf187f4d/images/0b5b9d6fb4e6a1a07ee423bf490d131ccfc6cfc7932ed41c51e126f29e0135cb.png",
+      "description": "3D clay illustration of a camera scanning a generic paper document."
+    }
+  },
+  "icons": {
+    "library": "lucide-react",
+    "style": "Use clear, recognizable icons. Ensure stroke width is 2 or 2.5 for better visibility for elderly users. Common icons: Shield, Camera, FileText, CheckCircle, AlertTriangle, AlertCircle, Home, Clock, Settings, ChevronRight."
+  },
+  "instructions_to_main_agent": [
+    "Simulate mobile-first app on web: restrict layout to 'max-w-md mx-auto'.",
+    "Use minimum 14pt (ideally text-lg) for body text for high readability.",
+    "Do not use transparent overlays that decrease readability.",
+    "Follow WCAG AA standards: keep text contrast very high.",
+    "Every button and interactive element must have large touch targets (h-14).",
+    "Make the Multi-stage loading screen feel calm and systematic, reducing user anxiety."
+  ],
+  "critical_rules": [
+    "Always wrap interactive elements in testing attributes (e.g., data-testid=\"scan-button\").",
+    "Use Manrope for Headings, IBM Plex Sans for body text.",
+    "No complex gradients. Keep surfaces flat, solid, and accessible.",
+    "Risk level cards MUST use the status color tokens (green, yellow, red)."
+  ]
+}
