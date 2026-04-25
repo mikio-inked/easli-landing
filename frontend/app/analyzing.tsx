@@ -21,6 +21,8 @@ import {
 } from '../src/store';
 import { analyzeDocument } from '../src/api';
 import { LanguageCode, t } from '../src/i18n';
+import { saveOriginal } from '../src/originals';
+import { getSaveOriginals } from '../src/settings';
 import { colors, fontSize, fontWeight, radius, spacing } from '../src/theme';
 
 type Status = 'running' | 'error';
