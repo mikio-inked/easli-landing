@@ -1,9 +1,10 @@
 // Helpers to export the current analysis as a shareable PDF or plain text
-// using Expo's native share sheet. Works on iOS, Android and (best-effort) web.
+// using the native share sheet. Uses ONLY React Native's built-in Share API
+// (no expo-sharing dependency) so we avoid native build issues with newer
+// expo-modules-core. expo-print is still used for HTML→PDF conversion.
 
-import { Alert, Platform } from 'react-native';
+import { Alert, Platform, Share } from 'react-native';
 import * as Print from 'expo-print';
-import * as Sharing from 'expo-sharing';
 
 import { AnalysisRecord } from './api';
 import { LanguageCode, categoryLabel, t } from './i18n';
@@ -228,24 +229,11 @@ export async function shareAnalysisAsText(
     Alert.alert('KlarPost', text);
     return;
   }
-  // Native: share the text via expo-sharing using a tmp .txt file.
+  // Native: use the built-in React Native share sheet (no expo-sharing
+  // dependency — that package's iOS native code breaks in some Expo SDK
+  // toolchains, so we deliberately avoid it).
   try {
-    const FileSystem = await import('expo-file-system');
-    // expo-file-system v18 deprecates documentDirectory in favor of cacheDirectory for tmp.
-    const dir = (FileSystem as any).cacheDirectory || (FileSystem as any).documentDirectory;
-    const path = `${dir}klarpost-${Date.now()}.txt`;
-    await (FileSystem as any).writeAsStringAsync(path, text, {
-      encoding: (FileSystem as any).EncodingType?.UTF8 ?? 'utf8',
-    });
-    if (await Sharing.isAvailableAsync()) {
-      await Sharing.shareAsync(path, {
-        mimeType: 'text/plain',
-        dialogTitle: 'KlarPost',
-        UTI: 'public.plain-text',
-      });
-    } else {
-      Alert.alert('KlarPost', text);
-    }
+    await Share.share({ message: text, title: 'KlarPost' });
   } catch (e) {
     Alert.alert('KlarPost', t(lang, 'share_failed'));
   }
@@ -258,19 +246,24 @@ export async function shareAnalysisAsPdf(
   const html = buildAnalysisHtml(record, lang);
   try {
     const { uri } = await Print.printToFileAsync({ html });
-    if (await Sharing.isAvailableAsync()) {
-      await Sharing.shareAsync(uri, {
-        mimeType: 'application/pdf',
-        dialogTitle: 'KlarPost',
-        UTI: 'com.adobe.pdf',
-      });
-    } else if (Platform.OS === 'web') {
-      // Best-effort: open the rendered PDF in a new tab.
+    if (Platform.OS === 'web') {
       const w: any = (globalThis as any).window;
       if (w?.open) w.open(uri, '_blank');
-    } else {
-      Alert.alert('KlarPost', t(lang, 'share_failed'));
+      return;
     }
+    if (Platform.OS === 'ios') {
+      // iOS share sheet accepts a file:// URL and lets the user pick
+      // Mail / AirDrop / Files / Print etc. Native Share API works here.
+      await Share.share({ url: uri, title: 'KlarPost' });
+      return;
+    }
+    // Android: Share.share doesn't natively support file URIs in a useful
+    // way, so fall back to text + a note. Users can also tap Share-as-text
+    // for the full readable version.
+    await Share.share({
+      message: buildAnalysisText(record, lang),
+      title: 'KlarPost',
+    });
   } catch (e) {
     Alert.alert('KlarPost', t(lang, 'share_failed'));
   }
