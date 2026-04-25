@@ -89,8 +89,21 @@ class AnalysisResult(BaseModel):
 class AnalyzeRequest(BaseModel):
     device_id: str
     target_language: str  # one of LANGUAGES keys
+    # Legacy single-page payload (still supported for upload / older clients):
+    file_base64: Optional[str] = None
+    mime_type: Optional[str] = None
+    # New multi-page payload — used by the iOS-style scanner. Each page may
+    # itself be a PDF (which the server expands up to 5 pages) or an image.
+    pages: Optional[List["PageInput"]] = None
+
+
+class PageInput(BaseModel):
     file_base64: str
-    mime_type: str  # image/jpeg, image/png, image/webp, application/pdf
+    mime_type: str
+
+
+# Resolve forward reference now that PageInput exists.
+AnalyzeRequest.model_rebuild()
 
 
 class AnalysisRecord(BaseModel):
@@ -308,32 +321,52 @@ async def analyze_document(req: AnalyzeRequest):
 
     target_language_label = LANGUAGES[req.target_language]
 
-    # Validate base64
-    try:
-        raw_bytes = base64.b64decode(req.file_base64, validate=False)
-    except Exception:
-        raise HTTPException(status_code=400, detail="Invalid base64 file content")
-
-    if not raw_bytes:
-        raise HTTPException(status_code=400, detail="Empty file content")
-
-    if len(raw_bytes) > 25 * 1024 * 1024:
-        raise HTTPException(status_code=413, detail="File too large. Please use a file under 25MB.")
-
-    mime = (req.mime_type or "").lower().strip()
-    images: List[Tuple[str, str]] = []
-
-    if mime == "application/pdf" or mime == "pdf":
-        try:
-            images = pdf_to_images_base64(raw_bytes, max_pages=5)
-        except Exception as e:
-            logger.exception("PDF conversion failed")
-            raise HTTPException(status_code=400, detail=f"Could not read PDF: {str(e)}")
-    elif mime in ("image/jpeg", "image/jpg", "image/png", "image/webp", "image/heic", "image/heif"):
-        image_mime = "image/jpeg" if mime == "image/jpg" else mime
-        images = [(req.file_base64, image_mime)]
+    # Normalise input pages — accept either the legacy single-file shape or
+    # the new `pages` array. We always end up with a list of (base64, mime).
+    raw_pages: List[Tuple[str, str]] = []
+    if req.pages:
+        for p in req.pages:
+            raw_pages.append((p.file_base64, p.mime_type))
+    elif req.file_base64 and req.mime_type:
+        raw_pages.append((req.file_base64, req.mime_type))
     else:
-        raise HTTPException(status_code=400, detail=f"Unsupported file type: {req.mime_type}. Use JPEG, PNG, WEBP or PDF.")
+        raise HTTPException(status_code=400, detail="No file content provided")
+
+    if len(raw_pages) == 0:
+        raise HTTPException(status_code=400, detail="No file content provided")
+
+    MAX_TOTAL_PAGES = 20
+    images: List[Tuple[str, str]] = []
+    for raw_b64, raw_mime in raw_pages:
+        if len(images) >= MAX_TOTAL_PAGES:
+            break
+        try:
+            raw_bytes = base64.b64decode(raw_b64, validate=False)
+        except Exception:
+            raise HTTPException(status_code=400, detail="Invalid base64 file content")
+        if not raw_bytes:
+            raise HTTPException(status_code=400, detail="Empty file content")
+        if len(raw_bytes) > 25 * 1024 * 1024:
+            raise HTTPException(status_code=413, detail="File too large. Please use a file under 25MB.")
+        mime = (raw_mime or "").lower().strip()
+        if mime == "application/pdf" or mime == "pdf":
+            try:
+                # Each PDF can contribute up to 5 pages, but we still cap the
+                # total at MAX_TOTAL_PAGES across the whole request.
+                budget = MAX_TOTAL_PAGES - len(images)
+                pdf_pages = pdf_to_images_base64(raw_bytes, max_pages=min(5, budget))
+            except Exception as e:
+                logger.exception("PDF conversion failed")
+                raise HTTPException(status_code=400, detail=f"Could not read PDF: {str(e)}")
+            images.extend(pdf_pages)
+        elif mime in ("image/jpeg", "image/jpg", "image/png", "image/webp", "image/heic", "image/heif"):
+            image_mime = "image/jpeg" if mime == "image/jpg" else mime
+            images.append((raw_b64, image_mime))
+        else:
+            raise HTTPException(status_code=400, detail=f"Unsupported file type: {raw_mime}. Use JPEG, PNG, WEBP or PDF.")
+
+    if not images:
+        raise HTTPException(status_code=400, detail="No readable pages found")
 
     # Call GPT
     result = await analyze_with_gpt(images, target_language_label)
@@ -342,7 +375,7 @@ async def analyze_document(req: AnalyzeRequest):
         device_id=req.device_id,
         target_language=req.target_language,
         target_language_label=target_language_label,
-        mime_type=req.mime_type,
+        mime_type=(req.pages[0].mime_type if req.pages else (req.mime_type or "")),
         result=result,
     )
 

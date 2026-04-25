@@ -117,7 +117,8 @@ export type UIKey =
   | 'notif_title'
   | 'notif_body'
   | 'pdf_view_unsupported'
-  | 'pages_used';
+  | 'pages_used'
+  | 'multi_page_hint';
 
 type UIStrings = Record<UIKey, string>;
 
@@ -217,6 +218,7 @@ const en: UIStrings = {
   notif_body: "Don't forget about this deadline from KlarPost.",
   pdf_view_unsupported: 'PDFs are stored on this device but cannot be previewed yet.',
   pages_used: 'Read {n} page(s)',
+  multi_page_hint: 'Multi-page · keep going, then tap Done',
 };
 
 const zh: UIStrings = {
@@ -315,6 +317,7 @@ const zh: UIStrings = {
   notif_body: '别忘了这个来自 KlarPost 的截止日期。',
   pdf_view_unsupported: 'PDF 已保存在本机，但暂不支持在应用内预览。',
   pages_used: '已读取 {n} 页',
+  multi_page_hint: '多页 · 继续拍摄，完成后点「完成」',
 };
 
 const vi: UIStrings = {
@@ -395,6 +398,25 @@ const vi: UIStrings = {
   no_explanation: 'Chưa có giải thích.',
   today: 'Hôm nay',
   yesterday: 'Hôm qua',
+  save_originals: 'Lưu tài liệu gốc trên thiết bị này',
+  save_originals_sub: 'Tài liệu gốc chỉ ở trên iPhone của bạn và không được tải lên máy chủ.',
+  view_original: 'Xem tài liệu gốc',
+  remind_me: 'Nhắc tôi',
+  reminder_set: 'Đã đặt nhắc',
+  cancel_reminder: 'Huỷ nhắc',
+  pick_when_remind: 'Khi nào nên nhắc bạn?',
+  preset_7d: 'Trước 7 ngày, 9:00',
+  preset_3d: 'Trước 3 ngày, 9:00',
+  preset_1d: 'Trước 1 ngày, 9:00',
+  preset_dayof: 'Đúng ngày, 9:00',
+  preset_custom: 'Ngày và giờ tuỳ chỉnh',
+  past_deadline: 'Thời điểm này đã qua. Hãy chọn lúc khác.',
+  permission_needed: 'Cần quyền thông báo.',
+  notif_title: 'Hạn chót sắp tới',
+  notif_body: 'Đừng quên hạn chót này từ KlarPost.',
+  pdf_view_unsupported: 'PDF được lưu trên máy nhưng chưa thể xem trước trong ứng dụng.',
+  pages_used: 'Đã đọc {n} trang',
+  multi_page_hint: 'Nhiều trang · tiếp tục chụp, rồi nhấn Xong',
 };
 
 const tr: UIStrings = {
@@ -475,6 +497,25 @@ const tr: UIStrings = {
   no_explanation: 'Açıklama yok.',
   today: 'Bugün',
   yesterday: 'Dün',
+  save_originals: 'Orijinalleri bu cihaza kaydet',
+  save_originals_sub: 'Orijinaller yalnızca iPhone’unuzda kalır, sunucuya yüklenmez.',
+  view_original: 'Orijinali görüntüle',
+  remind_me: 'Bana hatırlat',
+  reminder_set: 'Hatırlatma kuruldu',
+  cancel_reminder: 'Hatırlatmayı iptal et',
+  pick_when_remind: 'Sizi ne zaman hatırlatalım?',
+  preset_7d: '7 gün önce, 09:00',
+  preset_3d: '3 gün önce, 09:00',
+  preset_1d: '1 gün önce, 09:00',
+  preset_dayof: 'Aynı gün, 09:00',
+  preset_custom: 'Özel tarih ve saat',
+  past_deadline: 'Bu tarih geçmişte. Daha sonraki bir zaman seçin.',
+  permission_needed: 'Bildirim izni gerekli.',
+  notif_title: 'Yaklaşan son tarih',
+  notif_body: 'KlarPost’tan gelen bu son tarihi unutmayın.',
+  pdf_view_unsupported: 'PDF cihaza kaydedildi ancak henüz uygulama içinde önizlenemiyor.',
+  pages_used: '{n} sayfa okundu',
+  multi_page_hint: 'Çok sayfalı · devam edin, bitince Tamam’a dokunun',
 };
 
 const ru: UIStrings = {
@@ -573,6 +614,7 @@ const ru: UIStrings = {
   notif_body: 'Не забудьте про этот срок из KlarPost.',
   pdf_view_unsupported: 'PDF сохранён на устройстве, но предпросмотр пока недоступен.',
   pages_used: 'Прочитано {n} стр.',
+  multi_page_hint: 'Несколько страниц · снимайте дальше, затем «Готово»',
 };
 
 const es: UIStrings = {
@@ -653,6 +695,25 @@ const es: UIStrings = {
   no_explanation: 'No hay explicación.',
   today: 'Hoy',
   yesterday: 'Ayer',
+  save_originals: 'Guardar originales en este dispositivo',
+  save_originals_sub: 'Los originales se quedan en tu iPhone y nunca se suben al servidor.',
+  view_original: 'Ver original',
+  remind_me: 'Recordármelo',
+  reminder_set: 'Recordatorio creado',
+  cancel_reminder: 'Cancelar recordatorio',
+  pick_when_remind: '¿Cuándo te lo recuerdo?',
+  preset_7d: '7 días antes, 9:00',
+  preset_3d: '3 días antes, 9:00',
+  preset_1d: '1 día antes, 9:00',
+  preset_dayof: 'El mismo día, 9:00',
+  preset_custom: 'Fecha y hora personalizadas',
+  past_deadline: 'Esta hora ya pasó. Elige una posterior.',
+  permission_needed: 'Se necesita permiso de notificaciones.',
+  notif_title: 'Plazo próximo',
+  notif_body: 'No olvides este plazo de KlarPost.',
+  pdf_view_unsupported: 'El PDF se guarda en el dispositivo pero aún no se puede previsualizar.',
+  pages_used: 'Se leyeron {n} página(s)',
+  multi_page_hint: 'Varias páginas · sigue, luego pulsa Listo',
 };
 
 const STRINGS: Record<LanguageCode, UIStrings> = { en, zh, vi, tr, ru, es };

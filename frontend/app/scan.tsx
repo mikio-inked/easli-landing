@@ -48,7 +48,7 @@ export default function ScanScreen() {
         return;
       }
       const mime = (a.mimeType || 'image/jpeg').toLowerCase();
-      setPendingAnalysis({ base64: a.base64, mimeType: mime });
+      setPendingAnalysis({ pages: [{ base64: a.base64, mimeType: mime }] });
       router.replace('/analyzing');
     } catch (e: any) {
       Alert.alert(t(lang, 'error_generic'), e?.message || '');

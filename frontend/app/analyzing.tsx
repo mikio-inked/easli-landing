@@ -41,7 +41,7 @@ export default function Analyzing() {
       const l = (await getStoredLanguage()) ?? 'en';
       setLang(l);
       const pending = takePendingAnalysis();
-      if (!pending) {
+      if (!pending || pending.pages.length === 0) {
         setStatus('error');
         setErrorMsg(t(l, 'error_no_image'));
         return;
@@ -58,16 +58,17 @@ export default function Analyzing() {
         const record = await analyzeDocument({
           device_id: deviceId,
           target_language: l,
-          file_base64: pending.base64,
-          mime_type: pending.mimeType,
+          pages: pending.pages.map((p) => ({ file_base64: p.base64, mime_type: p.mimeType })),
         });
         if (intervalRef.current) clearInterval(intervalRef.current);
         setStep(3);
         setLastResult(record);
         // Optional on-device storage of the original document — opt-in only.
+        // For multi-page captures we store only the first page (preview only).
         try {
-          if (await getSaveOriginals()) {
-            await saveOriginal(record.id, pending.base64, pending.mimeType);
+          if (await getSaveOriginals() && pending.pages.length > 0) {
+            const first = pending.pages[0];
+            await saveOriginal(record.id, first.base64, first.mimeType);
           }
         } catch {
           // Non-fatal: result is already saved on the server.

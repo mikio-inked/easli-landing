@@ -71,11 +71,15 @@ async function jsonOrThrow<T>(res: Response): Promise<T> {
   return body as T;
 }
 
+export interface AnalyzePage {
+  file_base64: string;
+  mime_type: string;
+}
+
 export async function analyzeDocument(params: {
   device_id: string;
   target_language: LanguageCode;
-  file_base64: string;
-  mime_type: string;
+  pages: AnalyzePage[];
 }): Promise<AnalysisRecord> {
   const res = await fetch(`${BASE_URL}/api/analyze`, {
     method: 'POST',

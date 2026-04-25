@@ -1,6 +1,8 @@
 // Document scanner camera — live framing overlay inspired by iOS Notes
-// scanner. Renders the camera fullscreen, four corner brackets define the
-// document area, with shutter, flash, and library buttons.
+// scanner with multi-page capture. Renders the camera fullscreen with four
+// corner brackets defining the document area, a horizontal thumbnail strip
+// of pages already captured, a shutter button, flash toggle, and a
+// "Done · N" CTA that appears once the first page is captured.
 //
 // Note: real edge auto-detection requires a custom dev build (e.g.
 // react-native-document-scanner-plugin). This screen gives the same visual
@@ -9,10 +11,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   Animated,
   Easing,
+  Image,
   Platform,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   View,
@@ -23,17 +28,26 @@ import * as FileSystem from 'expo-file-system/legacy';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
+  Check,
   Image as ImageIcon,
   X,
   Zap,
   ZapOff,
 } from 'lucide-react-native';
 import { Button } from '../src/ui';
-import { setPendingAnalysis, getLanguage as getStoredLanguage } from '../src/store';
+import {
+  PendingPage,
+  getLanguage as getStoredLanguage,
+  setPendingAnalysis,
+} from '../src/store';
 import { LanguageCode, t } from '../src/i18n';
 import { colors, fontSize, fontWeight, radius, spacing } from '../src/theme';
 
 type FlashMode = 'off' | 'on' | 'auto';
+
+interface CapturedPage extends PendingPage {
+  uri: string;
+}
 
 export default function CameraScreen() {
   const router = useRouter();
@@ -43,6 +57,7 @@ export default function CameraScreen() {
   const [ready, setReady] = useState(false);
   const [busy, setBusy] = useState(false);
   const [flash, setFlash] = useState<FlashMode>('off');
+  const [pages, setPages] = useState<CapturedPage[]>([]);
   const flashAnim = useRef(new Animated.Value(0)).current;
   const tipFade = useRef(new Animated.Value(1)).current;
 
@@ -64,7 +79,6 @@ export default function CameraScreen() {
   }, [tipFade]);
 
   useEffect(() => {
-    // Request permission lazily on first mount.
     if (permission && !permission.granted && permission.canAskAgain) {
       requestPermission();
     }
@@ -104,9 +118,13 @@ export default function CameraScreen() {
       const b64 = await FileSystem.readAsStringAsync(photo.uri, {
         encoding: 'base64' as any,
       });
-      setPendingAnalysis({ base64: b64, mimeType: 'image/jpeg' });
-      router.replace('/analyzing');
-    } catch (e: any) {
+      setPages((prev) => [
+        ...prev,
+        { base64: b64, mimeType: 'image/jpeg', uri: photo.uri },
+      ]);
+    } catch {
+      // ignore — surface via the busy spinner reset
+    } finally {
       setBusy(false);
     }
   };
@@ -125,42 +143,110 @@ export default function CameraScreen() {
         quality: 0.7,
         base64: true,
         allowsEditing: false,
+        allowsMultipleSelection: true,
       });
-      if (res.canceled || !res.assets?.[0]?.base64) {
+      if (res.canceled || !res.assets?.length) {
         setBusy(false);
         return;
       }
-      const a = res.assets[0];
-      const mime = (a.mimeType || 'image/jpeg').toLowerCase();
-      setPendingAnalysis({ base64: a.base64!, mimeType: mime });
-      router.replace('/analyzing');
-    } catch {
+      const newPages: CapturedPage[] = [];
+      for (const a of res.assets) {
+        if (!a.base64) continue;
+        const mime = (a.mimeType || 'image/jpeg').toLowerCase();
+        newPages.push({ base64: a.base64, mimeType: mime, uri: a.uri });
+      }
+      if (newPages.length === 0) {
+        setBusy(false);
+        return;
+      }
+      setPages((prev) => [...prev, ...newPages]);
+    } finally {
       setBusy(false);
     }
+  };
+
+  const handleRemove = (idx: number) => {
+    setPages((prev) => prev.filter((_, i) => i !== idx));
+  };
+
+  const handleDone = () => {
+    if (pages.length === 0) return;
+    setPendingAnalysis({
+      pages: pages.map((p) => ({ base64: p.base64, mimeType: p.mimeType })),
+    });
+    router.replace('/analyzing');
+  };
+
+  const handleClose = () => {
+    if (pages.length === 0) {
+      router.back();
+      return;
+    }
+    Alert.alert(t(lang, 'cancel'), '', [
+      { text: t(lang, 'cancel'), style: 'cancel' },
+      {
+        text: t(lang, 'delete'),
+        style: 'destructive',
+        onPress: () => router.back(),
+      },
+    ]);
   };
 
   const cycleFlash = () => {
     setFlash((f) => (f === 'off' ? 'on' : f === 'on' ? 'auto' : 'off'));
   };
 
-  // Web preview: CameraView is not supported on react-native-web; fall back
-  // to library picker UI. This must be checked BEFORE the permission gate
-  // because expo-camera permissions are not implemented on web and would
-  // otherwise force users into the permission-denied UI.
+  // Permission states
   if (Platform.OS === 'web') {
-    // CameraView on web is limited; fall back to library picker UI.
     return (
       <SafeAreaView style={styles.permissionWrap}>
         <View style={styles.permissionInner}>
           <Text style={styles.permTitle}>{t(lang, 'scan_document')}</Text>
           <Text style={styles.permBody}>
-            The live camera scanner runs on iPhone via Expo Go. On the web preview please pick an image from your library.
+            The live multi-page scanner runs on iPhone via Expo Go. On the web preview please pick one or more images from your library.
           </Text>
           <Button
             label={t(lang, 'pick_from_library')}
             onPress={handleLibrary}
             loading={busy}
             testID="camera-pick-library-web"
+          />
+          {pages.length > 0 ? (
+            <Button
+              label={`${t(lang, 'done')} · ${pages.length}`}
+              onPress={handleDone}
+              testID="camera-web-done"
+              icon={<Check color={colors.white} size={18} strokeWidth={2.5} />}
+            />
+          ) : null}
+          <Pressable onPress={() => router.back()} style={styles.permCancel}>
+            <Text style={styles.permCancelLabel}>{t(lang, 'cancel')}</Text>
+          </Pressable>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (!permission) {
+    return (
+      <View style={styles.permissionWrap}>
+        <ActivityIndicator color={colors.white} />
+      </View>
+    );
+  }
+
+  if (!permission.granted) {
+    return (
+      <SafeAreaView style={styles.permissionWrap}>
+        <View style={styles.permissionInner}>
+          <Text style={styles.permTitle}>{t(lang, 'open_camera')}</Text>
+          <Text style={styles.permBody}>
+            {t(lang, 'tip_lighting')} · {t(lang, 'tip_flat')} · {t(lang, 'tip_full_page')}
+          </Text>
+          <Button
+            label={t(lang, 'open_camera')}
+            onPress={requestPermission}
+            testID="camera-grant"
           />
           <Pressable onPress={() => router.back()} style={styles.permCancel}>
             <Text style={styles.permCancelLabel}>{t(lang, 'cancel')}</Text>
@@ -172,6 +258,10 @@ export default function CameraScreen() {
 
   const FlashIcon = flash === 'off' ? ZapOff : Zap;
   const flashLabel = flash === 'off' ? 'Off' : flash === 'on' ? 'On' : 'Auto';
+  const tipText = pages.length === 0
+    ? t(lang, 'tip_full_page')
+    : t(lang, 'multi_page_hint');
+  const pageCount = pages.length;
 
   return (
     <View style={styles.root} testID="camera-screen">
@@ -205,7 +295,7 @@ export default function CameraScreen() {
         {/* Top bar */}
         <View style={styles.topBar} pointerEvents="box-none">
           <Pressable
-            onPress={() => router.back()}
+            onPress={handleClose}
             style={styles.iconChip}
             testID="camera-close"
             hitSlop={10}
@@ -213,7 +303,7 @@ export default function CameraScreen() {
             <X color={colors.white} size={22} strokeWidth={2.6} />
           </Pressable>
           <Animated.View style={[styles.tipChip, { opacity: tipFade }]}>
-            <Text style={styles.tipText}>{t(lang, 'tip_full_page')}</Text>
+            <Text style={styles.tipText}>{tipText}</Text>
           </Animated.View>
           <Pressable
             onPress={cycleFlash}
@@ -230,33 +320,76 @@ export default function CameraScreen() {
           </Pressable>
         </View>
 
-        {/* Bottom bar */}
-        <View style={styles.bottomBar} pointerEvents="box-none">
-          <Pressable
-            onPress={handleLibrary}
-            disabled={busy}
-            style={[styles.sideBtn, busy && { opacity: 0.4 }]}
-            testID="camera-library"
-            hitSlop={8}
-          >
-            <ImageIcon color={colors.white} size={22} strokeWidth={2.4} />
-          </Pressable>
-
-          <Pressable
-            onPress={handleCapture}
-            disabled={busy || !ready}
-            style={[styles.shutterOuter, (busy || !ready) && { opacity: 0.5 }]}
-            testID="camera-shutter"
-            hitSlop={6}
-          >
-            <View style={styles.shutterRing}>
-              <View style={styles.shutterInner}>
-                {busy ? <ActivityIndicator color={colors.white} /> : null}
-              </View>
+        {/* Bottom area: thumbnail strip + bar */}
+        <View pointerEvents="box-none">
+          {pageCount > 0 ? (
+            <View style={styles.thumbStripWrap} testID="camera-thumb-strip">
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.thumbStripContent}
+              >
+                {pages.map((p, i) => (
+                  <View key={p.uri + i} style={styles.thumbItem}>
+                    <Image source={{ uri: p.uri }} style={styles.thumbImg} />
+                    <View style={styles.thumbNumber}>
+                      <Text style={styles.thumbNumberText}>{i + 1}</Text>
+                    </View>
+                    <Pressable
+                      onPress={() => handleRemove(i)}
+                      hitSlop={8}
+                      style={styles.thumbRemove}
+                      testID={`camera-thumb-remove-${i}`}
+                    >
+                      <X color={colors.white} size={12} strokeWidth={3} />
+                    </Pressable>
+                  </View>
+                ))}
+              </ScrollView>
             </View>
-          </Pressable>
+          ) : null}
 
-          <View style={styles.sideBtn} />
+          <View style={styles.bottomBar} pointerEvents="box-none">
+            <Pressable
+              onPress={handleLibrary}
+              disabled={busy}
+              style={[styles.sideBtn, busy && { opacity: 0.4 }]}
+              testID="camera-library"
+              hitSlop={8}
+            >
+              <ImageIcon color={colors.white} size={22} strokeWidth={2.4} />
+            </Pressable>
+
+            <Pressable
+              onPress={handleCapture}
+              disabled={busy || !ready}
+              style={[styles.shutterOuter, (busy || !ready) && { opacity: 0.5 }]}
+              testID="camera-shutter"
+              hitSlop={6}
+            >
+              <View style={styles.shutterRing}>
+                <View style={styles.shutterInner}>
+                  {busy ? <ActivityIndicator color={colors.white} /> : null}
+                </View>
+              </View>
+            </Pressable>
+
+            {pageCount > 0 ? (
+              <Pressable
+                onPress={handleDone}
+                style={styles.doneBtn}
+                testID="camera-done"
+                hitSlop={6}
+              >
+                <Check color={colors.white} size={18} strokeWidth={2.6} />
+                <Text style={styles.doneLabel}>
+                  {t(lang, 'done')} · {pageCount}
+                </Text>
+              </Pressable>
+            ) : (
+              <View style={styles.sideBtn} />
+            )}
+          </View>
         </View>
       </SafeAreaView>
     </View>
@@ -264,7 +397,6 @@ export default function CameraScreen() {
 }
 
 const FRAME_PADDING_H = 24;
-// Document framing aspect (portrait A4-ish). 0.707 = 1 / sqrt(2).
 const FRAME_ASPECT = 0.707;
 
 const styles = StyleSheet.create({
@@ -356,6 +488,60 @@ const styles = StyleSheet.create({
     borderRightWidth: 4,
     borderBottomRightRadius: 12,
   },
+  thumbStripWrap: {
+    paddingVertical: spacing.sm,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+  },
+  thumbStripContent: {
+    paddingHorizontal: spacing.md,
+    gap: 10,
+    alignItems: 'center',
+  },
+  thumbItem: {
+    width: 56,
+    height: 72,
+    borderRadius: radius.sm,
+    backgroundColor: '#222',
+    overflow: 'visible',
+    borderWidth: 2,
+    borderColor: '#FFFFFF',
+    position: 'relative',
+  },
+  thumbImg: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 4,
+  },
+  thumbNumber: {
+    position: 'absolute',
+    left: 2,
+    top: 2,
+    minWidth: 20,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 10,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  thumbNumberText: {
+    color: colors.white,
+    fontSize: 11,
+    fontWeight: fontWeight.bold,
+  },
+  thumbRemove: {
+    position: 'absolute',
+    right: -8,
+    top: -8,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: colors.red.solid,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: '#FFFFFF',
+  },
   bottomBar: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -371,6 +557,23 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.4)',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  doneBtn: {
+    minWidth: 96,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: colors.primary,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 14,
+    gap: 6,
+  },
+  doneLabel: {
+    color: colors.white,
+    fontSize: fontSize.base,
+    fontWeight: fontWeight.bold,
+    letterSpacing: 0.2,
   },
   shutterOuter: {
     width: 84,

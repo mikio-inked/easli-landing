@@ -55,9 +55,14 @@ export async function resetAll(): Promise<void> {
 
 // ---- Transient pending-analysis store (memory only) ----
 
-export interface PendingAnalysis {
+export interface PendingPage {
   base64: string;
   mimeType: string;
+  uri?: string; // local file uri, used only for thumbnails on the camera screen
+}
+
+export interface PendingAnalysis {
+  pages: PendingPage[];
 }
 
 let pending: PendingAnalysis | null = null;

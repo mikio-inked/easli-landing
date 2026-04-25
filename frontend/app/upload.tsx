@@ -60,7 +60,7 @@ export default function UploadScreen() {
         return;
       }
       const b64 = await FileSystem.readAsStringAsync(a.uri, { encoding: 'base64' as any });
-      setPendingAnalysis({ base64: b64, mimeType: 'application/pdf' });
+      setPendingAnalysis({ pages: [{ base64: b64, mimeType: 'application/pdf' }] });
       router.replace('/analyzing');
     } catch (e: any) {
       Alert.alert(t(lang, 'error_generic'), e?.message || '');
@@ -95,7 +95,7 @@ export default function UploadScreen() {
         Alert.alert(t(lang, 'error_generic'), t(lang, 'error_no_image'));
         return;
       }
-      setPendingAnalysis({ base64: a.base64, mimeType: mime });
+      setPendingAnalysis({ pages: [{ base64: a.base64, mimeType: mime }] });
       router.replace('/analyzing');
     } catch (e: any) {
       Alert.alert(t(lang, 'error_generic'), e?.message || '');
