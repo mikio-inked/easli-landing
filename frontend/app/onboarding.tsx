@@ -65,7 +65,15 @@ export default function Onboarding() {
   return (
     <SafeAreaView style={styles.safe} testID="onboarding-screen">
       <View style={styles.topBar}>
-        <Text style={styles.brand}>KlarPost</Text>
+        <View style={styles.brandRow}>
+          <Image
+            source={require('../assets/images/icon.png')}
+            style={styles.brandLogo}
+            resizeMode="cover"
+            accessibilityLabel="KlarPost"
+          />
+          <Text style={styles.brand}>KlarPost</Text>
+        </View>
         <Pressable onPress={finish} testID="onboarding-skip">
           <Text style={styles.skip}>{t(lang, 'skip')}</Text>
         </Pressable>
@@ -134,6 +142,16 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+  },
+  brandRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  brandLogo: {
+    width: 36,
+    height: 36,
+    borderRadius: radius.md,
   },
   brand: {
     fontSize: fontSize.xl,

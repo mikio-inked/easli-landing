@@ -88,9 +88,12 @@ export default function Home() {
     <SafeAreaView style={styles.safe} testID="home-screen">
       <View style={styles.topBar}>
         <View style={styles.brandRow}>
-          <View style={styles.brandLogo}>
-            <ShieldCheck color={colors.primary} size={22} strokeWidth={2.6} />
-          </View>
+          <Image
+            source={require('../assets/images/icon.png')}
+            style={styles.brandLogo}
+            resizeMode="cover"
+            accessibilityLabel="KlarPost"
+          />
           <Text style={styles.brandText}>KlarPost</Text>
         </View>
         <View style={styles.topActions}>
