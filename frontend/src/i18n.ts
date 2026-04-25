@@ -118,7 +118,18 @@ export type UIKey =
   | 'notif_body'
   | 'pdf_view_unsupported'
   | 'pages_used'
-  | 'multi_page_hint';
+  | 'multi_page_hint'
+  | 'ask_question'
+  | 'chat_placeholder'
+  | 'chat_thinking'
+  | 'chat_clear_confirm'
+  | 'chat_scope_note'
+  | 'chat_empty_title'
+  | 'chat_empty_sub'
+  | 'chat_starter_1'
+  | 'chat_starter_2'
+  | 'chat_starter_3'
+  | 'chat_starter_4';
 
 type UIStrings = Record<UIKey, string>;
 
@@ -318,6 +329,17 @@ const zh: UIStrings = {
   pdf_view_unsupported: 'PDF 已保存在本机，但暂不支持在应用内预览。',
   pages_used: '已读取 {n} 页',
   multi_page_hint: '多页 · 继续拍摄，完成后点「完成」',
+  ask_question: '就此文件提问',
+  chat_placeholder: '请就这封信提问…',
+  chat_thinking: '思考中…',
+  chat_clear_confirm: '清空此对话？',
+  chat_scope_note: '我只能帮您理解这份文件。',
+  chat_empty_title: '关于这封信，您有什么想问的？',
+  chat_empty_sub: '我可以解释词语、截止日期、下一步以及如何礼貌回复 —— 但只限于这份文件。',
+  chat_starter_1: '用简单的话解释这封信',
+  chat_starter_2: '我接下来该做什么？',
+  chat_starter_3: '如果错过截止日期会怎样？',
+  chat_starter_4: '怎样礼貌地回复？',
 };
 
 const vi: UIStrings = {
@@ -417,6 +439,17 @@ const vi: UIStrings = {
   pdf_view_unsupported: 'PDF được lưu trên máy nhưng chưa thể xem trước trong ứng dụng.',
   pages_used: 'Đã đọc {n} trang',
   multi_page_hint: 'Nhiều trang · tiếp tục chụp, rồi nhấn Xong',
+  ask_question: 'Hỏi về tài liệu này',
+  chat_placeholder: 'Đặt câu hỏi về bức thư này…',
+  chat_thinking: 'Đang suy nghĩ…',
+  chat_clear_confirm: 'Xoá cuộc trò chuyện này?',
+  chat_scope_note: 'Tôi chỉ giúp về tài liệu này.',
+  chat_empty_title: 'Hỏi bất cứ điều gì về bức thư này',
+  chat_empty_sub: 'Tôi có thể giải thích từ ngữ, hạn chót, việc cần làm và cách trả lời lịch sự — chỉ trong phạm vi tài liệu này.',
+  chat_starter_1: 'Giải thích bức thư bằng lời đơn giản',
+  chat_starter_2: 'Tôi nên làm gì tiếp theo?',
+  chat_starter_3: 'Nếu tôi lỡ hạn thì sao?',
+  chat_starter_4: 'Tôi có thể trả lời lịch sự như thế nào?',
 };
 
 const tr: UIStrings = {
@@ -516,6 +549,17 @@ const tr: UIStrings = {
   pdf_view_unsupported: 'PDF cihaza kaydedildi ancak henüz uygulama içinde önizlenemiyor.',
   pages_used: '{n} sayfa okundu',
   multi_page_hint: 'Çok sayfalı · devam edin, bitince Tamam’a dokunun',
+  ask_question: 'Bu belge hakkında soru sor',
+  chat_placeholder: 'Bu mektup hakkında bir şey sorun…',
+  chat_thinking: 'Düşünüyor…',
+  chat_clear_confirm: 'Bu konuşma silinsin mi?',
+  chat_scope_note: 'Yalnızca bu belge konusunda yardımcı olabilirim.',
+  chat_empty_title: 'Bu mektup hakkında ne sormak istersiniz?',
+  chat_empty_sub: 'Kelimeleri, son tarihleri, ne yapmanız gerektiğini ve nasıl kibar yanıt vereceğinizi açıklayabilirim — yalnızca bu belge için.',
+  chat_starter_1: 'Bu mektubu basit kelimelerle açıkla',
+  chat_starter_2: 'Şimdi ne yapmalıyım?',
+  chat_starter_3: 'Son tarihi kaçırırsam ne olur?',
+  chat_starter_4: 'Nasıl kibarca yanıtlayabilirim?',
 };
 
 const ru: UIStrings = {
@@ -615,6 +659,17 @@ const ru: UIStrings = {
   pdf_view_unsupported: 'PDF сохранён на устройстве, но предпросмотр пока недоступен.',
   pages_used: 'Прочитано {n} стр.',
   multi_page_hint: 'Несколько страниц · снимайте дальше, затем «Готово»',
+  ask_question: 'Спросить про этот документ',
+  chat_placeholder: 'Задайте вопрос об этом письме…',
+  chat_thinking: 'Думаю…',
+  chat_clear_confirm: 'Очистить диалог?',
+  chat_scope_note: 'Я помогу только с этим документом.',
+  chat_empty_title: 'Спросите что угодно об этом письме',
+  chat_empty_sub: 'Я могу объяснить слова, сроки, что делать и как вежливо ответить — только по этому документу.',
+  chat_starter_1: 'Объясни это письмо простыми словами',
+  chat_starter_2: 'Что мне делать дальше?',
+  chat_starter_3: 'Что будет, если я пропущу срок?',
+  chat_starter_4: 'Как вежливо ответить?',
 };
 
 const es: UIStrings = {
@@ -714,6 +769,17 @@ const es: UIStrings = {
   pdf_view_unsupported: 'El PDF se guarda en el dispositivo pero aún no se puede previsualizar.',
   pages_used: 'Se leyeron {n} página(s)',
   multi_page_hint: 'Varias páginas · sigue, luego pulsa Listo',
+  ask_question: 'Preguntar sobre este documento',
+  chat_placeholder: 'Haz una pregunta sobre esta carta…',
+  chat_thinking: 'Pensando…',
+  chat_clear_confirm: '¿Borrar esta conversación?',
+  chat_scope_note: 'Solo puedo ayudarte con este documento.',
+  chat_empty_title: '¿Qué quieres saber sobre esta carta?',
+  chat_empty_sub: 'Puedo explicar palabras, plazos, qué hacer y cómo responder con educación — solo sobre este documento.',
+  chat_starter_1: 'Explica esta carta en palabras sencillas',
+  chat_starter_2: '¿Qué debo hacer a continuación?',
+  chat_starter_3: '¿Y si no llego al plazo?',
+  chat_starter_4: '¿Cómo puedo responder con educación?',
 };
 
 const STRINGS: Record<LanguageCode, UIStrings> = { en, zh, vi, tr, ru, es };

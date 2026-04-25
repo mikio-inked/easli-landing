@@ -27,6 +27,7 @@ import {
   HelpCircle,
   Info,
   ListTodo,
+  MessageCircle,
   Reply,
   RotateCcw,
   ShieldAlert,
@@ -481,9 +482,16 @@ export default function ResultScreen() {
         </View>
 
         <Button
+          label={t(lang, 'ask_question')}
+          onPress={() => router.push(`/chat?id=${encodeURIComponent(record.id)}`)}
+          icon={<MessageCircle color={colors.white} size={18} strokeWidth={2.5} />}
+          testID="result-ask-question"
+        />
+        <Button
           label={t(lang, 'analyze_again')}
           onPress={() => router.replace('/home')}
-          icon={<RotateCcw color={colors.white} size={18} strokeWidth={2.5} />}
+          variant="secondary"
+          icon={<RotateCcw color={colors.primary} size={18} strokeWidth={2.5} />}
           testID="result-analyze-again"
         />
         <View style={{ height: spacing.lg }} />

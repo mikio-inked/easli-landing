@@ -56,6 +56,13 @@ export interface AnalysisListItem {
   summary_translated: string;
 }
 
+export interface ChatMessage {
+  role: 'user' | 'assistant';
+  content: string;
+  off_topic: boolean;
+  created_at: string;
+}
+
 async function jsonOrThrow<T>(res: Response): Promise<T> {
   const text = await res.text();
   let body: any = null;
@@ -110,5 +117,33 @@ export async function deleteAllAnalyses(deviceId: string): Promise<void> {
   const res = await fetch(`${BASE_URL}/api/analyses?device_id=${encodeURIComponent(deviceId)}`, {
     method: 'DELETE',
   });
+  await jsonOrThrow(res);
+}
+
+export async function listChatMessages(analysisId: string, deviceId: string): Promise<ChatMessage[]> {
+  const res = await fetch(
+    `${BASE_URL}/api/analyses/${encodeURIComponent(analysisId)}/messages?device_id=${encodeURIComponent(deviceId)}`
+  );
+  return jsonOrThrow<ChatMessage[]>(res);
+}
+
+export async function sendChatMessage(
+  analysisId: string,
+  deviceId: string,
+  message: string
+): Promise<ChatMessage> {
+  const res = await fetch(`${BASE_URL}/api/analyses/${encodeURIComponent(analysisId)}/chat`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ device_id: deviceId, message }),
+  });
+  return jsonOrThrow<ChatMessage>(res);
+}
+
+export async function clearChatMessages(analysisId: string, deviceId: string): Promise<void> {
+  const res = await fetch(
+    `${BASE_URL}/api/analyses/${encodeURIComponent(analysisId)}/messages?device_id=${encodeURIComponent(deviceId)}`,
+    { method: 'DELETE' }
+  );
   await jsonOrThrow(res);
 }
