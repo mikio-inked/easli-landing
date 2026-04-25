@@ -64,6 +64,14 @@ export default function Analyzing() {
         if (intervalRef.current) clearInterval(intervalRef.current);
         setStep(3);
         setLastResult(record);
+        // Optional on-device storage of the original document — opt-in only.
+        try {
+          if (await getSaveOriginals()) {
+            await saveOriginal(record.id, pending.base64, pending.mimeType);
+          }
+        } catch {
+          // Non-fatal: result is already saved on the server.
+        }
         // Small pause so the user sees the final tick before navigating.
         setTimeout(() => router.replace(`/result?id=${encodeURIComponent(record.id)}`), 350);
       } catch (e: any) {

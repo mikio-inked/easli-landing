@@ -1,6 +1,6 @@
 // Result screen — renders the structured analysis as stacked cards.
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -10,16 +10,19 @@ import {
   Text,
   View,
 } from 'react-native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Clipboard from 'expo-clipboard';
 import {
   AlertTriangle,
   ArrowLeft,
+  Bell,
+  BellRing,
   Building2,
   CalendarClock,
   CheckCircle2,
   Copy,
+  Eye,
   FileText,
   HelpCircle,
   Info,
@@ -29,6 +32,7 @@ import {
   ShieldAlert,
   Sparkles,
   Trash2,
+  XCircle,
 } from 'lucide-react-native';
 import { Badge, Button, Card, SectionTitle } from '../src/ui';
 import {
@@ -39,6 +43,13 @@ import {
 } from '../src/store';
 import { AnalysisRecord, deleteAnalysis, getAnalysis } from '../src/api';
 import { LanguageCode, t } from '../src/i18n';
+import {
+  cancelAllForAnalysis,
+  cancelReminder,
+  getReminders,
+  ReminderRecord,
+} from '../src/notifications';
+import { deleteOriginal, hasOriginal } from '../src/originals';
 import { colors, fontSize, fontWeight, radius, spacing } from '../src/theme';
 
 function riskMeta(level: 'green' | 'yellow' | 'red', lang: LanguageCode) {
@@ -63,6 +74,29 @@ function riskMeta(level: 'green' | 'yellow' | 'red', lang: LanguageCode) {
   };
 }
 
+function deadlineKeyFor(idx: number, d: { date: string; description: string }): string {
+  return `${idx}|${(d.date || '').trim()}|${(d.description || '').slice(0, 40).trim()}`;
+}
+
+function tryParseDeadlineDate(raw: string): Date | null {
+  if (!raw) return null;
+  const s = raw.trim();
+  // ISO first
+  const iso = new Date(s);
+  if (!isNaN(iso.getTime()) && /\d{4}/.test(s)) return iso;
+  // German DD.MM.YYYY
+  const dm = s.match(/^(\d{1,2})[.\/-](\d{1,2})[.\/-](\d{2,4})$/);
+  if (dm) {
+    const day = parseInt(dm[1], 10);
+    const mon = parseInt(dm[2], 10) - 1;
+    let yr = parseInt(dm[3], 10);
+    if (yr < 100) yr += 2000;
+    const d = new Date(yr, mon, day, 9, 0, 0, 0);
+    if (!isNaN(d.getTime())) return d;
+  }
+  return null;
+}
+
 export default function ResultScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id?: string }>();
@@ -70,6 +104,13 @@ export default function ResultScreen() {
   const [record, setRecord] = useState<AnalysisRecord | null>(null);
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState(false);
+  const [reminders, setReminders] = useState<ReminderRecord[]>([]);
+  const [originalSaved, setOriginalSaved] = useState(false);
+
+  const refreshReminders = useCallback(async (recordId: string) => {
+    const list = await getReminders(recordId);
+    setReminders(list);
+  }, []);
 
   useEffect(() => {
     (async () => {
@@ -79,6 +120,8 @@ export default function ResultScreen() {
       if (cached && (!id || cached.id === id)) {
         setRecord(cached);
         setLoading(false);
+        await refreshReminders(cached.id);
+        setOriginalSaved(await hasOriginal(cached.id));
         return;
       }
       if (!id) {
@@ -90,13 +133,24 @@ export default function ResultScreen() {
         const r = await getAnalysis(id, did);
         setLastResult(r);
         setRecord(r);
+        await refreshReminders(r.id);
+        setOriginalSaved(await hasOriginal(r.id));
       } catch {
         setRecord(null);
       } finally {
         setLoading(false);
       }
     })();
-  }, [id]);
+  }, [id, refreshReminders]);
+
+  // When returning from the reminder modal, refresh the reminders list.
+  useFocusEffect(
+    useCallback(() => {
+      if (record?.id) {
+        refreshReminders(record.id);
+      }
+    }, [record?.id, refreshReminders])
+  );
 
   if (loading) {
     return (
@@ -143,6 +197,8 @@ export default function ResultScreen() {
           const did = await ensureDeviceId();
           try {
             await deleteAnalysis(record.id, did);
+            await cancelAllForAnalysis(record.id);
+            await deleteOriginal(record.id);
             setLastResult(null);
             router.replace('/home');
           } catch (e: any) {
@@ -162,9 +218,20 @@ export default function ResultScreen() {
         <Text style={styles.headerTitle} numberOfLines={1}>
           {r.document_type || t(lang, 'document_type')}
         </Text>
-        <Pressable onPress={onDelete} testID="result-delete" hitSlop={12}>
-          <Trash2 color={colors.textSecondary} size={22} strokeWidth={2.2} />
-        </Pressable>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+          {originalSaved ? (
+            <Pressable
+              onPress={() => router.push(`/original?id=${encodeURIComponent(record.id)}`)}
+              testID="result-view-original"
+              hitSlop={12}
+            >
+              <Eye color={colors.primary} size={22} strokeWidth={2.4} />
+            </Pressable>
+          ) : null}
+          <Pressable onPress={onDelete} testID="result-delete" hitSlop={12}>
+            <Trash2 color={colors.textSecondary} size={22} strokeWidth={2.2} />
+          </Pressable>
+        </View>
       </View>
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
@@ -250,26 +317,86 @@ export default function ResultScreen() {
           <SectionRow icon={<CalendarClock color={colors.primary} size={18} strokeWidth={2.5} />} title={t(lang, 'deadlines')} />
           {r.deadlines && r.deadlines.length > 0 ? (
             <View style={{ gap: spacing.sm }}>
-              {r.deadlines.map((d, i) => (
-                <View key={i} style={styles.deadlineItem}>
-                  <View style={styles.deadlineDateChip}>
-                    <Text style={styles.deadlineDate}>{d.date || '—'}</Text>
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.deadlineDesc}>{d.description}</Text>
-                    {d.confidence ? (
-                      <View style={{ marginTop: 4 }}>
-                        <Badge
-                          label={d.confidence}
-                          variant={
-                            d.confidence === 'high' ? 'green' : d.confidence === 'medium' ? 'yellow' : 'neutral'
-                          }
-                        />
+              {r.deadlines.map((d, i) => {
+                const key = deadlineKeyFor(i, d);
+                const existing = reminders.find((rm) => rm.deadlineKey === key);
+                const parsed = tryParseDeadlineDate(d.date);
+                const isPast = parsed ? parsed.getTime() < Date.now() : false;
+                const onToggleReminder = () => {
+                  if (existing) {
+                    Alert.alert(t(lang, 'cancel_reminder'), '', [
+                      { text: t(lang, 'cancel'), style: 'cancel' },
+                      {
+                        text: t(lang, 'delete'),
+                        style: 'destructive',
+                        onPress: async () => {
+                          await cancelReminder(record.id, key);
+                          await refreshReminders(record.id);
+                        },
+                      },
+                    ]);
+                    return;
+                  }
+                  if (isPast) {
+                    Alert.alert(t(lang, 'past_deadline'));
+                    return;
+                  }
+                  router.push({
+                    pathname: '/reminder',
+                    params: {
+                      analysisId: record.id,
+                      deadlineKey: key,
+                      deadlineIso: parsed ? parsed.toISOString() : '',
+                      description: d.description || '',
+                    },
+                  });
+                };
+                return (
+                  <View key={i} style={styles.deadlineItem}>
+                    <View style={styles.deadlineDateChip}>
+                      <Text style={styles.deadlineDate}>{d.date || '—'}</Text>
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.deadlineDesc}>{d.description}</Text>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 6, flexWrap: 'wrap' }}>
+                        {d.confidence ? (
+                          <Badge
+                            label={d.confidence}
+                            variant={
+                              d.confidence === 'high' ? 'green' : d.confidence === 'medium' ? 'yellow' : 'neutral'
+                            }
+                          />
+                        ) : null}
+                        <Pressable
+                          onPress={onToggleReminder}
+                          style={[
+                            styles.reminderBtn,
+                            existing && { backgroundColor: colors.green.bg, borderColor: colors.green.border },
+                          ]}
+                          testID={`reminder-toggle-${i}`}
+                        >
+                          {existing ? (
+                            <BellRing color={colors.green.text} size={14} strokeWidth={2.5} />
+                          ) : (
+                            <Bell color={colors.primary} size={14} strokeWidth={2.5} />
+                          )}
+                          <Text
+                            style={[
+                              styles.reminderBtnLabel,
+                              existing && { color: colors.green.text },
+                            ]}
+                          >
+                            {existing ? t(lang, 'reminder_set') : t(lang, 'remind_me')}
+                          </Text>
+                          {existing ? (
+                            <XCircle color={colors.green.text} size={14} strokeWidth={2.4} />
+                          ) : null}
+                        </Pressable>
                       </View>
-                    ) : null}
+                    </View>
                   </View>
-                </View>
-              ))}
+                );
+              })}
             </View>
           ) : (
             <Text style={[styles.body, { color: colors.textSecondary }]}>{t(lang, 'no_deadlines')}</Text>
@@ -562,6 +689,22 @@ const styles = StyleSheet.create({
   copyLabel: {
     color: colors.primary,
     fontSize: fontSize.sm,
+    fontWeight: fontWeight.bold,
+  },
+  reminderBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: radius.full,
+    backgroundColor: colors.primarySoft,
+    borderWidth: 1,
+    borderColor: colors.primarySoft,
+  },
+  reminderBtnLabel: {
+    color: colors.primary,
+    fontSize: fontSize.xs,
     fontWeight: fontWeight.bold,
   },
   subSectionTitle: {

@@ -99,7 +99,25 @@ export type UIKey =
   | 'analyze_again'
   | 'no_explanation'
   | 'today'
-  | 'yesterday';
+  | 'yesterday'
+  | 'save_originals'
+  | 'save_originals_sub'
+  | 'view_original'
+  | 'remind_me'
+  | 'reminder_set'
+  | 'cancel_reminder'
+  | 'pick_when_remind'
+  | 'preset_7d'
+  | 'preset_3d'
+  | 'preset_1d'
+  | 'preset_dayof'
+  | 'preset_custom'
+  | 'past_deadline'
+  | 'permission_needed'
+  | 'notif_title'
+  | 'notif_body'
+  | 'pdf_view_unsupported'
+  | 'pages_used';
 
 type UIStrings = Record<UIKey, string>;
 
@@ -181,6 +199,24 @@ const en: UIStrings = {
   no_explanation: 'No explanation available.',
   today: 'Today',
   yesterday: 'Yesterday',
+  save_originals: 'Save originals on this device',
+  save_originals_sub: 'Originals stay on your iPhone, never uploaded to a server.',
+  view_original: 'View original',
+  remind_me: 'Remind me',
+  reminder_set: 'Reminder set',
+  cancel_reminder: 'Cancel reminder',
+  pick_when_remind: 'When should I remind you?',
+  preset_7d: '7 days before, 9:00',
+  preset_3d: '3 days before, 9:00',
+  preset_1d: '1 day before, 9:00',
+  preset_dayof: 'On the day, 9:00',
+  preset_custom: 'Custom date & time',
+  past_deadline: 'This date is in the past. Pick a later time.',
+  permission_needed: 'Notification permission is required.',
+  notif_title: 'Upcoming deadline',
+  notif_body: "Don't forget about this deadline from KlarPost.",
+  pdf_view_unsupported: 'PDFs are stored on this device but cannot be previewed yet.',
+  pages_used: 'Read {n} page(s)',
 };
 
 const zh: UIStrings = {
@@ -261,6 +297,24 @@ const zh: UIStrings = {
   no_explanation: '暂无解释。',
   today: '今天',
   yesterday: '昨天',
+  save_originals: '在本机保存原始文件',
+  save_originals_sub: '原件只保留在您的 iPhone 上，绝不会上传到服务器。',
+  view_original: '查看原件',
+  remind_me: '提醒我',
+  reminder_set: '已设提醒',
+  cancel_reminder: '取消提醒',
+  pick_when_remind: '什么时候提醒您？',
+  preset_7d: '提前 7 天，上午 9:00',
+  preset_3d: '提前 3 天，上午 9:00',
+  preset_1d: '提前 1 天，上午 9:00',
+  preset_dayof: '当天上午 9:00',
+  preset_custom: '自定义日期和时间',
+  past_deadline: '所选时间已过，请选择更晚的时间。',
+  permission_needed: '需要通知权限。',
+  notif_title: '即将到期',
+  notif_body: '别忘了这个来自 KlarPost 的截止日期。',
+  pdf_view_unsupported: 'PDF 已保存在本机，但暂不支持在应用内预览。',
+  pages_used: '已读取 {n} 页',
 };
 
 const vi: UIStrings = {
@@ -501,6 +555,24 @@ const ru: UIStrings = {
   no_explanation: 'Объяснение недоступно.',
   today: 'Сегодня',
   yesterday: 'Вчера',
+  save_originals: 'Сохранять оригиналы на этом устройстве',
+  save_originals_sub: 'Оригиналы остаются только на вашем iPhone и никогда не отправляются на сервер.',
+  view_original: 'Открыть оригинал',
+  remind_me: 'Напомнить',
+  reminder_set: 'Напоминание установлено',
+  cancel_reminder: 'Отменить напоминание',
+  pick_when_remind: 'Когда напомнить?',
+  preset_7d: 'За 7 дней, 09:00',
+  preset_3d: 'За 3 дня, 09:00',
+  preset_1d: 'За 1 день, 09:00',
+  preset_dayof: 'В день, 09:00',
+  preset_custom: 'Своя дата и время',
+  past_deadline: 'Это время уже прошло. Выберите более позднее.',
+  permission_needed: 'Нужно разрешение на уведомления.',
+  notif_title: 'Скоро срок',
+  notif_body: 'Не забудьте про этот срок из KlarPost.',
+  pdf_view_unsupported: 'PDF сохранён на устройстве, но предпросмотр пока недоступен.',
+  pages_used: 'Прочитано {n} стр.',
 };
 
 const es: UIStrings = {

@@ -1,0 +1,50 @@
+{
+  "summary": "Iteration 3 testing complete. Backend multi-page PDF support works as designed (3-page combined, 7-page truncated to first 5, zh CJK on multi-page) and JPEG regression still passes — 6/6 pytest cases green against live LLM. Frontend: settings toggle, reminder modal, original screen, and app boot regression all verified on the Expo web preview. One web-only side effect surfaced: expo-file-system/legacy.getInfoAsync is not implemented for web, so calling hasOriginal/deleteAllOriginals/loadOriginal on the web preview produces an unhandled promise rejection that triggers the dev LogBox overlay. The screens themselves still render and persist data correctly; this should not occur on real iOS / Expo Go.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [
+      {
+        "flow": "originals on web preview",
+        "issue": "expo-file-system/legacy is not supported on react-native-web. Any call into src/originals.ts (hasOriginal, loadOriginal, deleteAllOriginals) throws 'expo-file-system.getInfoAsync is not available on web'. Observed in 3 places: (1) toggling settings-save-originals-toggle OFF triggers deleteAllOriginals() -> unhandled rejection + LogBox overlay (the AsyncStorage flag still flips to '0' correctly); (2) navigating to /original?id=... in web preview, the screen renders but throws while trying readMeta; (3) result.tsx useEffect calls hasOriginal(record.id) which throws on web. On native iOS this works fine. Suggest wrapping the getInfoAsync calls in try/catch (return null/false on failure) so the web preview stays clean and result-view-original conditional is safe to evaluate on web.",
+        "affected_testIDs": ["settings-save-originals-toggle", "original-screen", "result-screen", "result-view-original"]
+      }
+    ],
+    "design_issues": [],
+    "react_native_issues": [
+      {
+        "component": "expo-notifications on web",
+        "issue": "Console warning: '[expo-notifications] Listening to push token changes is not yet fully supported on web.' Harmless on web; full notifications only work on Expo Go / native. Flagged so retesting on iOS device covers actual scheduleReminder behaviour."
+      }
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_klarpost_api.py",
+    "/app/backend/tests/test_multipage_pdf.py",
+    "/app/test_reports/pytest/iter3_results.xml",
+    "/app/test_reports/iteration_2.json"
+  ],
+  "action_items": [
+    "Harden src/originals.ts so all FileSystem.getInfoAsync (and downstream readAsStringAsync/writeAsStringAsync/deleteAsync) calls are wrapped in try/catch and return safe defaults (null / false / no-op) when running on web. This prevents the LogBox red overlay on the Expo web preview and makes hasOriginal()/deleteAllOriginals()/loadOriginal() safe to call from any platform.",
+    "(Optional) Guard expo-notifications.addPushTokenListener registration on Platform.OS === 'web' to suppress the web warning."
+  ],
+  "critical_code_review_comments": [
+    "backend/server.py pdf_to_images_base64 correctly clamps to first 5 pages and renders each at 2x scale via PyMuPDF; analyze_with_gpt sends them as separate ImageContent items with a 'page note' that asks the model to treat them as one document. Verified end-to-end against live GPT-5.2: page-1 (Mahnung/412,50 EUR) and page-2 (missing documents) details both surface in the combined analysis.",
+    "backend/server.py keeps the 12 MB request limit even though 5 PDF pages can blow past that. Test-rig had to switch to JPEG-encoded PDF pages to stay under cap. Real users uploading 5-page hi-res PDFs may hit 413; consider streaming-resize or raising the cap.",
+    "frontend/app/result.tsx always calls hasOriginal(record.id) in useEffect; on web this currently throws. See action item above.",
+    "frontend/app/reminder.tsx — preset-disabled logic correctly disables presets whose computed time is in the past, and reminder-confirm starts disabled until a preset is picked (verified). Continue button uses scheduleReminder which on web will fail silently because expo-notifications scheduling is no-op; not a functional regression for native.",
+    "frontend/src/originals.ts uses expo-file-system/legacy — confirm with main agent that the legacy import is the right choice given the SDK version; the new namespaced API would also have the same web limitation."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_multipage_pdf.py (NEW — 3 multi-page pdf tests)"
+  ],
+  "success_rate": {
+    "backend": "100% (6/6: 3 multi-page PDF + JPEG regression + 2 health)",
+    "frontend": "5/6 verified on web (settings toggle, reminder presets, reminder confirm enable/disable, original screen render, boot regression). The result-screen 'view-original chip absent' check could not be exercised without an existing analysis for device feat-device-1; logic inspection confirms originalSaved defaults to false and the icon block is conditionally rendered."
+  },
+  "seed_data_creation": "test_multipage_pdf.py uses ephemeral TEST_DEVICE_<uuid> ids — they leak a few analyses into Mongo but are namespaced and harmless. Pre-existing iteration-1/2 seed (device 92f12911-…, analysis b0da98a1-…) was not touched. localStorage seed (deviceId=feat-device-1, language=en, onboarded=1) was set in browser only; backend has no analyses for feat-device-1.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Backend multi-page PDF behaviour is fully covered by /app/backend/tests/test_multipage_pdf.py — re-run with `pytest backend/tests/ -v --tb=short`. Each pdf test takes ~15-25s of live LLM time. The only outstanding frontend issue is the web-only expo-file-system/legacy crash described above; once main agent guards the FS calls, re-test by navigating to /original and toggling settings-save-originals-toggle in the web preview and confirming no LogBox overlay appears. To fully test result-view-original chip visibility on web, first POST /api/analyze for device_id=feat-device-1 to seed an analysis, then visit /result?id=<that-id> — chip should be hidden because hasOriginal returns false on web (after the FS guard fix).",
+  "rca_of_issue": "RCA — web preview LogBox overlay: src/originals.ts performs `FileSystem.getInfoAsync(...)` unconditionally; the legacy module is a stub on react-native-web and rejects with 'getInfoAsync is not available on web'. Three code paths reach it on the web preview: (a) settings.tsx onToggleSaveOriginals(false) -> deleteAllOriginals(), (b) original.tsx useEffect -> loadOriginal() -> readMeta(), (c) result.tsx useEffect -> hasOriginal(). Mitigation: wrap each FileSystem call in try/catch returning null/false/empty on failure, OR short-circuit at the top of each function when Platform.OS === 'web'. This is a tiny non-business-logic change."
+}

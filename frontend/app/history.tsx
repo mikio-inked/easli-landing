@@ -17,6 +17,8 @@ import { Badge } from '../src/ui';
 import { ensureDeviceId, getLanguage as getStoredLanguage, setLastResult } from '../src/store';
 import { AnalysisListItem, deleteAnalysis, listAnalyses } from '../src/api';
 import { LanguageCode, t } from '../src/i18n';
+import { cancelAllForAnalysis } from '../src/notifications';
+import { deleteOriginal } from '../src/originals';
 import { colors, fontSize, fontWeight, radius, spacing } from '../src/theme';
 
 function formatDate(iso: string, lang: LanguageCode): string {
@@ -73,6 +75,8 @@ export default function HistoryScreen() {
           const id = await ensureDeviceId();
           try {
             await deleteAnalysis(it.id, id);
+            await cancelAllForAnalysis(it.id);
+            await deleteOriginal(it.id);
             setItems((prev) => prev.filter((x) => x.id !== it.id));
           } catch (e: any) {
             Alert.alert(t(lang, 'error_generic'), e?.message || '');

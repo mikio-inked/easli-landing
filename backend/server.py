@@ -11,7 +11,7 @@ import re
 import tempfile
 from pathlib import Path
 from pydantic import BaseModel, Field
-from typing import List, Optional, Literal
+from typing import List, Optional, Literal, Tuple
 import uuid
 from datetime import datetime, timezone
 
@@ -116,19 +116,23 @@ class AnalysisListItem(BaseModel):
 
 # ==================== HELPERS ====================
 
-def pdf_to_image_base64(pdf_bytes: bytes) -> tuple[str, str]:
-    """Convert first page of PDF to PNG base64. Returns (base64, mime)."""
+def pdf_to_images_base64(pdf_bytes: bytes, max_pages: int = 5) -> List[Tuple[str, str]]:
+    """Convert up to first `max_pages` pages of a PDF to PNG base64.
+    Returns a list of (base64, mime) tuples in page order.
+    """
     doc = fitz.open(stream=pdf_bytes, filetype="pdf")
     if doc.page_count == 0:
         doc.close()
         raise ValueError("PDF has no pages")
-    page = doc.load_page(0)
-    # Render at 2x for clarity
+    pages: List[Tuple[str, str]] = []
+    page_count = min(max_pages, doc.page_count)
     matrix = fitz.Matrix(2.0, 2.0)
-    pix = page.get_pixmap(matrix=matrix)
-    img_bytes = pix.tobytes("png")
+    for i in range(page_count):
+        page = doc.load_page(i)
+        pix = page.get_pixmap(matrix=matrix)
+        pages.append((base64.b64encode(pix.tobytes("png")).decode("utf-8"), "image/png"))
     doc.close()
-    return base64.b64encode(img_bytes).decode("utf-8"), "image/png"
+    return pages
 
 
 def build_system_prompt(target_language_label: str) -> str:
@@ -226,9 +230,11 @@ def extract_json_from_text(text: str) -> Optional[dict]:
     return None
 
 
-async def analyze_with_gpt(image_b64: str, mime_type: str, target_language_label: str) -> AnalysisResult:
+async def analyze_with_gpt(images: List[Tuple[str, str]], target_language_label: str) -> AnalysisResult:
     if not EMERGENT_LLM_KEY:
         raise HTTPException(status_code=500, detail="LLM key not configured")
+    if not images:
+        raise HTTPException(status_code=400, detail="No image content to analyze")
 
     session_id = f"klarpost-{uuid.uuid4()}"
     chat = LlmChat(
@@ -237,10 +243,19 @@ async def analyze_with_gpt(image_b64: str, mime_type: str, target_language_label
         system_message=build_system_prompt(target_language_label),
     ).with_model("openai", "gpt-5.2")
 
-    image_content = ImageContent(image_base64=image_b64)
+    image_contents = [ImageContent(image_base64=b64) for b64, _ in images]
+    page_note = (
+        f"This document has {len(images)} page(s). They are provided in order from page 1. "
+        "Treat them as ONE document and produce a single combined analysis."
+        if len(images) > 1
+        else ""
+    )
     user_message = UserMessage(
-        text=f"Please analyze this German document image and respond ONLY with the JSON object as specified. The user's selected target language is {target_language_label}.",
-        file_contents=[image_content],
+        text=(
+            f"Please analyze this German document and respond ONLY with the JSON object as specified. "
+            f"The user's selected target language is {target_language_label}. {page_note}"
+        ).strip(),
+        file_contents=image_contents,
     )
 
     try:
@@ -306,24 +321,22 @@ async def analyze_document(req: AnalyzeRequest):
         raise HTTPException(status_code=413, detail="File too large. Please use a file under 12MB.")
 
     mime = (req.mime_type or "").lower().strip()
-    image_b64: str
-    image_mime: str
+    images: List[Tuple[str, str]] = []
 
     if mime == "application/pdf" or mime == "pdf":
         try:
-            image_b64, image_mime = pdf_to_image_base64(raw_bytes)
+            images = pdf_to_images_base64(raw_bytes, max_pages=5)
         except Exception as e:
             logger.exception("PDF conversion failed")
             raise HTTPException(status_code=400, detail=f"Could not read PDF: {str(e)}")
     elif mime in ("image/jpeg", "image/jpg", "image/png", "image/webp", "image/heic", "image/heif"):
-        # For HEIC/HEIF, GPT may still accept; keep mime as-is
-        image_b64 = req.file_base64
         image_mime = "image/jpeg" if mime == "image/jpg" else mime
+        images = [(req.file_base64, image_mime)]
     else:
         raise HTTPException(status_code=400, detail=f"Unsupported file type: {req.mime_type}. Use JPEG, PNG, WEBP or PDF.")
 
     # Call GPT
-    result = await analyze_with_gpt(image_b64, image_mime, target_language_label)
+    result = await analyze_with_gpt(images, target_language_label)
 
     record = AnalysisRecord(
         device_id=req.device_id,

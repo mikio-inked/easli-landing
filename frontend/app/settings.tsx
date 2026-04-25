@@ -6,6 +6,7 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
+  Switch,
   Text,
   View,
 } from 'react-native';
@@ -14,6 +15,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import {
   ArrowLeft,
   ChevronRight,
+  HardDrive,
   HelpCircle,
   Languages as LanguagesIcon,
   Lock,
@@ -30,17 +32,31 @@ import {
   setLastResult,
 } from '../src/store';
 import { LanguageCode, getLanguage as getLanguageMeta, t } from '../src/i18n';
+import { cancelAllReminders } from '../src/notifications';
+import { deleteAllOriginals } from '../src/originals';
+import { getSaveOriginals, setSaveOriginals } from '../src/settings';
 import { colors, fontSize, fontWeight, radius, spacing } from '../src/theme';
 
 export default function SettingsScreen() {
   const router = useRouter();
   const [lang, setLang] = useState<LanguageCode>('en');
+  const [saveOriginals, setSaveOriginalsState] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
       getStoredLanguage().then((l) => setLang(l ?? 'en'));
+      getSaveOriginals().then(setSaveOriginalsState);
     }, [])
   );
+
+  const onToggleSaveOriginals = async (value: boolean) => {
+    setSaveOriginalsState(value);
+    await setSaveOriginals(value);
+    if (!value) {
+      // Turning OFF the toggle clears any locally saved originals.
+      await deleteAllOriginals();
+    }
+  };
 
   const onDeleteAll = () => {
     Alert.alert(t(lang, 'confirm_delete_all'), '', [
@@ -52,6 +68,8 @@ export default function SettingsScreen() {
           const id = await ensureDeviceId();
           try {
             await deleteAllAnalyses(id);
+            await cancelAllReminders();
+            await deleteAllOriginals();
             setLastResult(null);
             Alert.alert(t(lang, 'done'));
           } catch (e: any) {
@@ -75,6 +93,8 @@ export default function SettingsScreen() {
           } catch {
             // ignore
           }
+          await cancelAllReminders();
+          await deleteAllOriginals();
           await resetAll();
           setLastResult(null);
           router.replace('/onboarding');
@@ -95,6 +115,25 @@ export default function SettingsScreen() {
         <View style={{ width: 26 }} />
       </View>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        <Card>
+          <View style={styles.row}>
+            <View style={[styles.rowIcon, { backgroundColor: colors.primarySoft }]}>
+              <HardDrive color={colors.primary} size={20} strokeWidth={2.4} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.rowTitle}>{t(lang, 'save_originals')}</Text>
+              <Text style={styles.rowSub}>{t(lang, 'save_originals_sub')}</Text>
+            </View>
+            <Switch
+              value={saveOriginals}
+              onValueChange={onToggleSaveOriginals}
+              trackColor={{ false: colors.border, true: colors.primary }}
+              thumbColor={colors.white}
+              testID="settings-save-originals-toggle"
+            />
+          </View>
+        </Card>
+
         <Card>
           <Pressable
             onPress={() => router.push('/language')}
