@@ -591,7 +591,17 @@ async def list_analyses(device_id: str):
         raise HTTPException(status_code=400, detail="device_id is required")
     cursor = db.analyses.find(
         {"device_id": device_id},
-        {"_id": 0, "id": 1, "created_at": 1, "target_language": 1, "target_language_label": 1, "result": 1}
+        {
+            "_id": 0,
+            "id": 1,
+            "created_at": 1,
+            "target_language": 1,
+            "target_language_label": 1,
+            "result.document_type": 1,
+            "result.sender": 1,
+            "result.risk_level": 1,
+            "result.summary_translated": 1,
+        },
     ).sort("created_at", -1).limit(200)
     items: List[AnalysisListItem] = []
     async for doc in cursor:
