@@ -1,6 +1,6 @@
 // Onboarding flow — 3 swipeable steps with calm illustrations and a single big CTA.
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   Image,
   Pressable,
@@ -16,28 +16,28 @@ import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ArrowRight, ShieldCheck, ScanLine, Languages } from 'lucide-react-native';
 import { Button } from '../src/ui';
-import { setOnboarded } from '../src/store';
+import { getLanguage, setOnboarded } from '../src/store';
 import { colors, fontSize, fontWeight, radius, spacing } from '../src/theme';
-import { t } from '../src/i18n';
+import { LanguageCode, t } from '../src/i18n';
 
 const SLIDES = [
   {
     key: 'translate',
-    image: 'https://static.prod-images.emergentagent.com/jobs/1f0c6f21-2efe-4a5b-950e-770baf187f4d/images/f3c1092a5553559a52b9fee5cc730259954d0c214aa2c13e238cb266c39fa787.png',
+    image: require('../assets/images/onb1_translate.png'),
     icon: Languages,
     titleKey: 'onb1_title' as const,
     bodyKey: 'onb1_body' as const,
   },
   {
     key: 'scan',
-    image: 'https://static.prod-images.emergentagent.com/jobs/1f0c6f21-2efe-4a5b-950e-770baf187f4d/images/0b5b9d6fb4e6a1a07ee423bf490d131ccfc6cfc7932ed41c51e126f29e0135cb.png',
+    image: require('../assets/images/onb2_deadlines.png'),
     icon: ScanLine,
     titleKey: 'onb2_title' as const,
     bodyKey: 'onb2_body' as const,
   },
   {
     key: 'privacy',
-    image: 'https://static.prod-images.emergentagent.com/jobs/1f0c6f21-2efe-4a5b-950e-770baf187f4d/images/dfb7c0cde2961f6522cce0622e0475893ae84c46d863f8c6ae0ec4c4ad6b1fdc.png',
+    image: require('../assets/images/onb3_privacy.png'),
     icon: ShieldCheck,
     titleKey: 'onb3_title' as const,
     bodyKey: 'onb3_body' as const,
@@ -48,7 +48,13 @@ export default function Onboarding() {
   const router = useRouter();
   const { width } = useWindowDimensions();
   const [page, setPage] = useState(0);
-  const lang = 'en'; // Pre-language default; locale picker is the next screen.
+  const [lang, setLang] = useState<LanguageCode>('en');
+
+  useEffect(() => {
+    getLanguage().then((l) => {
+      if (l) setLang(l);
+    });
+  }, []);
 
   const onScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
     const idx = Math.round(e.nativeEvent.contentOffset.x / width);
@@ -57,7 +63,7 @@ export default function Onboarding() {
 
   const finish = async () => {
     await setOnboarded();
-    router.replace('/language?from=onboarding');
+    router.replace('/home');
   };
 
   const isLast = page === SLIDES.length - 1;
@@ -92,7 +98,7 @@ export default function Onboarding() {
             <View key={s.key} style={[styles.slide, { width }]}>
               <View style={styles.illustrationWrap}>
                 <Image
-                  source={{ uri: s.image }}
+                  source={s.image}
                   style={styles.illustration}
                   resizeMode="contain"
                 />

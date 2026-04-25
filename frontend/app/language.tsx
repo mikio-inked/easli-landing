@@ -7,7 +7,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { ArrowLeft, Check } from 'lucide-react-native';
 import { Button } from '../src/ui';
 import { LanguageCode, LANGUAGES, t } from '../src/i18n';
-import { getLanguage, setLanguage } from '../src/store';
+import { getLanguage, isOnboarded, setLanguage } from '../src/store';
 import { colors, fontSize, fontWeight, radius, spacing } from '../src/theme';
 
 export default function LanguageScreen() {
@@ -28,6 +28,16 @@ export default function LanguageScreen() {
   const onContinue = async () => {
     if (!selected) return;
     await setLanguage(selected);
+    // First-run path: language picker is shown BEFORE the onboarding tutorial,
+    // so we route into onboarding. From any other entry (settings / change-
+    // language) we just go home.
+    if (from === 'gateway') {
+      const onboarded = await isOnboarded();
+      if (!onboarded) {
+        router.replace('/onboarding');
+        return;
+      }
+    }
     router.replace('/home');
   };
 

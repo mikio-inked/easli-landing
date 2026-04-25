@@ -12,14 +12,15 @@ export default function Index() {
   useEffect(() => {
     (async () => {
       await ensureDeviceId();
+      const lang = await getLanguage();
+      if (!lang) {
+        // First run: pick language first so the onboarding speaks to the user.
+        router.replace('/language?from=gateway');
+        return;
+      }
       const onboarded = await isOnboarded();
       if (!onboarded) {
         router.replace('/onboarding');
-        return;
-      }
-      const lang = await getLanguage();
-      if (!lang) {
-        router.replace('/language?from=gateway');
         return;
       }
       router.replace('/home');
