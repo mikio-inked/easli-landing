@@ -85,8 +85,14 @@ async def gen_one(filename: str, prompt: str):
     img = images[0]
     image_bytes = base64.b64decode(img["data"])
     out_path = os.path.join(OUT_DIR, filename)
-    with open(out_path, "wb") as f:
-        f.write(image_bytes)
+    # Gemini Nano Banana sometimes returns JPEG bytes regardless of the
+    # requested file extension. Always re-encode through PIL to guarantee
+    # we save a real PNG (Android AAPT2 rejects JPEG-in-PNG files at build
+    # time with "file failed to compile").
+    from io import BytesIO
+    from PIL import Image
+    pil_img = Image.open(BytesIO(image_bytes)).convert("RGB")
+    pil_img.save(out_path, "PNG", optimize=True)
     size = os.path.getsize(out_path)
     print(f"[{filename}] saved {size // 1024} KB -> {out_path}")
 
