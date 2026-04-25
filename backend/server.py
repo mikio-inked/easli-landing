@@ -317,8 +317,8 @@ async def analyze_document(req: AnalyzeRequest):
     if not raw_bytes:
         raise HTTPException(status_code=400, detail="Empty file content")
 
-    if len(raw_bytes) > 12 * 1024 * 1024:
-        raise HTTPException(status_code=413, detail="File too large. Please use a file under 12MB.")
+    if len(raw_bytes) > 25 * 1024 * 1024:
+        raise HTTPException(status_code=413, detail="File too large. Please use a file under 25MB.")
 
     mime = (req.mime_type or "").lower().strip()
     images: List[Tuple[str, str]] = []
