@@ -135,12 +135,23 @@ if __name__ == "__main__":
     fav = render_icon(64, mode="full_bleed")
     save_jpeg_safe_png(fav, f"{out_dir}/favicon.png", opaque_bg=BRAND_BLUE)
 
-    # 5) Quick visual reference at 256 + 128 sizes
+    # 5) Google Play Store listing icon — 512×512 RGB, no alpha.
+    play_store = render_icon(512, mode="full_bleed")
+    save_jpeg_safe_png(play_store, f"{out_dir}/play-store-icon.png", opaque_bg=BRAND_BLUE)
+
+    # 6) Marketing preview at 256 (handy for App Store screenshots / press kits)
     preview = render_icon(256, mode="full_bleed")
-    save_jpeg_safe_png(preview, "/tmp/klarpost_icon_preview_256.png", opaque_bg=BRAND_BLUE)
+    save_jpeg_safe_png(preview, f"{out_dir}/marketing-icon-256.png", opaque_bg=BRAND_BLUE)
 
     print("Generated icons:")
-    for name in ("icon.png", "adaptive-icon.png", "splash-icon.png", "favicon.png"):
+    for name in (
+        "icon.png",
+        "adaptive-icon.png",
+        "splash-icon.png",
+        "favicon.png",
+        "play-store-icon.png",
+        "marketing-icon-256.png",
+    ):
         path = f"{out_dir}/{name}"
         with Image.open(path) as im:
             print(f"  {name}: {im.size} {im.mode}")
