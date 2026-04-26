@@ -15,6 +15,7 @@ import {
 } from 'lucide-react-native';
 import { Badge } from '../src/ui';
 import { listAnalyses, AnalysisListItem } from '../src/api';
+import { getUsage, type UsageState } from '../src/usage';
 import {
   LanguageCode,
   getLanguage as getLanguageMeta,
@@ -106,6 +107,96 @@ export default function Home() {
     );
   };
 
+  // Proactive paywall trigger.
+  //
+  // We call GET /api/usage/{device_id} BEFORE letting the user open the
+  // camera/picker, so they don't waste a capture on a quota that's already
+  // exhausted. The backend remains the single source of truth — the
+  // reactive 402/429 handling in /analyzing.tsx still catches cases where
+  // usage changed between this check and the actual /api/analyze call.
+  //
+  // Decision tree:
+  //   primary quota > 0      → proceed to scan/upload
+  //   primary == 0, soft mode, soft slots remain
+  //                          → /paywall?next=<target> (Continue free visible)
+  //   primary == 0, soft mode, soft exhausted
+  //                          → /paywall?reason=test_limit_reached&next=<target>
+  //   primary == 0, hard mode
+  //                          → /paywall?reason=payment_required&next=<target>
+  //   network error          → proceed; backend will gate on /analyze.
+  //
+  // Privacy: only event names + device_id (anonymous) hit console.info — we
+  // never log the usage values themselves.
+  const routeWithEntitlement = async (target: '/scan' | '/upload') => {
+    await ensureConsentThen(async () => {
+      const id = await ensureDeviceId();
+      // eslint-disable-next-line no-console
+      console.info('[paywall] proactive_paywall_check device=' + id);
+
+      let usage: UsageState | null = null;
+      try {
+        usage = await getUsage(id);
+      } catch {
+        // Network or backend hiccup — be permissive and let the user try.
+        // The backend will still enforce on /api/analyze and route to the
+        // paywall reactively if usage was actually exhausted.
+        // eslint-disable-next-line no-console
+        console.info('[paywall] proactive_paywall_check_failed');
+        router.push(target);
+        return;
+      }
+
+      // Privacy: we intentionally log ONLY the event name + anonymous device
+      // id, never the actual usage counters or any document data.
+      const r = getRemainingForLog(usage);
+
+      // Primary quota = real entitlement (free + Plus + single-letter).
+      // Soft slots are TEST allowance and intentionally NOT counted here so
+      // that the paywall fires after the free trial even when soft slots
+      // remain — that's the whole point of the proactive trigger.
+      const freeRemaining = r.freeRemaining;
+      const plusRemaining = r.plusRemaining;
+      const primaryRemaining =
+        freeRemaining + plusRemaining + usage.single_letter_credits;
+
+      if (primaryRemaining > 0) {
+        router.push(target);
+        return;
+      }
+
+      // No primary quota left — pick the right paywall variant.
+      const next = target.replace(/^\//, '');
+      if (usage.paywall_mode === 'soft') {
+        const softRemaining = r.softRemaining;
+        if (softRemaining <= 0) {
+          // eslint-disable-next-line no-console
+          console.info('[paywall] proactive_paywall_route reason=test_limit_reached');
+          router.push(`/paywall?reason=test_limit_reached&next=${next}`);
+        } else {
+          // eslint-disable-next-line no-console
+          console.info('[paywall] proactive_paywall_route reason=soft_offer');
+          router.push(`/paywall?next=${next}`);
+        }
+      } else if (usage.paywall_mode === 'hard') {
+        // eslint-disable-next-line no-console
+        console.info('[paywall] proactive_paywall_route reason=payment_required');
+        router.push(`/paywall?reason=payment_required&next=${next}`);
+      } else {
+        // 'disabled' — no paywall, proceed.
+        router.push(target);
+      }
+    });
+  };
+
+  // small helper extracted so the gate above stays readable
+  const getRemainingForLog = (u: UsageState) => ({
+    freeRemaining: Math.max(0, u.free_analyses_total - u.free_analyses_used),
+    plusRemaining: u.plus_active
+      ? Math.max(0, u.plus_monthly_total - u.plus_monthly_used)
+      : 0,
+    softRemaining: Math.max(0, u.soft_extra_total - u.soft_extra_used),
+  });
+
   return (
     <SafeAreaView style={styles.safe} testID="home-screen">
       <View style={styles.topBar}>
@@ -156,7 +247,7 @@ export default function Home() {
         <Text style={styles.heroBody}>{t(lang, 'home_intro')}</Text>
 
         <Pressable
-          onPress={() => ensureConsentThen(() => router.push('/scan'))}
+          onPress={() => routeWithEntitlement('/scan')}
           style={({ pressed }) => [styles.heroButton, pressed && { opacity: 0.95 }]}
           testID="home-scan-btn"
         >
@@ -172,7 +263,7 @@ export default function Home() {
         </Pressable>
 
         <Pressable
-          onPress={() => ensureConsentThen(() => router.push('/upload'))}
+          onPress={() => routeWithEntitlement('/upload')}
           style={({ pressed }) => [styles.heroButtonAlt, pressed && { opacity: 0.95 }]}
           testID="home-upload-btn"
         >

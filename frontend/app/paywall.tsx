@@ -195,12 +195,18 @@ export default function Paywall() {
 
   const handleContinueFree = useCallback(() => {
     if (!canContinueFree) return;
-    // Pop back to whatever launched the paywall. The user can retry the
-    // scan/upload on Home — backend allows up to soft_extra_total before
-    // it returns 429 again.
+    // If we know the original target (proactive trigger sets ?next=scan|upload),
+    // route there directly so the user actually proceeds with the capture.
+    // Otherwise fall back to a simple "go back" so the previous screen
+    // can resume what the user was doing.
+    const target = (params.next as string | undefined) || '';
+    if (target === 'scan' || target === 'upload') {
+      router.replace(`/${target}`);
+      return;
+    }
     if (router.canGoBack()) router.back();
     else router.replace('/home');
-  }, [canContinueFree, router]);
+  }, [canContinueFree, params.next, router]);
 
   return (
     <SafeAreaView style={styles.safe} testID="paywall-screen">

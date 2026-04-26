@@ -85,12 +85,19 @@ async function jsonOrThrow<T>(res: Response): Promise<T> {
 
 export async function getUsage(deviceId: string): Promise<UsageState> {
   if (!deviceId) throw new Error('device_id is required');
-  const res = await fetch(`${BASE_URL}/api/usage/${encodeURIComponent(deviceId)}`);
+  // Always go to network — the entitlement gate must reflect the latest
+  // server-side state (e.g. just after a webhook credit was applied).
+  const res = await fetch(`${BASE_URL}/api/usage/${encodeURIComponent(deviceId)}`, {
+    cache: 'no-store',
+    headers: { 'Cache-Control': 'no-cache' },
+  });
   return jsonOrThrow<UsageState>(res);
 }
 
 export async function getPaywallConfig(): Promise<PaywallConfig> {
-  const res = await fetch(`${BASE_URL}/api/paywall/config`);
+  const res = await fetch(`${BASE_URL}/api/paywall/config`, {
+    cache: 'no-store',
+  });
   return jsonOrThrow<PaywallConfig>(res);
 }
 
