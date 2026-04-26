@@ -360,7 +360,7 @@ agent_communication:
 
 metadata:
   created_by: "main_agent"
-  version: "1.4"
+  version: "1.5"
   test_sequence: 5
   run_ui: true
 
@@ -369,6 +369,19 @@ test_plan:
   stuck_tasks: []
   test_all: false
   test_priority: "high_first"
+
+legal_pages:
+  - task: "Public Imprint / Privacy / Contact pages at /legal, /legal/impressum, /legal/privacy, /legal/contact"
+    implemented: true
+    working: "NA"
+    file: "/app/frontend/app/legal/*.tsx"
+    stuck_count: 0
+    priority: "medium"
+    needs_retesting: false
+    status_history:
+        -working: "NA"
+        -agent: "main"
+        -comment: "5 new files: /app/frontend/app/legal/_layout.tsx (Stack inheriting root), /app/frontend/app/legal/index.tsx (3-card landing — Imprint/Privacy/Contact), /app/frontend/app/legal/impressum.tsx (bilingual DE+EN, § 5 TMG, with [TODO] placeholders for entity/address/email), /app/frontend/app/legal/privacy.tsx (formal Art. 13/14 DSGVO, 9 sections DE + 7 sections EN summary, lists Mistral AI Paris + MongoDB EU + RevenueCat US + Apple/Google as processors, 90-day retention via TTL, exercise rights via Settings → Export/Delete), /app/frontend/app/legal/contact.tsx (mailto button + copy-address + GDPR-anfrage hint + 'What we will never ask for' card). Settings screen now has a 'Legal' row that pushes /legal. 18 i18n keys for EN/DE_simple/ES/RU/TR/VI/ZH wired (legal/legal_subtitle/impressum/impressum_subtitle/contact/contact_subtitle). All 4 pages share a doc-card layout with maxWidth: 720 + alignSelf: center so they look right on web AND mobile. tsc --noEmit passes 0 errors. Manual screenshot verification (en) confirms render on /legal, /legal/impressum, /legal/privacy, /legal/contact at 390x844. NO backend changes required for this feature — these are static pages."
 
 frontend_polish_results:
   - task: "Result Screen 2.0 polish — risk hero, main action card, scam handling, accordions, sticky bar, fallbacks, language coverage"

@@ -225,7 +225,14 @@ export type UIKey =
   | 'other_document'
   | 'urgency_unknown'
   | 'reply_draft_create'
-  | 'not_alone';
+  | 'not_alone'
+  // ---- Legal pages ----
+  | 'legal'
+  | 'legal_subtitle'
+  | 'impressum'
+  | 'impressum_subtitle'
+  | 'contact'
+  | 'contact_subtitle';
 
 type UIStrings = Record<UIKey, string>;
 
@@ -432,6 +439,13 @@ const en: UIStrings = {
   urgency_unknown: 'Could not assess urgency reliably',
   reply_draft_create: 'Create reply draft',
   not_alone: 'You are not alone. Here is what this letter means and what to do next.',
+  // ---- Legal pages ----
+  legal: 'Legal',
+  legal_subtitle: 'Imprint, privacy & contact',
+  impressum: 'Imprint',
+  impressum_subtitle: 'Legal disclosure (§ 5 TMG)',
+  contact: 'Contact',
+  contact_subtitle: 'Reach us by email',
 };
 
 const zh: UIStrings = {
@@ -635,6 +649,13 @@ const zh: UIStrings = {
   urgency_unknown: '无法可靠地评估紧急程度',
   reply_draft_create: '生成回复草稿',
   not_alone: '您并不孤单。这就是这封信的含义以及接下来该怎么做。',
+  // ---- Legal pages ----
+  legal: '法律信息',
+  legal_subtitle: '版本说明、隐私和联系方式',
+  impressum: '版本说明',
+  impressum_subtitle: '依据德国 § 5 TMG 法律披露',
+  contact: '联系方式',
+  contact_subtitle: '通过电子邮件与我们联系',
 };
 
 const vi: UIStrings = {
@@ -838,6 +859,13 @@ const vi: UIStrings = {
   urgency_unknown: 'Không thể đánh giá độ khẩn cấp',
   reply_draft_create: 'Tạo bản nháp trả lời',
   not_alone: 'Bạn không đơn độc. Đây là ý nghĩa của thư và bước tiếp theo nên làm.',
+  // ---- Legal pages ----
+  legal: 'Pháp lý',
+  legal_subtitle: 'Thông tin pháp lý, quyền riêng tư & liên hệ',
+  impressum: 'Thông tin pháp lý',
+  impressum_subtitle: 'Thông báo pháp lý theo § 5 TMG',
+  contact: 'Liên hệ',
+  contact_subtitle: 'Liên hệ qua email',
 };
 
 const tr: UIStrings = {
@@ -1041,6 +1069,13 @@ const tr: UIStrings = {
   urgency_unknown: 'Aciliyet güvenilir bir şekilde değerlendirilemedi',
   reply_draft_create: 'Yanıt taslağı oluştur',
   not_alone: 'Yalnız değilsiniz. İşte bu mektubun anlamı ve atılacak adımlar.',
+  // ---- Legal pages ----
+  legal: 'Yasal',
+  legal_subtitle: 'Künye, gizlilik & iletişim',
+  impressum: 'Künye',
+  impressum_subtitle: '§ 5 TMG uyarınca yasal bilgiler',
+  contact: 'İletişim',
+  contact_subtitle: 'E-posta ile bize ulaşın',
 };
 
 const ru: UIStrings = {
@@ -1244,6 +1279,13 @@ const ru: UIStrings = {
   urgency_unknown: 'Срочность определить не удалось',
   reply_draft_create: 'Создать черновик ответа',
   not_alone: 'Вы не одни. Вот что значит это письмо и что делать дальше.',
+  // ---- Legal pages ----
+  legal: 'Юридическая информация',
+  legal_subtitle: 'Выходные данные, конфиденциальность и контакты',
+  impressum: 'Выходные данные',
+  impressum_subtitle: 'Юридическое раскрытие согласно § 5 TMG',
+  contact: 'Контакты',
+  contact_subtitle: 'Связаться по электронной почте',
 };
 
 const es: UIStrings = {
@@ -1447,6 +1489,13 @@ const es: UIStrings = {
   urgency_unknown: 'No fue posible evaluar la urgencia con fiabilidad',
   reply_draft_create: 'Crear borrador de respuesta',
   not_alone: 'No estás solo. Esto es lo que significa la carta y qué hacer a continuación.',
+  // ---- Legal pages ----
+  legal: 'Aviso legal',
+  legal_subtitle: 'Aviso legal, privacidad y contacto',
+  impressum: 'Aviso legal (Impressum)',
+  impressum_subtitle: 'Información legal según § 5 TMG',
+  contact: 'Contacto',
+  contact_subtitle: 'Contáctanos por correo electrónico',
 };
 
 // Simple German — Leichte / Einfache Sprache. Short sentences, common words,
@@ -1652,6 +1701,13 @@ const de_simple: UIStrings = {
   urgency_unknown: 'Dringlichkeit konnte nicht sicher bewertet werden',
   reply_draft_create: 'Antwort-Entwurf erstellen',
   not_alone: 'Sie sind nicht allein. Hier ist, was dieser Brief bedeutet und was Sie tun können.',
+  // ---- Legal pages ----
+  legal: 'Rechtliches',
+  legal_subtitle: 'Impressum, Datenschutz & Kontakt',
+  impressum: 'Impressum',
+  impressum_subtitle: 'Angaben gemäß § 5 TMG',
+  contact: 'Kontakt',
+  contact_subtitle: 'Per E-Mail erreichbar',
 };
 
 const STRINGS: Record<LanguageCode, UIStrings> = { en, zh, vi, tr, ru, es, de_simple };

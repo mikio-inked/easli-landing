@@ -28,6 +28,7 @@ import {
   Languages as LanguagesIcon,
   Lock,
   RotateCw,
+  Scale,
   ShieldAlert,
   ShieldCheck,
   Trash2,
@@ -355,6 +356,23 @@ export default function SettingsScreen() {
               <Text style={styles.rowSub}>{t(lang, 'disclaimer_long')}</Text>
             </View>
           </View>
+          <View style={styles.divider} />
+          <Pressable
+            onPress={() => router.push('/legal' as any)}
+            style={styles.row}
+            testID="settings-legal"
+            accessibilityRole="button"
+            accessibilityLabel={t(lang, 'legal')}
+          >
+            <View style={styles.rowIcon}>
+              <Scale color={colors.primary} size={20} strokeWidth={2.4} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.rowTitle}>{t(lang, 'legal')}</Text>
+              <Text style={styles.rowSub}>{t(lang, 'legal_subtitle')}</Text>
+            </View>
+            <ChevronRight color={colors.textMuted} size={22} strokeWidth={2.4} />
+          </Pressable>
         </Card>
 
         <Card>
