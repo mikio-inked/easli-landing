@@ -11,7 +11,7 @@ Tagline: **"Understand German letters before they become a problem."**
 ## Stack
 - **Frontend**: React Native + Expo (SDK 54, Expo Router file-based routing), TypeScript
 - **Backend**: FastAPI + Motor (async MongoDB)
-- **AI**: GPT-5.2 via `emergentintegrations` library (vision + structured JSON)
+- **AI**: **Mistral AI 🇫🇷 (EU-hosted, DSGVO-friendly)** — `pixtral-large-latest` for vision OCR + analysis, `mistral-large-latest` for the document-scoped chat. Native `mistralai==1.9.11` SDK. (Migrated from OpenAI GPT-5.2 / Emergent LLM key for full EU data residency.)
 - **Storage**: MongoDB (analysis results only — never the original document)
 - **Auth**: Anonymous device-id (AsyncStorage) — placeholder for full auth later
 
