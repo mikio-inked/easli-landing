@@ -625,8 +625,47 @@ def _is_rate_limit_error(exc: Exception) -> bool:
     return False
 
 
-# Backoff sequence (seconds): try, wait 2s, try, wait 4s, try → fail.
-_RATE_LIMIT_BACKOFF_SECONDS = [2, 4]
+# Default backoff schedule (seconds) used ONLY when Mistral's 429 response does
+# not include a Retry-After header. Modern Mistral endpoints almost always send
+# one; this fallback is for robustness.
+#
+# Total fallback wait: 2 + 4 + 8 + 16 = 30s across 4 retries (5 total attempts).
+_RATE_LIMIT_DEFAULT_BACKOFF_SECONDS = [2, 4, 8, 16]
+# Hard cap on a single sleep — even if Mistral asks us to wait 5 minutes, we
+# don't keep an iOS upload connection open that long. The client gets a clean
+# 429 with the original Retry-After hint forwarded.
+_RATE_LIMIT_MAX_SINGLE_WAIT_SECONDS = 30
+# Hard cap on total accumulated retry-wait. Past this we surrender and let the
+# user retry from the app (which is friendlier than a 60s+ spinner).
+_RATE_LIMIT_MAX_TOTAL_WAIT_SECONDS = 45
+# Default we surface to the client if Mistral didn't tell us anything.
+_RATE_LIMIT_FALLBACK_CLIENT_HINT = 8
+
+
+def _parse_retry_after_seconds(exc: Exception) -> Optional[int]:
+    """Extract the integer Retry-After hint from a Mistral 429 response.
+
+    The mistralai SDK's error classes inherit from MistralError which exposes
+    `.headers` (httpx.Headers). Retry-After can be either delta-seconds (int)
+    or an HTTP-date string. We only honour the integer form — HTTP-dates are
+    rare in API responses and adding chrono parsing isn't worth the bytes.
+    """
+    headers = getattr(exc, "headers", None)
+    if headers is None:
+        return None
+    raw = None
+    try:
+        # httpx.Headers is case-insensitive but be defensive across SDK shapes.
+        raw = headers.get("retry-after") or headers.get("Retry-After")
+    except Exception:
+        return None
+    if not raw:
+        return None
+    try:
+        v = int(str(raw).strip())
+        return max(1, v)  # never let a bad value request 0s
+    except (ValueError, TypeError):
+        return None
 
 
 async def mistral_complete_with_retry(
@@ -635,40 +674,85 @@ async def mistral_complete_with_retry(
     model: str,
     **kwargs,
 ):
-    """Call mistral_client.chat.complete_async with up to 2 retries on 429.
+    """Call mistral_client.chat.complete_async with retries on HTTP 429.
 
-    On the final attempt, if Mistral still answers 429 we raise
-    MistralRateLimited so the route handler can convert it into a clean
-    HTTP 429 with a Retry-After header. Other errors propagate untouched.
+    Retry strategy:
+      1) If the 429 response carries a `Retry-After` header, honour it (capped
+         at _RATE_LIMIT_MAX_SINGLE_WAIT_SECONDS to avoid keeping a mobile
+         upload connection open too long).
+      2) Otherwise fall back to an exponential schedule: 2s, 4s, 8s, 16s.
+      3) Stop retrying as soon as the cumulative wait would exceed
+         _RATE_LIMIT_MAX_TOTAL_WAIT_SECONDS.
+
+    On final failure we raise MistralRateLimited(retry_after=...) where
+    retry_after is the LAST hint Mistral gave us (so the iOS toast says
+    "try again in N seconds" with the same N that the server told us).
+
+    Privacy: log lines contain only the label, model, attempt number, wait
+    duration, and (when present) the server's retry-after hint. They never
+    contain message content, image bytes, or API keys.
     """
-    last_exc: Exception | None = None
-    for attempt in range(len(_RATE_LIMIT_BACKOFF_SECONDS) + 1):
+    last_exc: Optional[Exception] = None
+    last_client_hint: int = _RATE_LIMIT_FALLBACK_CLIENT_HINT
+    total_waited: int = 0
+    max_attempts = len(_RATE_LIMIT_DEFAULT_BACKOFF_SECONDS) + 1  # 5 total
+
+    for attempt in range(max_attempts):
         try:
             return await mistral_client.chat.complete_async(model=model, **kwargs)
         except Exception as e:
-            if _is_rate_limit_error(e):
-                last_exc = e
-                if attempt < len(_RATE_LIMIT_BACKOFF_SECONDS):
-                    wait = _RATE_LIMIT_BACKOFF_SECONDS[attempt]
-                    logger.warning(
-                        "mistral_rate_limited label=%s model=%s attempt=%d retry_in=%ds",
-                        label, model, attempt + 1, wait,
-                    )
-                    await asyncio.sleep(wait)
-                    continue
-                # Final attempt also rate-limited — surface a clean exception.
-                logger.error(
-                    "mistral_rate_limited_final label=%s model=%s attempts=%d",
-                    label, model, attempt + 1,
+            if not _is_rate_limit_error(e):
+                # Non-429 → propagate so existing 502 handler runs.
+                raise
+            last_exc = e
+
+            # Decide how long to wait before the next attempt.
+            server_hint = _parse_retry_after_seconds(e)
+            if server_hint is not None:
+                # Trust the server, but cap it.
+                wait = min(server_hint, _RATE_LIMIT_MAX_SINGLE_WAIT_SECONDS)
+                # Also remember the *uncapped* server hint so we can forward
+                # the truthful number to the iOS client when we ultimately
+                # give up.
+                last_client_hint = server_hint
+            elif attempt < len(_RATE_LIMIT_DEFAULT_BACKOFF_SECONDS):
+                wait = _RATE_LIMIT_DEFAULT_BACKOFF_SECONDS[attempt]
+                last_client_hint = wait
+            else:
+                wait = None  # no more attempts left
+
+            # Decide whether we have room in the budget for one more retry.
+            attempts_left = attempt + 1 < max_attempts
+            within_budget = (
+                wait is not None
+                and (total_waited + wait) <= _RATE_LIMIT_MAX_TOTAL_WAIT_SECONDS
+            )
+
+            if attempts_left and within_budget:
+                logger.warning(
+                    "mistral_rate_limited label=%s model=%s attempt=%d/%d "
+                    "retry_in=%ds server_hint=%s total_waited=%ds",
+                    label, model, attempt + 1, max_attempts,
+                    wait, server_hint if server_hint is not None else "none",
+                    total_waited,
                 )
-                # Suggest a polite retry window matching the longest backoff
-                # we just used. Apple/Android clients respect Retry-After.
-                raise MistralRateLimited(retry_after=8) from e
-            # Non-429 → propagate so existing 502 handler runs.
-            raise
-    # Defensive: should be unreachable.
+                await asyncio.sleep(wait)
+                total_waited += wait
+                continue
+
+            # Out of attempts or out of budget — surface a clean exception so
+            # the route handler can return HTTP 429 with the truthful
+            # Retry-After hint to the iOS client.
+            logger.error(
+                "mistral_rate_limited_final label=%s model=%s attempts=%d "
+                "total_waited=%ds final_hint=%ds",
+                label, model, attempt + 1, total_waited, last_client_hint,
+            )
+            raise MistralRateLimited(retry_after=last_client_hint) from e
+
+    # Defensive — the loop always returns or raises.
     if last_exc is not None:
-        raise MistralRateLimited(retry_after=8) from last_exc
+        raise MistralRateLimited(retry_after=last_client_hint) from last_exc
     raise RuntimeError("mistral_complete_with_retry: unreachable")
 
 
