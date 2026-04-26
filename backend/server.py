@@ -11,7 +11,7 @@ import re
 import tempfile
 from pathlib import Path
 from pydantic import BaseModel, Field
-from typing import List, Optional, Literal, Tuple
+from typing import List, Optional, Literal, Tuple, Any
 import uuid
 from datetime import datetime, timezone
 
@@ -334,6 +334,61 @@ def extract_json_from_text(text: str) -> Optional[dict]:
     return None
 
 
+def _coerce_literal(value: Any, allowed: List[str], default: str) -> str:
+    """Defensively coerce a possibly-chatty Literal field into one of `allowed`.
+
+    Mistral Large 3 occasionally emits values like
+        "high (but the deadline itself is fraudulent)"
+    which Pydantic Literal[...] rejects with a ValidationError. We extract the
+    first matching token (case-insensitive, word-boundary) so the analysis
+    doesn't fail just because the model added editorial commentary.
+    """
+    if not isinstance(value, str):
+        return default
+    lowered = value.lower()
+    for token in allowed:
+        # Word-boundary match so 'medium' wins over 'high' if both appear.
+        if re.search(r'\b' + re.escape(token) + r'\b', lowered):
+            return token
+    return default
+
+
+def _sanitize_literal_fields(parsed: dict) -> None:
+    """Normalize every Literal[...] field in-place before Pydantic validation.
+
+    Keeps the sanitizer in one place so adding a new Literal in AnalysisResult
+    only needs one corresponding entry here.
+    """
+    if not isinstance(parsed, dict):
+        return
+
+    parsed["risk_level"] = _coerce_literal(
+        parsed.get("risk_level"), ["green", "yellow", "red"], "green"
+    )
+
+    category_allowed = [
+        "tax", "insurance", "rent", "bank", "health", "government", "court",
+        "utilities", "telecom", "work", "education", "other",
+    ]
+    parsed["category"] = _coerce_literal(parsed.get("category"), category_allowed, "other")
+
+    deadlines = parsed.get("deadlines")
+    if isinstance(deadlines, list):
+        for d in deadlines:
+            if isinstance(d, dict) and "confidence" in d:
+                d["confidence"] = _coerce_literal(
+                    d.get("confidence"), ["low", "medium", "high"], "medium"
+                )
+
+    actions = parsed.get("required_actions")
+    if isinstance(actions, list):
+        for a in actions:
+            if isinstance(a, dict) and "urgency" in a:
+                a["urgency"] = _coerce_literal(
+                    a.get("urgency"), ["low", "medium", "high"], "medium"
+                )
+
+
 async def analyze_with_mistral(
     images: List[Tuple[str, str]],
     target_language_label: str,
@@ -431,6 +486,12 @@ async def analyze_with_mistral(
     # Ensure target_language is set
     parsed["target_language"] = target_language_label
     parsed["source_language"] = "German"
+
+    # Defensive coercion: Mistral Large 3 occasionally adds editorial
+    # commentary inside Literal[...] fields (e.g. confidence='high (but…)').
+    # Normalize them BEFORE Pydantic validation so a chatty model doesn't
+    # turn a valid analysis into a 502.
+    _sanitize_literal_fields(parsed)
 
     try:
         result = AnalysisResult(**parsed)
@@ -801,14 +862,33 @@ async def delete_history_for_device(device_id: str):
     device_id. This is the explicit "Delete my data" endpoint called from the
     Settings screen. Backed by the same MongoDB collections as the legacy
     `DELETE /api/analyses?device_id=...`, but uses a clearer REST shape.
+
+    Note on the message counter: chat messages are stored embedded inside the
+    analyses doc as `messages: [...]` (not in a separate collection in this
+    build), so we sum their length BEFORE deleting the parent docs to give
+    the user an accurate "deleted_messages" number. We also clean any rows
+    that may exist in the legacy `chat_messages` collection just in case.
     """
     if not device_id:
         raise HTTPException(status_code=400, detail="device_id is required")
+
+    # Count embedded messages BEFORE delete so we can return an honest total.
+    embedded_count = 0
+    cursor = db.analyses.find(
+        {"device_id": device_id},
+        {"messages": 1, "_id": 0},
+    )
+    async for doc in cursor:
+        msgs = doc.get("messages")
+        if isinstance(msgs, list):
+            embedded_count += len(msgs)
+
     analyses_res = await db.analyses.delete_many({"device_id": device_id})
-    messages_res = await db.chat_messages.delete_many({"device_id": device_id})
+    legacy_res = await db.chat_messages.delete_many({"device_id": device_id})
+
     return {
         "deleted_analyses": analyses_res.deleted_count,
-        "deleted_messages": messages_res.deleted_count,
+        "deleted_messages": embedded_count + legacy_res.deleted_count,
     }
 
 
