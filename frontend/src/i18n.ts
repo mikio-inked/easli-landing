@@ -160,7 +160,43 @@ export type UIKey =
   | 'privacy_p_no_tracking'
   | 'privacy_h_third_parties'
   | 'privacy_p_third_parties'
-  | 'privacy_updated';
+  | 'privacy_updated'
+  // ---- Phase 2: Paywall / Usage / Settings -------------------------
+  | 'paywall_title'
+  | 'paywall_subtitle'
+  | 'paywall_option_single_title'
+  | 'paywall_option_single_price'
+  | 'paywall_option_single_desc'
+  | 'paywall_option_monthly_title'
+  | 'paywall_option_monthly_price'
+  | 'paywall_option_monthly_desc'
+  | 'paywall_option_yearly_title'
+  | 'paywall_option_yearly_price'
+  | 'paywall_option_yearly_desc'
+  | 'paywall_continue_free_test'
+  | 'paywall_test_note'
+  | 'paywall_restore'
+  | 'paywall_legal_note'
+  | 'paywall_privacy_note'
+  | 'paywall_payments_unavailable'
+  | 'paywall_payments_unavailable_apk'
+  | 'paywall_purchase_cancelled'
+  | 'paywall_purchase_failed'
+  | 'paywall_purchase_success'
+  | 'paywall_restored'
+  | 'paywall_test_limit_title'
+  | 'paywall_test_limit_body'
+  | 'manage_plus'
+  | 'show_usage'
+  | 'usage_title'
+  | 'usage_free'
+  | 'usage_soft_test'
+  | 'usage_single_credits'
+  | 'usage_plus_status_active'
+  | 'usage_plus_status_inactive'
+  | 'usage_plus_until'
+  | 'usage_plus_remaining'
+  | 'usage_chat_total';
 
 type UIStrings = Record<UIKey, string>;
 
@@ -300,6 +336,43 @@ const en: UIStrings = {
   privacy_h_third_parties: 'Third parties',
   privacy_p_third_parties: 'Mistral AI (Paris, France) — processes document content and chat messages to generate the analysis. Apple/Google App Stores — only for app delivery and crash reports.',
   privacy_updated: 'Last updated: April 2025',
+  // ---- Paywall (rendered in German for all locales — App-Store relevant) ----
+  paywall_title: 'Weitere Briefe einfach verstehen',
+  paywall_subtitle: 'Scanne deutsche Schreiben, erkenne Fristen und erhalte klare nächste Schritte in deiner Sprache.',
+  paywall_option_single_title: '1 Brief analysieren',
+  paywall_option_single_price: 'Einmalig 1,49 €',
+  paywall_option_single_desc: 'Ideal, wenn du nur gelegentlich Hilfe brauchst.',
+  paywall_option_monthly_title: 'KlarPost Plus',
+  paywall_option_monthly_price: '4,99 € / Monat',
+  paywall_option_monthly_desc: 'Bis zu 20 Briefe pro Monat, Verlauf, PDF-Export, Erinnerungen und Antwortentwürfe.',
+  paywall_option_yearly_title: 'KlarPost Plus Jahr',
+  paywall_option_yearly_price: '39,99 € / Jahr',
+  paywall_option_yearly_desc: 'Für regelmäßige Nutzung. Günstiger als monatlich.',
+  paywall_continue_free_test: 'Kostenlos im Test fortfahren',
+  paywall_test_note: 'TestFlight/APK-Hinweis: In der Live-Version wäre hier eine Zahlung erforderlich. Für diesen Test kannst du kostenlos fortfahren, solange dein Testkontingent nicht erreicht ist.',
+  paywall_restore: 'Käufe wiederherstellen',
+  paywall_legal_note: 'KlarPost ersetzt keine Rechts-, Steuer-, medizinische oder offizielle Beratung.',
+  paywall_privacy_note: 'Keine Werbung. Kein Tracking. Du kannst deine Daten jederzeit löschen.',
+  paywall_payments_unavailable: 'Zahlungen sind in dieser Testversion noch nicht verfügbar.',
+  paywall_payments_unavailable_apk: 'Zahlungen sind in dieser Version noch nicht verfügbar. Bitte nutze die offizielle Store-Version.',
+  paywall_purchase_cancelled: 'Kauf abgebrochen.',
+  paywall_purchase_failed: 'Kauf fehlgeschlagen. Bitte später erneut versuchen.',
+  paywall_purchase_success: 'Vielen Dank! Dein Kauf war erfolgreich.',
+  paywall_restored: 'Käufe wiederhergestellt.',
+  paywall_test_limit_title: 'Testkontingent erreicht',
+  paywall_test_limit_body: 'Dein Testkontingent ist erreicht. Danke fürs Testen von KlarPost.',
+  // ---- Settings / Usage labels (localised) ----
+  manage_plus: 'Manage KlarPost Plus',
+  show_usage: 'Show my usage',
+  usage_title: 'My usage',
+  usage_free: 'Free analyses',
+  usage_soft_test: 'Test analyses',
+  usage_single_credits: 'Single-letter credits',
+  usage_plus_status_active: 'KlarPost Plus active',
+  usage_plus_status_inactive: 'KlarPost Plus inactive',
+  usage_plus_until: 'Active until',
+  usage_plus_remaining: 'Plus analyses this month',
+  usage_chat_total: 'Questions',
 };
 
 const zh: UIStrings = {
@@ -438,6 +511,41 @@ const zh: UIStrings = {
   privacy_h_third_parties: '第三方服务',
   privacy_p_third_parties: 'Mistral AI(法国巴黎)——处理文件内容和聊天信息以生成分析。Apple/Google App Store——仅用于应用分发和崩溃报告。',
   privacy_updated: '最后更新:2025 年 4 月',
+  paywall_title: 'Weitere Briefe einfach verstehen',
+  paywall_subtitle: 'Scanne deutsche Schreiben, erkenne Fristen und erhalte klare nächste Schritte in deiner Sprache.',
+  paywall_option_single_title: '1 Brief analysieren',
+  paywall_option_single_price: 'Einmalig 1,49 €',
+  paywall_option_single_desc: 'Ideal, wenn du nur gelegentlich Hilfe brauchst.',
+  paywall_option_monthly_title: 'KlarPost Plus',
+  paywall_option_monthly_price: '4,99 € / Monat',
+  paywall_option_monthly_desc: 'Bis zu 20 Briefe pro Monat, Verlauf, PDF-Export, Erinnerungen und Antwortentwürfe.',
+  paywall_option_yearly_title: 'KlarPost Plus Jahr',
+  paywall_option_yearly_price: '39,99 € / Jahr',
+  paywall_option_yearly_desc: 'Für regelmäßige Nutzung. Günstiger als monatlich.',
+  paywall_continue_free_test: 'Kostenlos im Test fortfahren',
+  paywall_test_note: 'TestFlight/APK-Hinweis: In der Live-Version wäre hier eine Zahlung erforderlich. Für diesen Test kannst du kostenlos fortfahren, solange dein Testkontingent nicht erreicht ist.',
+  paywall_restore: 'Käufe wiederherstellen',
+  paywall_legal_note: 'KlarPost ersetzt keine Rechts-, Steuer-, medizinische oder offizielle Beratung.',
+  paywall_privacy_note: 'Keine Werbung. Kein Tracking. Du kannst deine Daten jederzeit löschen.',
+  paywall_payments_unavailable: 'Zahlungen sind in dieser Testversion noch nicht verfügbar.',
+  paywall_payments_unavailable_apk: 'Zahlungen sind in dieser Version noch nicht verfügbar. Bitte nutze die offizielle Store-Version.',
+  paywall_purchase_cancelled: 'Kauf abgebrochen.',
+  paywall_purchase_failed: 'Kauf fehlgeschlagen. Bitte später erneut versuchen.',
+  paywall_purchase_success: 'Vielen Dank! Dein Kauf war erfolgreich.',
+  paywall_restored: 'Käufe wiederhergestellt.',
+  paywall_test_limit_title: 'Testkontingent erreicht',
+  paywall_test_limit_body: 'Dein Testkontingent ist erreicht. Danke fürs Testen von KlarPost.',
+  manage_plus: '管理 KlarPost Plus',
+  show_usage: '显示使用情况',
+  usage_title: '我的使用情况',
+  usage_free: '免费分析',
+  usage_soft_test: '测试分析',
+  usage_single_credits: '单封信件额度',
+  usage_plus_status_active: 'KlarPost Plus 已启用',
+  usage_plus_status_inactive: 'KlarPost Plus 未启用',
+  usage_plus_until: '有效期至',
+  usage_plus_remaining: '本月 Plus 分析',
+  usage_chat_total: '问题',
 };
 
 const vi: UIStrings = {
@@ -576,6 +684,41 @@ const vi: UIStrings = {
   privacy_h_third_parties: 'Bên thứ ba',
   privacy_p_third_parties: 'Mistral AI (Paris, Pháp) — xử lý nội dung tài liệu và tin nhắn để tạo phân tích. Apple/Google App Store — chỉ dùng để phân phối ứng dụng và báo cáo lỗi.',
   privacy_updated: 'Cập nhật lần cuối: Tháng 4 năm 2025',
+  paywall_title: 'Weitere Briefe einfach verstehen',
+  paywall_subtitle: 'Scanne deutsche Schreiben, erkenne Fristen und erhalte klare nächste Schritte in deiner Sprache.',
+  paywall_option_single_title: '1 Brief analysieren',
+  paywall_option_single_price: 'Einmalig 1,49 €',
+  paywall_option_single_desc: 'Ideal, wenn du nur gelegentlich Hilfe brauchst.',
+  paywall_option_monthly_title: 'KlarPost Plus',
+  paywall_option_monthly_price: '4,99 € / Monat',
+  paywall_option_monthly_desc: 'Bis zu 20 Briefe pro Monat, Verlauf, PDF-Export, Erinnerungen und Antwortentwürfe.',
+  paywall_option_yearly_title: 'KlarPost Plus Jahr',
+  paywall_option_yearly_price: '39,99 € / Jahr',
+  paywall_option_yearly_desc: 'Für regelmäßige Nutzung. Günstiger als monatlich.',
+  paywall_continue_free_test: 'Kostenlos im Test fortfahren',
+  paywall_test_note: 'TestFlight/APK-Hinweis: In der Live-Version wäre hier eine Zahlung erforderlich. Für diesen Test kannst du kostenlos fortfahren, solange dein Testkontingent nicht erreicht ist.',
+  paywall_restore: 'Käufe wiederherstellen',
+  paywall_legal_note: 'KlarPost ersetzt keine Rechts-, Steuer-, medizinische oder offizielle Beratung.',
+  paywall_privacy_note: 'Keine Werbung. Kein Tracking. Du kannst deine Daten jederzeit löschen.',
+  paywall_payments_unavailable: 'Zahlungen sind in dieser Testversion noch nicht verfügbar.',
+  paywall_payments_unavailable_apk: 'Zahlungen sind in dieser Version noch nicht verfügbar. Bitte nutze die offizielle Store-Version.',
+  paywall_purchase_cancelled: 'Kauf abgebrochen.',
+  paywall_purchase_failed: 'Kauf fehlgeschlagen. Bitte später erneut versuchen.',
+  paywall_purchase_success: 'Vielen Dank! Dein Kauf war erfolgreich.',
+  paywall_restored: 'Käufe wiederhergestellt.',
+  paywall_test_limit_title: 'Testkontingent erreicht',
+  paywall_test_limit_body: 'Dein Testkontingent ist erreicht. Danke fürs Testen von KlarPost.',
+  manage_plus: 'Quản lý KlarPost Plus',
+  show_usage: 'Hiển thị mức sử dụng',
+  usage_title: 'Mức sử dụng của tôi',
+  usage_free: 'Phân tích miễn phí',
+  usage_soft_test: 'Phân tích thử nghiệm',
+  usage_single_credits: 'Tín dụng một lá thư',
+  usage_plus_status_active: 'KlarPost Plus đang hoạt động',
+  usage_plus_status_inactive: 'KlarPost Plus không hoạt động',
+  usage_plus_until: 'Hoạt động đến',
+  usage_plus_remaining: 'Phân tích Plus tháng này',
+  usage_chat_total: 'Câu hỏi',
 };
 
 const tr: UIStrings = {
@@ -714,6 +857,41 @@ const tr: UIStrings = {
   privacy_h_third_parties: 'Üçüncü taraflar',
   privacy_p_third_parties: 'Mistral AI (Paris, Fransa) — analiz oluşturmak için belge ve sohbet içeriğini işler. Apple/Google App Store — yalnızca uygulama dağıtımı ve çökme raporları için.',
   privacy_updated: 'Son güncelleme: Nisan 2025',
+  paywall_title: 'Weitere Briefe einfach verstehen',
+  paywall_subtitle: 'Scanne deutsche Schreiben, erkenne Fristen und erhalte klare nächste Schritte in deiner Sprache.',
+  paywall_option_single_title: '1 Brief analysieren',
+  paywall_option_single_price: 'Einmalig 1,49 €',
+  paywall_option_single_desc: 'Ideal, wenn du nur gelegentlich Hilfe brauchst.',
+  paywall_option_monthly_title: 'KlarPost Plus',
+  paywall_option_monthly_price: '4,99 € / Monat',
+  paywall_option_monthly_desc: 'Bis zu 20 Briefe pro Monat, Verlauf, PDF-Export, Erinnerungen und Antwortentwürfe.',
+  paywall_option_yearly_title: 'KlarPost Plus Jahr',
+  paywall_option_yearly_price: '39,99 € / Jahr',
+  paywall_option_yearly_desc: 'Für regelmäßige Nutzung. Günstiger als monatlich.',
+  paywall_continue_free_test: 'Kostenlos im Test fortfahren',
+  paywall_test_note: 'TestFlight/APK-Hinweis: In der Live-Version wäre hier eine Zahlung erforderlich. Für diesen Test kannst du kostenlos fortfahren, solange dein Testkontingent nicht erreicht ist.',
+  paywall_restore: 'Käufe wiederherstellen',
+  paywall_legal_note: 'KlarPost ersetzt keine Rechts-, Steuer-, medizinische oder offizielle Beratung.',
+  paywall_privacy_note: 'Keine Werbung. Kein Tracking. Du kannst deine Daten jederzeit löschen.',
+  paywall_payments_unavailable: 'Zahlungen sind in dieser Testversion noch nicht verfügbar.',
+  paywall_payments_unavailable_apk: 'Zahlungen sind in dieser Version noch nicht verfügbar. Bitte nutze die offizielle Store-Version.',
+  paywall_purchase_cancelled: 'Kauf abgebrochen.',
+  paywall_purchase_failed: 'Kauf fehlgeschlagen. Bitte später erneut versuchen.',
+  paywall_purchase_success: 'Vielen Dank! Dein Kauf war erfolgreich.',
+  paywall_restored: 'Käufe wiederhergestellt.',
+  paywall_test_limit_title: 'Testkontingent erreicht',
+  paywall_test_limit_body: 'Dein Testkontingent ist erreicht. Danke fürs Testen von KlarPost.',
+  manage_plus: 'KlarPost Plus\'ı yönet',
+  show_usage: 'Kullanımı göster',
+  usage_title: 'Kullanımım',
+  usage_free: 'Ücretsiz analizler',
+  usage_soft_test: 'Test analizleri',
+  usage_single_credits: 'Tek mektup kredileri',
+  usage_plus_status_active: 'KlarPost Plus aktif',
+  usage_plus_status_inactive: 'KlarPost Plus pasif',
+  usage_plus_until: 'Şu tarihe kadar geçerli',
+  usage_plus_remaining: 'Bu ayki Plus analizleri',
+  usage_chat_total: 'Sorular',
 };
 
 const ru: UIStrings = {
@@ -852,6 +1030,41 @@ const ru: UIStrings = {
   privacy_h_third_parties: 'Третьи стороны',
   privacy_p_third_parties: 'Mistral AI (Париж, Франция) — обрабатывает содержимое документов и сообщения для анализа. Apple/Google App Store — только для распространения приложения и отчётов о сбоях.',
   privacy_updated: 'Последнее обновление: апрель 2025',
+  paywall_title: 'Weitere Briefe einfach verstehen',
+  paywall_subtitle: 'Scanne deutsche Schreiben, erkenne Fristen und erhalte klare nächste Schritte in deiner Sprache.',
+  paywall_option_single_title: '1 Brief analysieren',
+  paywall_option_single_price: 'Einmalig 1,49 €',
+  paywall_option_single_desc: 'Ideal, wenn du nur gelegentlich Hilfe brauchst.',
+  paywall_option_monthly_title: 'KlarPost Plus',
+  paywall_option_monthly_price: '4,99 € / Monat',
+  paywall_option_monthly_desc: 'Bis zu 20 Briefe pro Monat, Verlauf, PDF-Export, Erinnerungen und Antwortentwürfe.',
+  paywall_option_yearly_title: 'KlarPost Plus Jahr',
+  paywall_option_yearly_price: '39,99 € / Jahr',
+  paywall_option_yearly_desc: 'Für regelmäßige Nutzung. Günstiger als monatlich.',
+  paywall_continue_free_test: 'Kostenlos im Test fortfahren',
+  paywall_test_note: 'TestFlight/APK-Hinweis: In der Live-Version wäre hier eine Zahlung erforderlich. Für diesen Test kannst du kostenlos fortfahren, solange dein Testkontingent nicht erreicht ist.',
+  paywall_restore: 'Käufe wiederherstellen',
+  paywall_legal_note: 'KlarPost ersetzt keine Rechts-, Steuer-, medizinische oder offizielle Beratung.',
+  paywall_privacy_note: 'Keine Werbung. Kein Tracking. Du kannst deine Daten jederzeit löschen.',
+  paywall_payments_unavailable: 'Zahlungen sind in dieser Testversion noch nicht verfügbar.',
+  paywall_payments_unavailable_apk: 'Zahlungen sind in dieser Version noch nicht verfügbar. Bitte nutze die offizielle Store-Version.',
+  paywall_purchase_cancelled: 'Kauf abgebrochen.',
+  paywall_purchase_failed: 'Kauf fehlgeschlagen. Bitte später erneut versuchen.',
+  paywall_purchase_success: 'Vielen Dank! Dein Kauf war erfolgreich.',
+  paywall_restored: 'Käufe wiederhergestellt.',
+  paywall_test_limit_title: 'Testkontingent erreicht',
+  paywall_test_limit_body: 'Dein Testkontingent ist erreicht. Danke fürs Testen von KlarPost.',
+  manage_plus: 'Управление KlarPost Plus',
+  show_usage: 'Показать использование',
+  usage_title: 'Моё использование',
+  usage_free: 'Бесплатные анализы',
+  usage_soft_test: 'Тестовые анализы',
+  usage_single_credits: 'Кредиты на одно письмо',
+  usage_plus_status_active: 'KlarPost Plus активен',
+  usage_plus_status_inactive: 'KlarPost Plus неактивен',
+  usage_plus_until: 'Активен до',
+  usage_plus_remaining: 'Plus-анализы в этом месяце',
+  usage_chat_total: 'Вопросы',
 };
 
 const es: UIStrings = {
@@ -990,6 +1203,41 @@ const es: UIStrings = {
   privacy_h_third_parties: 'Terceros',
   privacy_p_third_parties: 'Mistral AI (París, Francia) — procesa el contenido del documento y los mensajes para generar el análisis. Apple/Google App Store — solo para distribuir la app y reportar fallos.',
   privacy_updated: 'Última actualización: abril de 2025',
+  paywall_title: 'Weitere Briefe einfach verstehen',
+  paywall_subtitle: 'Scanne deutsche Schreiben, erkenne Fristen und erhalte klare nächste Schritte in deiner Sprache.',
+  paywall_option_single_title: '1 Brief analysieren',
+  paywall_option_single_price: 'Einmalig 1,49 €',
+  paywall_option_single_desc: 'Ideal, wenn du nur gelegentlich Hilfe brauchst.',
+  paywall_option_monthly_title: 'KlarPost Plus',
+  paywall_option_monthly_price: '4,99 € / Monat',
+  paywall_option_monthly_desc: 'Bis zu 20 Briefe pro Monat, Verlauf, PDF-Export, Erinnerungen und Antwortentwürfe.',
+  paywall_option_yearly_title: 'KlarPost Plus Jahr',
+  paywall_option_yearly_price: '39,99 € / Jahr',
+  paywall_option_yearly_desc: 'Für regelmäßige Nutzung. Günstiger als monatlich.',
+  paywall_continue_free_test: 'Kostenlos im Test fortfahren',
+  paywall_test_note: 'TestFlight/APK-Hinweis: In der Live-Version wäre hier eine Zahlung erforderlich. Für diesen Test kannst du kostenlos fortfahren, solange dein Testkontingent nicht erreicht ist.',
+  paywall_restore: 'Käufe wiederherstellen',
+  paywall_legal_note: 'KlarPost ersetzt keine Rechts-, Steuer-, medizinische oder offizielle Beratung.',
+  paywall_privacy_note: 'Keine Werbung. Kein Tracking. Du kannst deine Daten jederzeit löschen.',
+  paywall_payments_unavailable: 'Zahlungen sind in dieser Testversion noch nicht verfügbar.',
+  paywall_payments_unavailable_apk: 'Zahlungen sind in dieser Version noch nicht verfügbar. Bitte nutze die offizielle Store-Version.',
+  paywall_purchase_cancelled: 'Kauf abgebrochen.',
+  paywall_purchase_failed: 'Kauf fehlgeschlagen. Bitte später erneut versuchen.',
+  paywall_purchase_success: 'Vielen Dank! Dein Kauf war erfolgreich.',
+  paywall_restored: 'Käufe wiederhergestellt.',
+  paywall_test_limit_title: 'Testkontingent erreicht',
+  paywall_test_limit_body: 'Dein Testkontingent ist erreicht. Danke fürs Testen von KlarPost.',
+  manage_plus: 'Gestionar KlarPost Plus',
+  show_usage: 'Mostrar mi uso',
+  usage_title: 'Mi uso',
+  usage_free: 'Análisis gratuitos',
+  usage_soft_test: 'Análisis de prueba',
+  usage_single_credits: 'Créditos de carta única',
+  usage_plus_status_active: 'KlarPost Plus activo',
+  usage_plus_status_inactive: 'KlarPost Plus inactivo',
+  usage_plus_until: 'Activo hasta',
+  usage_plus_remaining: 'Análisis Plus este mes',
+  usage_chat_total: 'Preguntas',
 };
 
 // Simple German — Leichte / Einfache Sprache. Short sentences, common words,
@@ -1130,6 +1378,41 @@ const de_simple: UIStrings = {
   privacy_h_third_parties: 'Externe Partner',
   privacy_p_third_parties: 'Mistral AI (Paris, Frankreich) — verarbeitet den Brief-Inhalt und die Chat-Nachrichten für die Analyse. Apple/Google App Store — nur für die Verteilung der App und für Fehler-Berichte.',
   privacy_updated: 'Letzte Änderung: April 2025',
+  paywall_title: 'Weitere Briefe einfach verstehen',
+  paywall_subtitle: 'Scanne deutsche Schreiben, erkenne Fristen und erhalte klare nächste Schritte in deiner Sprache.',
+  paywall_option_single_title: '1 Brief analysieren',
+  paywall_option_single_price: 'Einmalig 1,49 €',
+  paywall_option_single_desc: 'Ideal, wenn du nur gelegentlich Hilfe brauchst.',
+  paywall_option_monthly_title: 'KlarPost Plus',
+  paywall_option_monthly_price: '4,99 € / Monat',
+  paywall_option_monthly_desc: 'Bis zu 20 Briefe pro Monat, Verlauf, PDF-Export, Erinnerungen und Antwortentwürfe.',
+  paywall_option_yearly_title: 'KlarPost Plus Jahr',
+  paywall_option_yearly_price: '39,99 € / Jahr',
+  paywall_option_yearly_desc: 'Für regelmäßige Nutzung. Günstiger als monatlich.',
+  paywall_continue_free_test: 'Kostenlos im Test fortfahren',
+  paywall_test_note: 'TestFlight/APK-Hinweis: In der Live-Version wäre hier eine Zahlung erforderlich. Für diesen Test kannst du kostenlos fortfahren, solange dein Testkontingent nicht erreicht ist.',
+  paywall_restore: 'Käufe wiederherstellen',
+  paywall_legal_note: 'KlarPost ersetzt keine Rechts-, Steuer-, medizinische oder offizielle Beratung.',
+  paywall_privacy_note: 'Keine Werbung. Kein Tracking. Du kannst deine Daten jederzeit löschen.',
+  paywall_payments_unavailable: 'Zahlungen sind in dieser Testversion noch nicht verfügbar.',
+  paywall_payments_unavailable_apk: 'Zahlungen sind in dieser Version noch nicht verfügbar. Bitte nutze die offizielle Store-Version.',
+  paywall_purchase_cancelled: 'Kauf abgebrochen.',
+  paywall_purchase_failed: 'Kauf fehlgeschlagen. Bitte später erneut versuchen.',
+  paywall_purchase_success: 'Vielen Dank! Dein Kauf war erfolgreich.',
+  paywall_restored: 'Käufe wiederhergestellt.',
+  paywall_test_limit_title: 'Testkontingent erreicht',
+  paywall_test_limit_body: 'Dein Testkontingent ist erreicht. Danke fürs Testen von KlarPost.',
+  manage_plus: 'KlarPost Plus verwalten',
+  show_usage: 'Mein Verbrauch',
+  usage_title: 'Mein Verbrauch',
+  usage_free: 'Freie Analysen',
+  usage_soft_test: 'Test-Analysen',
+  usage_single_credits: 'Einzel-Briefe',
+  usage_plus_status_active: 'KlarPost Plus aktiv',
+  usage_plus_status_inactive: 'KlarPost Plus inaktiv',
+  usage_plus_until: 'Aktiv bis',
+  usage_plus_remaining: 'Plus-Analysen diesen Monat',
+  usage_chat_total: 'Fragen',
 };
 
 const STRINGS: Record<LanguageCode, UIStrings> = { en, zh, vi, tr, ru, es, de_simple };
