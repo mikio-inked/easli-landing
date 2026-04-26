@@ -11,9 +11,11 @@ Tagline: **"Understand German letters before they become a problem."**
 ## Stack
 - **Frontend**: React Native + Expo (SDK 54, Expo Router file-based routing), TypeScript
 - **Backend**: FastAPI + Motor (async MongoDB)
-- **AI**: **Mistral AI 🇫🇷 (EU-hosted, DSGVO-friendly)** — `pixtral-large-latest` for vision OCR + analysis, `mistral-large-latest` for the document-scoped chat. Native `mistralai==1.9.11` SDK. (Migrated from OpenAI GPT-5.2 / Emergent LLM key for full EU data residency.)
-- **Storage**: MongoDB (analysis results only — never the original document)
+- **AI**: **Mistral AI 🇫🇷 (European AI provider, EU data residency by default)** — `mistral-large-2512` (Mistral Large 3) for both vision OCR + analysis (`/api/analyze`) AND document chat (`/api/analyses/{id}/chat`). Native `mistralai==1.9.11` SDK. Model IDs are pinned via env vars (`MISTRAL_VISION_MODEL` / `MISTRAL_ANALYSIS_MODEL` / `MISTRAL_CHAT_MODEL`) so swapping is trivial. (Migrated from OpenAI GPT-5.2 / Emergent LLM key for full EU residency; pixtral-large-latest replaced before its Feb 27 2026 deprecation.)
+- **Storage**: MongoDB (analysis results only — original images / PDFs are never persisted)
 - **Auth**: Anonymous device-id (AsyncStorage) — placeholder for full auth later
+- **Consent**: Active opt-in stored as `klarpost.consent_v1` in AsyncStorage; recorded at the end of onboarding and re-checked before every Scan/Upload (legacy users get a one-shot Alert)
+- **DSGVO surfaces**: `GET /api/export?device_id=...` (Art. 15) + `DELETE /api/history/{device_id}` (Art. 17), both wired to the Settings screen
 
 ## Source language → Target languages
 Source is always German. Target languages (with native script):
