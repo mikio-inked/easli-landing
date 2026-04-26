@@ -196,7 +196,17 @@ export type UIKey =
   | 'usage_plus_status_inactive'
   | 'usage_plus_until'
   | 'usage_plus_remaining'
-  | 'usage_chat_total';
+  | 'usage_chat_total'
+  | 'read_aloud_play'
+  | 'read_aloud_stop'
+  | 'scam_modal_title'
+  | 'scam_modal_subtitle'
+  | 'scam_modal_tips_title'
+  | 'scam_modal_tip_1'
+  | 'scam_modal_tip_2'
+  | 'scam_modal_tip_3'
+  | 'scam_modal_tip_4'
+  | 'scam_modal_acknowledge';
 
 type UIStrings = Record<UIKey, string>;
 
