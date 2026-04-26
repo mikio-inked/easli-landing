@@ -99,12 +99,29 @@ export interface PendingPage {
 
 export interface PendingAnalysis {
   pages: PendingPage[];
+  /** Stable idempotency key for the resulting /api/analyze call. Generated
+   *  the moment the user finalises a capture so retries from the analyzing
+   *  error screen reuse the same key and never double-consume usage. */
+  idempotencyKey: string;
 }
 
 let pending: PendingAnalysis | null = null;
 
-export function setPendingAnalysis(p: PendingAnalysis | null) {
-  pending = p;
+/** Public uuid helper — exposed so other modules (e.g. paywall) can mint
+ *  idempotency keys without re-implementing the same logic. */
+export function generateIdempotencyKey(): string {
+  return uuid();
+}
+
+export function setPendingAnalysis(p: { pages: PendingPage[]; idempotencyKey?: string } | null) {
+  if (!p) {
+    pending = null;
+    return;
+  }
+  pending = {
+    pages: p.pages,
+    idempotencyKey: p.idempotencyKey || uuid(),
+  };
 }
 
 export function takePendingAnalysis(): PendingAnalysis | null {

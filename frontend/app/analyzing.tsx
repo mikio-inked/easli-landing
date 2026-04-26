@@ -19,7 +19,7 @@ import {
   setLastResult,
   getLanguage as getStoredLanguage,
 } from '../src/store';
-import { analyzeDocument } from '../src/api';
+import { analyzeDocument, PaymentRequiredError, TestLimitReachedError } from '../src/api';
 import { LanguageCode, t } from '../src/i18n';
 import { saveOriginal } from '../src/originals';
 import { getSaveOriginals } from '../src/settings';
@@ -61,6 +61,7 @@ export default function Analyzing() {
           device_id: deviceId,
           target_language: l,
           pages: pending.pages.map((p) => ({ file_base64: p.base64, mime_type: p.mimeType })),
+          idempotency_key: pending.idempotencyKey,
         });
         if (intervalRef.current) clearInterval(intervalRef.current);
         setStep(3);
@@ -79,6 +80,17 @@ export default function Analyzing() {
         setTimeout(() => router.replace(`/result?id=${encodeURIComponent(record.id)}`), 350);
       } catch (e: any) {
         if (intervalRef.current) clearInterval(intervalRef.current);
+        // Backend entitlement gate fired. Route the user to the paywall
+        // (test_limit_reached → with a clear non-bypassable banner;
+        //  payment_required → standard 3-option paywall).
+        if (e instanceof TestLimitReachedError) {
+          router.replace('/paywall?reason=test_limit_reached');
+          return;
+        }
+        if (e instanceof PaymentRequiredError) {
+          router.replace('/paywall?reason=payment_required');
+          return;
+        }
         setStatus('error');
         setErrorMsg(e?.message || t(l, 'error_generic'));
       }

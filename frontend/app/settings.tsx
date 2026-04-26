@@ -3,6 +3,8 @@
 import { useCallback, useState } from 'react';
 import {
   Alert,
+  Linking,
+  Platform,
   Pressable,
   ScrollView,
   Share,
@@ -15,13 +17,17 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
   ArrowLeft,
+  BarChart3,
   ChevronRight,
+  Crown,
   DownloadCloud,
+  FlaskConical,
   Globe2,
   HardDrive,
   HelpCircle,
   Languages as LanguagesIcon,
   Lock,
+  RotateCw,
   ShieldAlert,
   ShieldCheck,
   Trash2,
@@ -38,20 +44,98 @@ import { LanguageCode, getLanguage as getLanguageMeta, t } from '../src/i18n';
 import { cancelAllReminders } from '../src/notifications';
 import { deleteAllOriginals } from '../src/originals';
 import { getSaveOriginals, setSaveOriginals } from '../src/settings';
+import { useUsage, getRemainingAnalyses } from '../src/usage';
+import {
+  isBillingAvailable,
+  PaymentsUnavailableError,
+  restorePurchases,
+} from '../src/billing';
 import { colors, fontSize, fontWeight, radius, spacing } from '../src/theme';
+
+const BACKEND = process.env.EXPO_PUBLIC_BACKEND_URL || '';
+const __APP_DEV__ =
+  // Expo / Metro injects __DEV__ at bundle time; fall back to NODE_ENV.
+  (typeof __DEV__ !== 'undefined' && (__DEV__ as boolean)) ||
+  process.env.NODE_ENV === 'development';
 
 export default function SettingsScreen() {
   const router = useRouter();
   const [lang, setLang] = useState<LanguageCode>('en');
+  const [deviceId, setDeviceId] = useState<string | null>(null);
   const [saveOriginals, setSaveOriginalsState] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [restoring, setRestoring] = useState(false);
+
+  const { usage, refresh: refreshUsage } = useUsage(deviceId);
+  const remaining = getRemainingAnalyses(usage);
 
   useFocusEffect(
     useCallback(() => {
-      getStoredLanguage().then((l) => setLang(l ?? 'en'));
+      (async () => {
+        setLang((await getStoredLanguage()) ?? 'en');
+        setDeviceId(await ensureDeviceId());
+      })();
       getSaveOriginals().then(setSaveOriginalsState);
     }, [])
   );
+
+  const onRestore = async () => {
+    if (restoring) return;
+    setRestoring(true);
+    try {
+      if (!isBillingAvailable()) {
+        Alert.alert(
+          'KlarPost',
+          Platform.OS === 'android'
+            ? t(lang, 'paywall_payments_unavailable_apk')
+            : t(lang, 'paywall_payments_unavailable')
+        );
+        return;
+      }
+      await restorePurchases();
+      await refreshUsage();
+      Alert.alert('KlarPost', t(lang, 'paywall_restored'));
+    } catch (e: any) {
+      if (e instanceof PaymentsUnavailableError) {
+        Alert.alert('KlarPost', t(lang, 'paywall_payments_unavailable'));
+        return;
+      }
+      Alert.alert('KlarPost', t(lang, 'paywall_purchase_failed'));
+    } finally {
+      setRestoring(false);
+    }
+  };
+
+  const onManagePlus = () => {
+    // Take the user to the official Apple/Google subscription management
+    // surface. RevenueCat does not own this UX. On unsupported platforms we
+    // simply show the test-mode message.
+    if (Platform.OS === 'ios') {
+      Linking.openURL('https://apps.apple.com/account/subscriptions').catch(() => {});
+    } else if (Platform.OS === 'android') {
+      Linking.openURL('https://play.google.com/store/account/subscriptions').catch(() => {});
+    } else {
+      Alert.alert('KlarPost', t(lang, 'paywall_payments_unavailable'));
+    }
+  };
+
+  const callDevTool = async (path: string, query: string) => {
+    if (!__APP_DEV__) return;
+    if (!deviceId) return;
+    try {
+      const res = await fetch(
+        `${BACKEND}/api/dev/usage/${path}?device_id=${encodeURIComponent(deviceId)}${query ? '&' + query : ''}`,
+        { method: 'POST' }
+      );
+      if (!res.ok) {
+        Alert.alert('Dev tools', `HTTP ${res.status}`);
+        return;
+      }
+      await refreshUsage();
+    } catch (e: any) {
+      Alert.alert('Dev tools', e?.message || 'Failed');
+    }
+  };
 
   const onToggleSaveOriginals = async (value: boolean) => {
     setSaveOriginalsState(value);
@@ -292,6 +376,149 @@ export default function SettingsScreen() {
           </Pressable>
         </Card>
 
+        {/* ---------- Subscription / Usage ---------- */}
+        <Card testID="settings-usage-card">
+          <View style={styles.row}>
+            <View style={[styles.rowIcon, { backgroundColor: colors.primarySoft }]}>
+              <BarChart3 color={colors.primary} size={20} strokeWidth={2.4} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.rowTitle}>{t(lang, 'usage_title')}</Text>
+              <Text style={styles.rowSub}>
+                {usage?.plus_active
+                  ? t(lang, 'usage_plus_status_active')
+                  : t(lang, 'usage_plus_status_inactive')}
+              </Text>
+            </View>
+          </View>
+
+          <View style={styles.usageGrid}>
+            <UsageRow
+              label={t(lang, 'usage_free')}
+              used={usage?.free_analyses_used ?? 0}
+              total={usage?.free_analyses_total ?? 0}
+            />
+            {usage?.paywall_mode === 'soft' && (
+              <UsageRow
+                label={t(lang, 'usage_soft_test')}
+                used={usage?.soft_extra_used ?? 0}
+                total={usage?.soft_extra_total ?? 0}
+              />
+            )}
+            <UsageRow
+              label={t(lang, 'usage_single_credits')}
+              used={usage?.single_letter_credits ?? 0}
+            />
+            {usage?.plus_active && (
+              <UsageRow
+                label={t(lang, 'usage_plus_remaining')}
+                used={usage?.plus_monthly_used ?? 0}
+                total={usage?.plus_monthly_total ?? 0}
+              />
+            )}
+            <UsageRow
+              label={t(lang, 'usage_chat_total')}
+              used={usage?.total_chat_questions_used ?? 0}
+              total={usage?.total_chat_questions_total ?? 0}
+            />
+          </View>
+        </Card>
+
+        <Card>
+          <Pressable
+            onPress={onManagePlus}
+            style={styles.row}
+            testID="settings-manage-plus"
+          >
+            <View style={[styles.rowIcon, { backgroundColor: colors.primarySoft }]}>
+              <Crown color={colors.primary} size={20} strokeWidth={2.4} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.rowTitle}>{t(lang, 'manage_plus')}</Text>
+              <Text style={styles.rowSub}>
+                {usage?.plus_active
+                  ? t(lang, 'usage_plus_status_active')
+                  : t(lang, 'usage_plus_status_inactive')}
+              </Text>
+            </View>
+            <ChevronRight color={colors.textMuted} size={22} strokeWidth={2.4} />
+          </Pressable>
+          <View style={styles.divider} />
+          <Pressable
+            onPress={onRestore}
+            disabled={restoring}
+            style={styles.row}
+            testID="settings-restore"
+          >
+            <View style={styles.rowIcon}>
+              <RotateCw color={colors.primary} size={20} strokeWidth={2.4} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.rowTitle}>{t(lang, 'paywall_restore')}</Text>
+            </View>
+            <ChevronRight color={colors.textMuted} size={22} strokeWidth={2.4} />
+          </Pressable>
+        </Card>
+
+        {/* ---------- Dev tools (only in development builds) ---------- */}
+        {__APP_DEV__ && (
+          <Card testID="settings-devtools-card">
+            <View style={styles.row}>
+              <View style={[styles.rowIcon, { backgroundColor: colors.yellow.bg }]}>
+                <FlaskConical color={colors.yellow.text} size={20} strokeWidth={2.4} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.rowTitle}>Dev tools</Text>
+                <Text style={styles.rowSub}>
+                  Only visible in development builds (__DEV__).
+                </Text>
+              </View>
+            </View>
+            <View style={styles.devGrid}>
+              <DevButton
+                label="Reset usage"
+                onPress={() => callDevTool('reset', '')}
+                testID="dev-reset"
+              />
+              <DevButton
+                label="Free limit"
+                onPress={() => callDevTool('simulate', 'scenario=free_limit')}
+                testID="dev-free-limit"
+              />
+              <DevButton
+                label="Soft limit"
+                onPress={() => callDevTool('simulate', 'scenario=soft_limit')}
+                testID="dev-soft-limit"
+              />
+              <DevButton
+                label="Plus active"
+                onPress={() => callDevTool('simulate', 'scenario=plus_active')}
+                testID="dev-plus-active"
+              />
+              <DevButton
+                label="Plus expired"
+                onPress={() => callDevTool('simulate', 'scenario=plus_expired')}
+                testID="dev-plus-expired"
+              />
+              <DevButton
+                label="Plus monthly limit"
+                onPress={() => callDevTool('simulate', 'scenario=plus_monthly_limit')}
+                testID="dev-plus-monthly-limit"
+              />
+              <DevButton
+                label="Add 1-letter credit"
+                onPress={() => callDevTool('simulate', 'scenario=add_single_letter')}
+                testID="dev-add-credit"
+              />
+              <DevButton
+                label="Reset chat"
+                onPress={() => callDevTool('simulate', 'scenario=reset_chat')}
+                testID="dev-reset-chat"
+              />
+            </View>
+          </Card>
+        )}
+
         <Text style={styles.version}>KlarPost · v1.0.0 (MVP)</Text>
       </ScrollView>
     </SafeAreaView>
@@ -383,4 +610,89 @@ const styles = StyleSheet.create({
     fontSize: fontSize.xs,
     marginTop: spacing.lg,
   },
+  usageGrid: {
+    marginTop: spacing.md,
+    gap: 8,
+  },
+  usageItemRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: radius.md,
+    backgroundColor: colors.primarySoft,
+  },
+  usageItemLabel: {
+    fontSize: fontSize.sm,
+    color: colors.textSecondary,
+  },
+  usageItemValue: {
+    fontSize: fontSize.sm,
+    fontWeight: fontWeight.bold,
+    color: colors.primary,
+    fontVariant: ['tabular-nums'],
+  },
+  devGrid: {
+    marginTop: spacing.md,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  devButton: {
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: radius.md,
+    backgroundColor: colors.yellow.bg,
+    borderWidth: 1,
+    borderColor: colors.yellow.border,
+  },
+  devButtonText: {
+    fontSize: fontSize.xs,
+    fontWeight: fontWeight.bold,
+    color: colors.yellow.text,
+  },
 });
+
+// ---- Sub-components scoped to settings.tsx -----------------------------
+
+function UsageRow({
+  label,
+  used,
+  total,
+}: {
+  label: string;
+  used: number;
+  total?: number;
+}) {
+  const value =
+    typeof total === 'number'
+      ? `${used} / ${total}`
+      : String(used);
+  return (
+    <View style={styles.usageItemRow}>
+      <Text style={styles.usageItemLabel}>{label}</Text>
+      <Text style={styles.usageItemValue}>{value}</Text>
+    </View>
+  );
+}
+
+function DevButton({
+  label,
+  onPress,
+  testID,
+}: {
+  label: string;
+  onPress: () => void;
+  testID?: string;
+}) {
+  return (
+    <Pressable
+      onPress={onPress}
+      style={({ pressed }) => [styles.devButton, pressed && { opacity: 0.7 }]}
+      testID={testID}
+    >
+      <Text style={styles.devButtonText}>{label}</Text>
+    </Pressable>
+  );
+}
