@@ -79,16 +79,35 @@ export default function ScanScreen() {
   const intoPendingPages = (scanned: ScannedPage[]): PendingPage[] =>
     scanned.map((p) => ({ base64: p.base64, mimeType: p.mimeType }));
 
+  /** Hard cap: KlarPost analyses are limited to 5 pages per document. */
+  const MAX_PAGES = 5;
+
   /** Launch the native iOS/Android document scanner and append its result.  */
   const launchNativeScan = async () => {
     if (busy) return;
+    // Compute how many more pages we can accept in this session and pass
+    // that to the plugin so its in-app counter reflects the real cap. If
+    // we already have MAX_PAGES, block the call entirely.
+    const remaining = MAX_PAGES - pages.length;
+    if (remaining <= 0) {
+      Alert.alert(
+        t(lang, 'pages_count_other').replace('{n}', String(MAX_PAGES)),
+        t(lang, 'error_generic'),
+      );
+      return;
+    }
     setBusy(true);
     try {
-      const result = await scanDocument({ maxPages: 10, quality: 80 });
+      const result = await scanDocument({ maxPages: remaining, quality: 80 });
 
       switch (result.status) {
         case 'success':
-          setPages((prev) => [...prev, ...intoPendingPages(result.pages)]);
+          // Defensive trim — the plugin should already respect maxPages,
+          // but never let one runaway response exceed the global cap.
+          setPages((prev) => [
+            ...prev,
+            ...intoPendingPages(result.pages).slice(0, MAX_PAGES - prev.length),
+          ]);
           break;
         case 'cancel':
           // User backed out — silent.
@@ -293,10 +312,10 @@ export default function ScanScreen() {
               icon={<ScanLine color={colors.white} size={20} strokeWidth={2.5} />}
               testID="scan-start-analysis"
             />
-            {/* On native we let the user keep scanning more pages; on web
-                fallback "scan another page" doesn't make sense — show the
-                library / camera buttons instead. */}
-            {nativeAvailable && !fallbackBanner ? (
+            {/* On native we let the user keep scanning more pages until the
+                5-page cap; on web fallback "scan another page" doesn't make
+                sense — show the library / camera buttons instead. */}
+            {nativeAvailable && !fallbackBanner && pages.length < MAX_PAGES ? (
               <Button
                 label={t(lang, 'scan_another')}
                 onPress={launchNativeScan}
@@ -304,7 +323,7 @@ export default function ScanScreen() {
                 icon={<Plus color={colors.primary} size={20} strokeWidth={2.5} />}
                 testID="scan-another-page"
               />
-            ) : (
+            ) : !nativeAvailable || fallbackBanner ? (
               <Button
                 label={t(lang, 'pick_from_library')}
                 onPress={openLibrary}
@@ -312,7 +331,7 @@ export default function ScanScreen() {
                 icon={<ImageIcon color={colors.primary} size={20} strokeWidth={2.5} />}
                 testID="scan-pick-library"
               />
-            )}
+            ) : null}
           </>
         ) : nativeAvailable && !fallbackBanner ? (
           <>
