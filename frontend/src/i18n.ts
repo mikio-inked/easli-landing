@@ -142,7 +142,25 @@ export type UIKey =
   | 'filter_all'
   | 'filter_category'
   | 'filter_no_results'
-  | 'category_label';
+  | 'category_label'
+  | 'eu_badge'
+  | 'eu_badge_sub'
+  | 'export_my_data'
+  | 'export_my_data_sub'
+  | 'export_failed'
+  | 'privacy_policy'
+  | 'privacy_intro'
+  | 'privacy_h_residency'
+  | 'privacy_p_residency'
+  | 'privacy_h_collect'
+  | 'privacy_p_collect'
+  | 'privacy_h_delete'
+  | 'privacy_p_delete'
+  | 'privacy_h_no_tracking'
+  | 'privacy_p_no_tracking'
+  | 'privacy_h_third_parties'
+  | 'privacy_p_third_parties'
+  | 'privacy_updated';
 
 type UIStrings = Record<UIKey, string>;
 
@@ -212,7 +230,7 @@ const en: UIStrings = {
   onb2_title: 'Find deadlines and next steps',
   onb2_body: 'See what the letter is asking, when, and what you can do next.',
   onb3_title: 'Your privacy comes first',
-  onb3_body: 'KlarPost does not save your original documents. Only the analysis is stored, and you can delete it any time.',
+  onb3_body: 'KlarPost analyzes your documents on Mistral AI servers in France. They never leave the EU. We do not save your originals. No ads, no tracking — and you can delete everything any time.',
   onb_get_started: 'Get started',
   privacy_short: 'Original documents are not stored. You stay in control.',
   disclaimer_long: 'KlarPost provides general information only. It does not give legal, tax, financial or medical advice. For important matters, please contact the sender or a qualified professional.',
@@ -264,6 +282,24 @@ const en: UIStrings = {
   filter_category: 'Category',
   filter_no_results: 'No analyses match this filter.',
   category_label: 'Category',
+  eu_badge: '🇪🇺 EU',
+  eu_badge_sub: 'Data in Europe',
+  export_my_data: 'Export my data',
+  export_my_data_sub: 'Download a JSON file with all your analyses.',
+  export_failed: 'Export failed. Please try again.',
+  privacy_policy: 'Privacy policy',
+  privacy_intro: 'Your trust matters. Here is how KlarPost handles your data — clearly and honestly.',
+  privacy_h_residency: '🇪🇺 Your data stays in Europe',
+  privacy_p_residency: 'Document analysis runs on Mistral AI servers in Paris, France. Your documents and chat messages never leave the EU.',
+  privacy_h_collect: 'What we collect',
+  privacy_p_collect: 'Document content and chat messages — sent only to Mistral AI to produce the analysis. An anonymous device ID — used to show you your own history. We do NOT collect your name, email, phone number, or location.',
+  privacy_h_delete: 'How to delete everything',
+  privacy_p_delete: 'Tap "Delete my data" in Settings. Everything is removed from our servers immediately. There is no account to delete because we never created one.',
+  privacy_h_no_tracking: 'No ads, no tracking',
+  privacy_p_no_tracking: 'We do not show ads. We do not sell or share your data with advertisers. We do not track you across other apps or websites.',
+  privacy_h_third_parties: 'Third parties',
+  privacy_p_third_parties: 'Mistral AI (Paris, France) — processes document content and chat messages to generate the analysis. Apple/Google App Stores — only for app delivery and crash reports.',
+  privacy_updated: 'Last updated: April 2025',
 };
 
 const zh: UIStrings = {
@@ -332,7 +368,7 @@ const zh: UIStrings = {
   onb2_title: '找出截止日期和下一步',
   onb2_body: '看清这封信在问什么、什么时候、以及您接下来可以做什么。',
   onb3_title: '您的隐私最重要',
-  onb3_body: 'KlarPost 不保存您的原始文件。只保存分析结果，您随时可以删除。',
+  onb3_body: 'KlarPost 在法国巴黎的 Mistral AI 服务器上分析您的文件。它们绝不会离开欧盟。我们不保存您的原件,不投放广告,不跟踪您——您随时可以删除一切。',
   onb_get_started: '开始使用',
   privacy_short: '原始文件不会被保存。您始终掌握控制权。',
   disclaimer_long: 'KlarPost 仅提供一般信息，不提供法律、税务、财务或医疗建议。对于重要事项，请联系发件人或合格的专业人士。',
@@ -384,6 +420,24 @@ const zh: UIStrings = {
   filter_category: '类别',
   filter_no_results: '此类别下暂无分析。',
   category_label: '类别',
+  eu_badge: '🇪🇺 欧盟',
+  eu_badge_sub: '数据留在欧洲',
+  export_my_data: '导出我的数据',
+  export_my_data_sub: '下载包含您所有分析的 JSON 文件。',
+  export_failed: '导出失败，请重试。',
+  privacy_policy: '隐私政策',
+  privacy_intro: '我们珍视您的信任。下面清楚地说明 KlarPost 如何处理您的数据。',
+  privacy_h_residency: '🇪🇺 您的数据留在欧洲',
+  privacy_p_residency: '文件分析在法国巴黎的 Mistral AI 服务器上运行。您的文件和聊天记录绝不会离开欧盟。',
+  privacy_h_collect: '我们收集的内容',
+  privacy_p_collect: '文件内容和聊天信息——仅发送给 Mistral AI 用于生成分析。匿名设备 ID——用于显示您自己的历史记录。我们不收集姓名、邮箱、电话或位置信息。',
+  privacy_h_delete: '如何删除一切',
+  privacy_p_delete: '在「设置」中点击「删除我的数据」,即可立即从我们的服务器移除一切。我们没有创建账户,所以也无需注销账户。',
+  privacy_h_no_tracking: '无广告,无跟踪',
+  privacy_p_no_tracking: '我们不展示广告,不向广告商出售或分享您的数据,也不会跨应用或网站跟踪您。',
+  privacy_h_third_parties: '第三方服务',
+  privacy_p_third_parties: 'Mistral AI(法国巴黎)——处理文件内容和聊天信息以生成分析。Apple/Google App Store——仅用于应用分发和崩溃报告。',
+  privacy_updated: '最后更新:2025 年 4 月',
 };
 
 const vi: UIStrings = {
@@ -452,7 +506,7 @@ const vi: UIStrings = {
   onb2_title: 'Tìm hạn chót và bước tiếp theo',
   onb2_body: 'Xem rõ bức thư đang yêu cầu gì, khi nào, và bạn có thể làm gì tiếp.',
   onb3_title: 'Quyền riêng tư của bạn là trên hết',
-  onb3_body: 'KlarPost không lưu tài liệu gốc. Chỉ lưu kết quả phân tích, và bạn có thể xoá bất cứ lúc nào.',
+  onb3_body: 'KlarPost phân tích tài liệu của bạn trên máy chủ Mistral AI tại Pháp. Chúng không bao giờ rời khỏi EU. Chúng tôi không lưu bản gốc, không quảng cáo, không theo dõi — và bạn có thể xoá mọi thứ bất cứ lúc nào.',
   onb_get_started: 'Bắt đầu',
   privacy_short: 'Tài liệu gốc không được lưu. Bạn luôn kiểm soát.',
   disclaimer_long: 'KlarPost chỉ cung cấp thông tin chung. Đây không phải là tư vấn pháp lý, thuế, tài chính hoặc y tế. Với những vấn đề quan trọng, hãy liên hệ với người gửi hoặc một chuyên gia có chuyên môn.',
@@ -504,6 +558,24 @@ const vi: UIStrings = {
   filter_category: 'Loại',
   filter_no_results: 'Không có phân tích nào phù hợp với bộ lọc này.',
   category_label: 'Loại',
+  eu_badge: '🇪🇺 EU',
+  eu_badge_sub: 'Dữ liệu trong châu Âu',
+  export_my_data: 'Xuất dữ liệu của tôi',
+  export_my_data_sub: 'Tải xuống tệp JSON với toàn bộ phân tích của bạn.',
+  export_failed: 'Xuất không thành công. Vui lòng thử lại.',
+  privacy_policy: 'Chính sách bảo mật',
+  privacy_intro: 'Sự tin tưởng của bạn rất quan trọng. Đây là cách KlarPost xử lý dữ liệu của bạn — rõ ràng và trung thực.',
+  privacy_h_residency: '🇪🇺 Dữ liệu của bạn ở lại châu Âu',
+  privacy_p_residency: 'Phân tích tài liệu chạy trên máy chủ Mistral AI tại Paris, Pháp. Tài liệu và tin nhắn của bạn không bao giờ rời khỏi EU.',
+  privacy_h_collect: 'Chúng tôi thu thập gì',
+  privacy_p_collect: 'Nội dung tài liệu và tin nhắn trò chuyện — chỉ gửi đến Mistral AI để tạo phân tích. ID thiết bị ẩn danh — dùng để hiển thị lịch sử của riêng bạn. Chúng tôi KHÔNG thu thập tên, email, số điện thoại hay vị trí.',
+  privacy_h_delete: 'Cách xóa mọi thứ',
+  privacy_p_delete: 'Nhấn "Xóa dữ liệu của tôi" trong Cài đặt. Mọi thứ sẽ bị xóa khỏi máy chủ ngay lập tức. Không có tài khoản nào để xóa vì chúng tôi không tạo tài khoản.',
+  privacy_h_no_tracking: 'Không quảng cáo, không theo dõi',
+  privacy_p_no_tracking: 'Chúng tôi không hiển thị quảng cáo, không bán hay chia sẻ dữ liệu với nhà quảng cáo, và không theo dõi bạn qua các ứng dụng khác.',
+  privacy_h_third_parties: 'Bên thứ ba',
+  privacy_p_third_parties: 'Mistral AI (Paris, Pháp) — xử lý nội dung tài liệu và tin nhắn để tạo phân tích. Apple/Google App Store — chỉ dùng để phân phối ứng dụng và báo cáo lỗi.',
+  privacy_updated: 'Cập nhật lần cuối: Tháng 4 năm 2025',
 };
 
 const tr: UIStrings = {
@@ -572,7 +644,7 @@ const tr: UIStrings = {
   onb2_title: 'Son tarihleri ve adımları görün',
   onb2_body: 'Mektubun ne istediğini, ne zaman ve sonraki adımı net görün.',
   onb3_title: 'Gizliliğiniz önce gelir',
-  onb3_body: 'KlarPost orijinal belgelerinizi saklamaz. Sadece analiz saklanır ve istediğiniz zaman silebilirsiniz.',
+  onb3_body: 'KlarPost belgelerinizi Fransa\'daki Mistral AI sunucularında analiz eder. AB\'yi asla terk etmezler. Orijinalleri saklamayız, reklam göstermeyiz, sizi takip etmeyiz — ve istediğiniz zaman her şeyi silebilirsiniz.',
   onb_get_started: 'Başla',
   privacy_short: 'Orijinal belgeler saklanmaz. Kontrol sizde.',
   disclaimer_long: 'KlarPost yalnızca genel bilgi sağlar. Hukuki, vergi, finansal veya tıbbi tavsiye vermez. Önemli konularda lütfen göndericiye veya yetkili bir uzmana danışın.',
@@ -624,6 +696,24 @@ const tr: UIStrings = {
   filter_category: 'Kategori',
   filter_no_results: 'Bu filtreye uygun analiz yok.',
   category_label: 'Kategori',
+  eu_badge: '🇪🇺 AB',
+  eu_badge_sub: 'Veriler Avrupa\'da',
+  export_my_data: 'Verilerimi dışa aktar',
+  export_my_data_sub: 'Tüm analizlerinizi içeren bir JSON dosyası indirin.',
+  export_failed: 'Dışa aktarma başarısız. Lütfen tekrar deneyin.',
+  privacy_policy: 'Gizlilik politikası',
+  privacy_intro: 'Güveniniz bizim için önemli. KlarPost verilerinizi nasıl ele alıyor — açık ve dürüstçe.',
+  privacy_h_residency: '🇪🇺 Verileriniz Avrupa\'da kalır',
+  privacy_p_residency: 'Belge analizi, Paris/Fransa\'daki Mistral AI sunucularında çalışır. Belgeleriniz ve sohbetleriniz AB\'yi asla terk etmez.',
+  privacy_h_collect: 'Neyi topluyoruz',
+  privacy_p_collect: 'Belge içeriği ve sohbet mesajları — yalnızca analiz için Mistral AI\'ya gönderilir. Anonim cihaz kimliği — kendi geçmişinizi göstermek için kullanılır. İsim, e-posta, telefon veya konum BİLGİSİ TOPLAMIYORUZ.',
+  privacy_h_delete: 'Her şeyi nasıl silersiniz',
+  privacy_p_delete: 'Ayarlar\'da "Verilerimi sil" seçeneğine dokunun. Her şey sunucularımızdan anında kaldırılır. Hesap oluşturmadığımız için silinecek bir hesap yok.',
+  privacy_h_no_tracking: 'Reklam yok, takip yok',
+  privacy_p_no_tracking: 'Reklam göstermiyoruz, verilerinizi reklamcılara satmıyor veya paylaşmıyoruz, sizi başka uygulama ya da sitelerde takip etmiyoruz.',
+  privacy_h_third_parties: 'Üçüncü taraflar',
+  privacy_p_third_parties: 'Mistral AI (Paris, Fransa) — analiz oluşturmak için belge ve sohbet içeriğini işler. Apple/Google App Store — yalnızca uygulama dağıtımı ve çökme raporları için.',
+  privacy_updated: 'Son güncelleme: Nisan 2025',
 };
 
 const ru: UIStrings = {
@@ -692,7 +782,7 @@ const ru: UIStrings = {
   onb2_title: 'Найдите сроки и следующие шаги',
   onb2_body: 'Понимайте, о чём спрашивает письмо, когда и что вы можете сделать дальше.',
   onb3_title: 'Ваша приватность важна',
-  onb3_body: 'KlarPost не сохраняет оригиналы документов. Сохраняется только анализ, и вы можете удалить его в любой момент.',
+  onb3_body: 'KlarPost анализирует ваши документы на серверах Mistral AI во Франции. Они никогда не покидают ЕС. Мы не сохраняем оригиналы, не показываем рекламу и не отслеживаем вас — и вы можете удалить всё в любой момент.',
   onb_get_started: 'Начать',
   privacy_short: 'Оригиналы не сохраняются. Контроль остаётся за вами.',
   disclaimer_long: 'KlarPost предоставляет только общую информацию. Это не юридическая, налоговая, финансовая или медицинская консультация. По важным вопросам обратитесь к отправителю или квалифицированному специалисту.',
@@ -744,6 +834,24 @@ const ru: UIStrings = {
   filter_category: 'Категория',
   filter_no_results: 'Нет анализов в этой категории.',
   category_label: 'Категория',
+  eu_badge: '🇪🇺 ЕС',
+  eu_badge_sub: 'Данные в Европе',
+  export_my_data: 'Экспортировать мои данные',
+  export_my_data_sub: 'Скачать JSON-файл со всеми вашими анализами.',
+  export_failed: 'Не удалось экспортировать. Попробуйте ещё раз.',
+  privacy_policy: 'Политика конфиденциальности',
+  privacy_intro: 'Ваше доверие важно для нас. Вот как KlarPost обращается с вашими данными — честно и прозрачно.',
+  privacy_h_residency: '🇪🇺 Ваши данные остаются в Европе',
+  privacy_p_residency: 'Анализ документов работает на серверах Mistral AI в Париже, Франция. Ваши документы и сообщения никогда не покидают ЕС.',
+  privacy_h_collect: 'Что мы собираем',
+  privacy_p_collect: 'Содержимое документов и сообщения чата — отправляются только в Mistral AI для анализа. Анонимный идентификатор устройства — чтобы показать вам вашу собственную историю. Мы НЕ собираем имя, e-mail, телефон или геолокацию.',
+  privacy_h_delete: 'Как удалить всё',
+  privacy_p_delete: 'Нажмите «Удалить мои данные» в Настройках. Всё мгновенно удалится с наших серверов. Удалять учётную запись не нужно — её просто нет.',
+  privacy_h_no_tracking: 'Без рекламы и слежки',
+  privacy_p_no_tracking: 'Мы не показываем рекламу, не продаём и не передаём ваши данные рекламодателям, не отслеживаем вас в других приложениях и сайтах.',
+  privacy_h_third_parties: 'Третьи стороны',
+  privacy_p_third_parties: 'Mistral AI (Париж, Франция) — обрабатывает содержимое документов и сообщения для анализа. Apple/Google App Store — только для распространения приложения и отчётов о сбоях.',
+  privacy_updated: 'Последнее обновление: апрель 2025',
 };
 
 const es: UIStrings = {
@@ -812,7 +920,7 @@ const es: UIStrings = {
   onb2_title: 'Encuentra plazos y próximos pasos',
   onb2_body: 'Ve qué pide la carta, cuándo y qué puedes hacer a continuación.',
   onb3_title: 'Tu privacidad es lo primero',
-  onb3_body: 'KlarPost no guarda tus documentos originales. Solo se guarda el análisis y puedes borrarlo cuando quieras.',
+  onb3_body: 'KlarPost analiza tus documentos en servidores de Mistral AI en Francia. Nunca salen de la UE. No guardamos tus originales, no mostramos anuncios, no te rastreamos — y puedes borrar todo cuando quieras.',
   onb_get_started: 'Empezar',
   privacy_short: 'Los documentos originales no se guardan. Tú tienes el control.',
   disclaimer_long: 'KlarPost solo proporciona información general. No es asesoría legal, fiscal, financiera ni médica. Para asuntos importantes, contacta al remitente o a un profesional cualificado.',
@@ -864,6 +972,24 @@ const es: UIStrings = {
   filter_category: 'Categoría',
   filter_no_results: 'No hay análisis en esta categoría.',
   category_label: 'Categoría',
+  eu_badge: '🇪🇺 UE',
+  eu_badge_sub: 'Datos en Europa',
+  export_my_data: 'Exportar mis datos',
+  export_my_data_sub: 'Descarga un archivo JSON con todos tus análisis.',
+  export_failed: 'No se pudo exportar. Inténtalo de nuevo.',
+  privacy_policy: 'Política de privacidad',
+  privacy_intro: 'Tu confianza nos importa. Así trata KlarPost tus datos — con claridad y honestidad.',
+  privacy_h_residency: '🇪🇺 Tus datos se quedan en Europa',
+  privacy_p_residency: 'El análisis de documentos se ejecuta en servidores de Mistral AI en París, Francia. Tus documentos y mensajes nunca salen de la UE.',
+  privacy_h_collect: 'Qué recopilamos',
+  privacy_p_collect: 'Contenido del documento y mensajes del chat — enviados solo a Mistral AI para generar el análisis. Un identificador anónimo de dispositivo — para mostrarte tu propio historial. NO recopilamos tu nombre, correo, teléfono o ubicación.',
+  privacy_h_delete: 'Cómo borrar todo',
+  privacy_p_delete: 'Toca «Borrar mis datos» en Ajustes. Todo se elimina de inmediato de nuestros servidores. No hay cuenta que borrar porque nunca creamos una.',
+  privacy_h_no_tracking: 'Sin anuncios, sin rastreo',
+  privacy_p_no_tracking: 'No mostramos anuncios, no vendemos ni compartimos tus datos con anunciantes, ni te rastreamos en otras apps o sitios web.',
+  privacy_h_third_parties: 'Terceros',
+  privacy_p_third_parties: 'Mistral AI (París, Francia) — procesa el contenido del documento y los mensajes para generar el análisis. Apple/Google App Store — solo para distribuir la app y reportar fallos.',
+  privacy_updated: 'Última actualización: abril de 2025',
 };
 
 // Simple German — Leichte / Einfache Sprache. Short sentences, common words,
@@ -934,7 +1060,7 @@ const de_simple: UIStrings = {
   onb2_title: 'Fristen und Schritte sehen',
   onb2_body: 'Sie sehen: Was steht im Brief? Was können Sie als Nächstes tun?',
   onb3_title: 'Ihre Daten sind sicher',
-  onb3_body: 'KlarPost speichert keine Original-Briefe. Nur die Erklärung. Sie können alles jederzeit löschen.',
+  onb3_body: 'KlarPost prüft Ihre Briefe auf Mistral-AI-Servern in Frankreich. Die Briefe verlassen die EU nicht. Wir speichern keine Originale. Keine Werbung. Kein Tracking. Sie können alles jederzeit löschen.',
   onb_get_started: 'Los geht es',
   privacy_short: 'Original-Briefe werden nicht gespeichert. Sie haben die Kontrolle.',
   disclaimer_long: 'KlarPost gibt nur allgemeine Informationen. KlarPost ist keine Rechts-, Steuer-, Geld- oder Arzt-Beratung. Bei wichtigen Fragen fragen Sie bitte den Absender oder einen Fachmann (zum Beispiel: einen Arzt, einen Anwalt, eine Beratungsstelle).',
@@ -986,6 +1112,24 @@ const de_simple: UIStrings = {
   filter_category: 'Kategorie',
   filter_no_results: 'Keine Briefe in dieser Kategorie.',
   category_label: 'Kategorie',
+  eu_badge: '🇪🇺 EU',
+  eu_badge_sub: 'Daten in Europa',
+  export_my_data: 'Meine Daten exportieren',
+  export_my_data_sub: 'Eine JSON-Datei mit allen Analysen herunterladen.',
+  export_failed: 'Export hat nicht geklappt. Bitte noch einmal versuchen.',
+  privacy_policy: 'Datenschutz',
+  privacy_intro: 'Ihr Vertrauen ist uns wichtig. So geht KlarPost mit Ihren Daten um — klar und ehrlich.',
+  privacy_h_residency: '🇪🇺 Ihre Daten bleiben in Europa',
+  privacy_p_residency: 'Die Analyse läuft auf Mistral-AI-Servern in Paris (Frankreich). Ihre Briefe und Chat-Nachrichten verlassen die EU nicht.',
+  privacy_h_collect: 'Was wir speichern',
+  privacy_p_collect: 'Brief-Inhalt und Chat-Nachrichten — gehen nur an Mistral AI, damit die Analyse möglich ist. Eine anonyme Geräte-Nummer — damit wir Ihnen Ihre eigene Liste zeigen können. Wir speichern KEINEN Namen, KEINE E-Mail, KEINE Telefonnummer und KEINEN Standort.',
+  privacy_h_delete: 'So löschen Sie alles',
+  privacy_p_delete: 'Tippen Sie auf „Meine Daten löschen" in den Einstellungen. Wir entfernen sofort alles von unseren Servern. Es gibt kein Konto, das man löschen müsste.',
+  privacy_h_no_tracking: 'Keine Werbung, kein Tracking',
+  privacy_p_no_tracking: 'Wir zeigen keine Werbung. Wir verkaufen oder teilen Ihre Daten nicht mit Werbe-Firmen. Wir verfolgen Sie nicht in anderen Apps oder Webseiten.',
+  privacy_h_third_parties: 'Externe Partner',
+  privacy_p_third_parties: 'Mistral AI (Paris, Frankreich) — verarbeitet den Brief-Inhalt und die Chat-Nachrichten für die Analyse. Apple/Google App Store — nur für die Verteilung der App und für Fehler-Berichte.',
+  privacy_updated: 'Letzte Änderung: April 2025',
 };
 
 const STRINGS: Record<LanguageCode, UIStrings> = { en, zh, vi, tr, ru, es, de_simple };

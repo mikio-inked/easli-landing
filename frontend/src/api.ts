@@ -139,6 +139,20 @@ export async function deleteAllAnalyses(deviceId: string): Promise<void> {
   await jsonOrThrow(res);
 }
 
+export interface ExportPayload {
+  app: string;
+  device_id: string;
+  exported_at: string;
+  data_residency: string;
+  count: number;
+  analyses: AnalysisRecord[];
+}
+
+export async function exportMyData(deviceId: string): Promise<ExportPayload> {
+  const res = await fetch(`${BASE_URL}/api/export?device_id=${encodeURIComponent(deviceId)}`);
+  return jsonOrThrow<ExportPayload>(res);
+}
+
 export async function listChatMessages(analysisId: string, deviceId: string): Promise<ChatMessage[]> {
   const res = await fetch(
     `${BASE_URL}/api/analyses/${encodeURIComponent(analysisId)}/messages?device_id=${encodeURIComponent(deviceId)}`

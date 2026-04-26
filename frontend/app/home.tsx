@@ -163,10 +163,17 @@ export default function Home() {
           </View>
         </Pressable>
 
-        <View style={styles.privacyRow}>
+        <Pressable
+          onPress={() => router.push('/privacy')}
+          style={({ pressed }) => [styles.privacyRow, pressed && { opacity: 0.7 }]}
+          testID="home-privacy-banner"
+        >
           <ShieldCheck color={colors.green.solid} size={16} strokeWidth={2.6} />
-          <Text style={styles.privacyText}>{t(lang, 'privacy_short')}</Text>
-        </View>
+          <Text style={styles.privacyText}>
+            <Text style={styles.privacyEU}>{t(lang, 'eu_badge')} · </Text>
+            {t(lang, 'eu_badge_sub')} — {t(lang, 'privacy_short')}
+          </Text>
+        </Pressable>
 
         <View style={styles.recentHeader}>
           <Text style={styles.recentTitle}>{t(lang, 'recent_analyses')}</Text>
@@ -357,12 +364,21 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    paddingHorizontal: 4,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: radius.lg,
+    backgroundColor: colors.green.bg,
+    borderWidth: 1,
+    borderColor: colors.green.border,
   },
   privacyText: {
     fontSize: fontSize.sm,
-    color: colors.textSecondary,
+    color: colors.green.text,
     flex: 1,
+    lineHeight: 19,
+  },
+  privacyEU: {
+    fontWeight: fontWeight.extrabold,
   },
   recentHeader: {
     flexDirection: 'row',

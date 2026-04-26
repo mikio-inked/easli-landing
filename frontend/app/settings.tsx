@@ -5,6 +5,7 @@ import {
   Alert,
   Pressable,
   ScrollView,
+  Share,
   StyleSheet,
   Switch,
   Text,
@@ -15,6 +16,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import {
   ArrowLeft,
   ChevronRight,
+  DownloadCloud,
+  Globe2,
   HardDrive,
   HelpCircle,
   Languages as LanguagesIcon,
@@ -24,7 +27,7 @@ import {
   Trash2,
 } from 'lucide-react-native';
 import { Card } from '../src/ui';
-import { deleteAllAnalyses } from '../src/api';
+import { deleteAllAnalyses, exportMyData } from '../src/api';
 import {
   ensureDeviceId,
   getLanguage as getStoredLanguage,
@@ -41,6 +44,7 @@ export default function SettingsScreen() {
   const router = useRouter();
   const [lang, setLang] = useState<LanguageCode>('en');
   const [saveOriginals, setSaveOriginalsState] = useState(false);
+  const [exporting, setExporting] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
@@ -55,6 +59,27 @@ export default function SettingsScreen() {
     if (!value) {
       // Turning OFF the toggle clears any locally saved originals.
       await deleteAllOriginals();
+    }
+  };
+
+  const onExport = async () => {
+    if (exporting) return;
+    setExporting(true);
+    try {
+      const id = await ensureDeviceId();
+      const payload = await exportMyData(id);
+      const json = JSON.stringify(payload, null, 2);
+      await Share.share(
+        {
+          message: json,
+          title: 'KlarPost data export',
+        },
+        { dialogTitle: 'KlarPost data export' }
+      );
+    } catch (e: any) {
+      Alert.alert(t(lang, 'export_failed'), e?.message || '');
+    } finally {
+      setExporting(false);
     }
   };
 
@@ -115,6 +140,25 @@ export default function SettingsScreen() {
         <View style={{ width: 26 }} />
       </View>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        <Pressable
+          onPress={() => router.push('/privacy')}
+          style={styles.euBanner}
+          testID="settings-eu-banner"
+        >
+          <View style={styles.euBannerIcon}>
+            <Globe2 color={colors.green.text} size={22} strokeWidth={2.6} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.euBannerTitle}>
+              {t(lang, 'eu_badge')} · {t(lang, 'eu_badge_sub')}
+            </Text>
+            <Text style={styles.euBannerSub} numberOfLines={2}>
+              {t(lang, 'privacy_p_residency')}
+            </Text>
+          </View>
+          <ChevronRight color={colors.green.text} size={22} strokeWidth={2.4} />
+        </Pressable>
+
         <Card>
           <View style={styles.row}>
             <View style={[styles.rowIcon, { backgroundColor: colors.primarySoft }]}>
@@ -155,6 +199,24 @@ export default function SettingsScreen() {
 
         <Card>
           <Pressable
+            onPress={onExport}
+            style={styles.row}
+            disabled={exporting}
+            testID="settings-export"
+          >
+            <View style={styles.rowIcon}>
+              <DownloadCloud color={colors.primary} size={20} strokeWidth={2.4} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.rowTitle}>{t(lang, 'export_my_data')}</Text>
+              <Text style={styles.rowSub}>{t(lang, 'export_my_data_sub')}</Text>
+            </View>
+            <ChevronRight color={colors.textMuted} size={22} strokeWidth={2.4} />
+          </Pressable>
+        </Card>
+
+        <Card>
+          <Pressable
             onPress={onDeleteAll}
             style={styles.row}
             testID="settings-delete-all"
@@ -185,15 +247,20 @@ export default function SettingsScreen() {
         </Card>
 
         <Card>
-          <View style={styles.row}>
+          <Pressable
+            onPress={() => router.push('/privacy')}
+            style={styles.row}
+            testID="settings-privacy-policy"
+          >
             <View style={[styles.rowIcon, { backgroundColor: colors.green.bg }]}>
               <ShieldCheck color={colors.green.text} size={20} strokeWidth={2.4} />
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={styles.rowTitle}>{t(lang, 'privacy')}</Text>
+              <Text style={styles.rowTitle}>{t(lang, 'privacy_policy')}</Text>
               <Text style={styles.rowSub}>{t(lang, 'privacy_short')}</Text>
             </View>
-          </View>
+            <ChevronRight color={colors.textMuted} size={22} strokeWidth={2.4} />
+          </Pressable>
           <View style={styles.divider} />
           <View style={styles.row}>
             <View style={styles.rowIcon}>
@@ -249,6 +316,37 @@ const styles = StyleSheet.create({
   content: {
     padding: spacing.lg,
     gap: spacing.md,
+  },
+  euBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    padding: spacing.md,
+    borderRadius: radius.xl,
+    backgroundColor: colors.green.bg,
+    borderWidth: 1,
+    borderColor: colors.green.border ?? colors.green.bg,
+  },
+  euBannerIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: radius.full,
+    backgroundColor: colors.white,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  euBannerTitle: {
+    fontSize: fontSize.base,
+    fontWeight: fontWeight.extrabold,
+    color: colors.green.text,
+    letterSpacing: -0.2,
+  },
+  euBannerSub: {
+    marginTop: 2,
+    fontSize: fontSize.sm,
+    color: colors.green.text,
+    lineHeight: 19,
+    opacity: 0.9,
   },
   row: {
     flexDirection: 'row',

@@ -180,14 +180,95 @@ backend:
         -agent: "testing"
         -comment: "PASS. requirements.txt confirms mistralai==1.9.11 pinned and no `emergentintegrations` line. Backend imports `from mistralai import Mistral` and successfully calls api.mistral.ai for both pixtral-large-latest and mistral-large-latest during the regression run."
 
+  - task: "GET /api/export — DSGVO Art. 15 data export"
+    implemented: true
+    working: "NA"
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+        -working: "NA"
+        -agent: "main"
+        -comment: "New endpoint at /api/export?device_id=... returns {app, device_id, exported_at, data_residency:'EU (Mistral AI, Paris)', count, analyses[]} where analyses are the full stored docs (no MongoDB internal _id fields) sorted newest-first by created_at. Validates device_id is non-empty (400) and missing param yields FastAPI 422. Local smoke test: empty device returns count=0 and empty analyses; HTTP 400 on empty device_id; HTTP 422 on missing param. Frontend Settings screen calls this and pipes the JSON through React Native Share so user can save / email / AirDrop the export."
+
+frontend:
+  - task: "Privacy policy screen at /privacy with 5 translated sections + EU residency hero chip"
+    implemented: true
+    working: true
+    file: "/app/frontend/app/privacy.tsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        -working: "NA"
+        -agent: "main"
+        -comment: "New screen accessed from Settings (EU banner + privacy_policy row) and from Home banner. Renders 5 cards: Data residency (green tint), What we collect, How to delete, No ads/tracking (green tint), Third parties. Footer 'Mistral AI · Paris, France 🇫🇷' + last-updated date + support email. All copy comes from i18n (translated for all 7 languages). Visual smoke test passed in screenshot."
+        -working: true
+        -agent: "testing"
+        -comment: "PASS on iPhone 390x844. testID=privacy-screen mounts, header reads 'Privacy policy', green EU hero chip shows '🇪🇺 EU · Data in Europe'. All 5 section titles present: 'Your data stays in Europe', 'What we collect', 'How to delete everything', 'No ads, no tracking', 'Third parties'. Body under residency mentions 'Mistral AI' and 'Paris'. Back arrow (testID=privacy-back) returns to previous screen successfully. No console errors."
+
+  - task: "Settings screen extended: EU banner card + Export my data + Privacy policy link"
+    implemented: true
+    working: true
+    file: "/app/frontend/app/settings.tsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        -working: "NA"
+        -agent: "main"
+        -comment: "Top of screen now shows a tappable green EU banner ('🇪🇺 EU · Data in Europe' + the residency one-liner) which navigates to /privacy. New Card with 'Export my data' (testID=settings-export) calls /api/export and pipes through React Native Share. Old static 'Privacy' card replaced with a tappable 'Privacy policy' row (testID=settings-privacy-policy) that pushes /privacy. Disclaimer (Important notice) preserved underneath. Existing rows (Save originals toggle, Change language, Delete all analyses, Delete my data, Help & support, Version) unchanged."
+        -working: true
+        -agent: "testing"
+        -comment: "PASS. settings-eu-banner visible at top with green-tinted bg rgb(209,250,229), text '🇪🇺 EU · Data in Europe — Document analysis runs on Mistral AI servers in Paris, France. Your documents and chat messages never leave the EU.' Tap navigates to /privacy. settings-export row title 'Export my data' present; tapping it does NOT crash the screen and produces zero new console errors (Share sheet unsupported on web is handled gracefully). settings-privacy-policy row title 'Privacy policy' present and tap navigates to /privacy."
+
+  - task: "Home screen EU residency banner replaces plain privacy footer"
+    implemented: true
+    working: true
+    file: "/app/frontend/app/home.tsx"
+    stuck_count: 0
+    priority: "medium"
+    needs_retesting: false
+    status_history:
+        -working: "NA"
+        -agent: "main"
+        -comment: "The previous compact 'Original documents are not stored' line is now a tappable green pill: '🇪🇺 EU · Data in Europe — <privacy_short>' with green border + emerald fill + ShieldCheck. testID=home-privacy-banner pushes /privacy."
+        -working: true
+        -agent: "testing"
+        -comment: "PASS. testID=home-privacy-banner visible on /home with text '🇪🇺 EU · Data in Europe — Original documents are not stored. You stay in control.' and green-tinted bg rgb(209,250,229). Tapping navigates to /privacy correctly. Home main CTAs unchanged: home-scan-btn, home-upload-btn, home-language-chip, home-history-btn, home-settings-btn all render and navigate to expected routes (/scan, /upload, /language, /history, /settings)."
+
+  - task: "Onboarding slide 3 + 18 new privacy/EU i18n keys translated for all 7 languages"
+    implemented: true
+    working: true
+    file: "/app/frontend/src/i18n.ts"
+    stuck_count: 0
+    priority: "low"
+    needs_retesting: false
+    status_history:
+        -working: "NA"
+        -agent: "main"
+        -comment: "onb3_body updated for en/zh/vi/tr/ru/es/de_simple to explicitly reference 'Mistral AI servers in France' and 'never leave the EU'. New UIKey union members added and translated for all 7 languages: eu_badge, eu_badge_sub, export_my_data, export_my_data_sub, export_failed, privacy_policy, privacy_intro, privacy_h_residency, privacy_p_residency, privacy_h_collect, privacy_p_collect, privacy_h_delete, privacy_p_delete, privacy_h_no_tracking, privacy_p_no_tracking, privacy_h_third_parties, privacy_p_third_parties, privacy_updated."
+        -working: true
+        -agent: "testing"
+        -comment: "PASS via /language flow. Selected 'Einfaches Deutsch' and tapped Continue, then visited /privacy. Screenshot confirms German page header 'Datenschutz', hero chip '🇪🇺 EU · Daten in Europa', and German section titles '🇪🇺 Ihre Daten bleiben in Europa' (with body 'Die Analyse läuft auf Mistral-AI-Servern in Paris (Frankreich). Ihre Briefe und Chat-Nachrichten verlassen die EU nicht.'), 'Was wir speichern', 'So löschen Sie alles' all rendering correctly. (Note: an initial text scrape returned stale English copy due to useFocusEffect setState timing, but the rendered screenshot confirms German translation works correctly.)"
+
+agent_communication:
+    -agent: "testing"
+    -message: "Frontend Privacy/DSGVO sprint regression complete on iPhone 390x844. 20/21 raw assertions PASS — the lone 'FAIL' (de_simple text scrape) is a test-side race in useFocusEffect; the captured screenshot at .screenshots/04_privacy_de.png clearly renders German titles correctly, so the i18n is working. Highlights: (1) home-privacy-banner shows '🇪🇺 EU · Data in Europe — …' with green-tinted bg and navigates to /privacy. (2) /privacy renders all 5 section titles, EU hero chip, Mistral AI / Paris body, and back arrow returns to caller. (3) settings-eu-banner is green/tappable and navigates; settings-export tap completes without crashing the screen and generates zero new console errors (web Share is gracefully handled); settings-privacy-policy navigates to /privacy. (4) Switching language to de_simple via /language propagates to /privacy (German titles, sections, and intro all rendered). (5) No regressions on home CTAs (home-scan-btn, home-upload-btn, home-language-chip, home-history-btn, home-settings-btn). 14 console messages observed (mostly RN-Web style/prop warnings); zero critical 'Cannot read property' / 'Uncaught' / 'is not defined'. All 4 frontend tasks marked working=true. Backend /api/export DSGVO endpoint is still flagged needs_retesting=true and was not exercised by this UI run (the Settings export tap completes locally; full Share/JSON pipeline can be confirmed by a backend test on /api/export?device_id=…)."
+
 metadata:
   created_by: "main_agent"
-  version: "1.1"
-  test_sequence: 2
-  run_ui: false
+  version: "1.2"
+  test_sequence: 3
+  run_ui: true
 
 test_plan:
-  current_focus: []
+  current_focus:
+    - "GET /api/export — DSGVO Art. 15 data export"
+    - "Privacy policy screen at /privacy with 5 translated sections + EU residency hero chip"
+    - "Settings screen extended: EU banner card + Export my data + Privacy policy link"
+    - "Home screen EU residency banner replaces plain privacy footer"
   stuck_tasks: []
   test_all: false
   test_priority: "high_first"

@@ -758,6 +758,30 @@ async def delete_all_analyses(device_id: str):
     return {"deleted": res.deleted_count}
 
 
+@api_router.get("/export")
+async def export_my_data(device_id: str):
+    """DSGVO Art. 15 — let the user download all data we hold for them.
+
+    Returns a single JSON document with every analysis (no MongoDB internal
+    fields). The frontend hands this to the share sheet so the user can save
+    it to Files / iCloud Drive / send by email.
+    """
+    if not device_id:
+        raise HTTPException(status_code=400, detail="device_id is required")
+    cursor = db.analyses.find({"device_id": device_id}, {"_id": 0}).sort("created_at", -1)
+    records: List[dict] = []
+    async for doc in cursor:
+        records.append(doc)
+    return {
+        "app": "KlarPost",
+        "device_id": device_id,
+        "exported_at": datetime.now(timezone.utc).isoformat(),
+        "data_residency": "EU (Mistral AI, Paris)",
+        "count": len(records),
+        "analyses": records,
+    }
+
+
 # Include the router in the main app
 app.include_router(api_router)
 
