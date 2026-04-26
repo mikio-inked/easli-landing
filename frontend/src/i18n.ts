@@ -206,7 +206,26 @@ export type UIKey =
   | 'scam_modal_tip_2'
   | 'scam_modal_tip_3'
   | 'scam_modal_tip_4'
-  | 'scam_modal_acknowledge';
+  | 'scam_modal_acknowledge'
+  // ---- Result Screen 2.0 polish ----
+  | 'main_action_title'
+  | 'respond_by'
+  | 'act_by'
+  | 'in_n_days'
+  | 'in_one_day'
+  | 'today_label'
+  | 'days_overdue'
+  | 'verify_in_original'
+  | 'scam_caution_body'
+  | 'scam_contact_caution'
+  | 'double_check'
+  | 'key_points_title'
+  | 'read_aloud_a11y'
+  | 'sender_unknown'
+  | 'other_document'
+  | 'urgency_unknown'
+  | 'reply_draft_create'
+  | 'not_alone';
 
 type UIStrings = Record<UIKey, string>;
 
@@ -394,6 +413,25 @@ const en: UIStrings = {
   scam_modal_tip_3: 'Do not click links or call unknown phone numbers from the letter.',
   scam_modal_tip_4: 'When in doubt, ask a trusted person or call the official institution directly.',
   scam_modal_acknowledge: 'I understand',
+  // ---- Result Screen 2.0 polish ----
+  main_action_title: "What's most important",
+  respond_by: 'Respond by',
+  act_by: 'Act by',
+  in_n_days: 'in {n} days',
+  in_one_day: 'tomorrow',
+  today_label: 'today',
+  days_overdue: '{n} days overdue',
+  verify_in_original: 'Always check this in the original letter.',
+  scam_caution_body: 'Do not pay or share personal data until you have verified the sender.',
+  scam_contact_caution: 'Use the official contact details from the sender\'s website — not only those in this letter.',
+  double_check: 'Please double-check',
+  key_points_title: 'Details and key points',
+  read_aloud_a11y: 'Read explanation aloud',
+  sender_unknown: 'Sender not clearly detected',
+  other_document: 'Other document',
+  urgency_unknown: 'Could not assess urgency reliably',
+  reply_draft_create: 'Create reply draft',
+  not_alone: 'You are not alone. Here is what this letter means and what to do next.',
 };
 
 const zh: UIStrings = {
@@ -578,6 +616,25 @@ const zh: UIStrings = {
   scam_modal_tip_3: '不要点击信中的链接，也不要拨打陌生电话号码。',
   scam_modal_tip_4: '如有疑问，请咨询信任的人或直接致电相关机构。',
   scam_modal_acknowledge: '我已知晓',
+  // ---- Result Screen 2.0 polish ----
+  main_action_title: '最重要的事',
+  respond_by: '请于以下日期前回复',
+  act_by: '请于以下日期前处理',
+  in_n_days: '还有 {n} 天',
+  in_one_day: '明天',
+  today_label: '今天',
+  days_overdue: '已逾期 {n} 天',
+  verify_in_original: '请始终在原信件中再次核对。',
+  scam_caution_body: '在确认发件人之前，请勿付款或提供个人信息。',
+  scam_contact_caution: '请使用发件人官方网站上的联系方式，不要只依赖此信件中的联系方式。',
+  double_check: '请再次核对',
+  key_points_title: '细节与要点',
+  read_aloud_a11y: '朗读说明',
+  sender_unknown: '未能清晰识别发件人',
+  other_document: '其他文件',
+  urgency_unknown: '无法可靠地评估紧急程度',
+  reply_draft_create: '生成回复草稿',
+  not_alone: '您并不孤单。这就是这封信的含义以及接下来该怎么做。',
 };
 
 const vi: UIStrings = {
@@ -762,6 +819,25 @@ const vi: UIStrings = {
   scam_modal_tip_3: 'Không bấm vào liên kết và không gọi số điện thoại lạ trong thư.',
   scam_modal_tip_4: 'Nếu nghi ngờ, hãy hỏi người thân tin cậy hoặc gọi trực tiếp cho cơ quan chính thức.',
   scam_modal_acknowledge: 'Đã hiểu',
+  // ---- Result Screen 2.0 polish ----
+  main_action_title: 'Quan trọng nhất',
+  respond_by: 'Trả lời trước',
+  act_by: 'Xử lý trước',
+  in_n_days: 'còn {n} ngày',
+  in_one_day: 'ngày mai',
+  today_label: 'hôm nay',
+  days_overdue: 'đã quá hạn {n} ngày',
+  verify_in_original: 'Hãy luôn kiểm tra lại trên thư gốc.',
+  scam_caution_body: 'Đừng thanh toán hay chia sẻ thông tin cá nhân cho đến khi bạn xác minh được người gửi.',
+  scam_contact_caution: 'Hãy dùng thông tin liên lạc chính thức từ trang web của người gửi, không chỉ những thông tin trong thư này.',
+  double_check: 'Vui lòng kiểm tra lại',
+  key_points_title: 'Chi tiết và điểm chính',
+  read_aloud_a11y: 'Đọc to phần giải thích',
+  sender_unknown: 'Không xác định rõ người gửi',
+  other_document: 'Tài liệu khác',
+  urgency_unknown: 'Không thể đánh giá độ khẩn cấp',
+  reply_draft_create: 'Tạo bản nháp trả lời',
+  not_alone: 'Bạn không đơn độc. Đây là ý nghĩa của thư và bước tiếp theo nên làm.',
 };
 
 const tr: UIStrings = {
@@ -946,6 +1022,25 @@ const tr: UIStrings = {
   scam_modal_tip_3: 'Mektuptaki bağlantılara tıklamayın, bilinmeyen telefon numaralarını aramayın.',
   scam_modal_tip_4: 'Şüpheniz varsa güvendiğiniz birine sorun veya kurumu doğrudan arayın.',
   scam_modal_acknowledge: 'Anladım',
+  // ---- Result Screen 2.0 polish ----
+  main_action_title: 'En önemlisi',
+  respond_by: 'Şu tarihe kadar yanıtlayın',
+  act_by: 'Şu tarihe kadar harekete geçin',
+  in_n_days: '{n} gün kaldı',
+  in_one_day: 'yarın',
+  today_label: 'bugün',
+  days_overdue: '{n} gün gecikti',
+  verify_in_original: 'Lütfen orijinal mektupta her zaman tekrar kontrol edin.',
+  scam_caution_body: 'Göndereni doğrulamadan ödeme yapmayın veya kişisel bilgilerinizi paylaşmayın.',
+  scam_contact_caution: 'Sadece bu mektuptaki iletişim bilgilerine değil, gönderenin resmi web sitesindeki iletişim bilgilerine güvenin.',
+  double_check: 'Lütfen tekrar kontrol edin',
+  key_points_title: 'Ayrıntılar ve önemli noktalar',
+  read_aloud_a11y: 'Açıklamayı sesli oku',
+  sender_unknown: 'Gönderen net olarak tespit edilemedi',
+  other_document: 'Diğer belge',
+  urgency_unknown: 'Aciliyet güvenilir bir şekilde değerlendirilemedi',
+  reply_draft_create: 'Yanıt taslağı oluştur',
+  not_alone: 'Yalnız değilsiniz. İşte bu mektubun anlamı ve atılacak adımlar.',
 };
 
 const ru: UIStrings = {
@@ -1130,6 +1225,25 @@ const ru: UIStrings = {
   scam_modal_tip_3: 'Не переходите по ссылкам и не звоните по неизвестным номерам из письма.',
   scam_modal_tip_4: 'В случае сомнений обратитесь к доверенному лицу или позвоните напрямую в учреждение.',
   scam_modal_acknowledge: 'Понятно',
+  // ---- Result Screen 2.0 polish ----
+  main_action_title: 'Самое важное',
+  respond_by: 'Ответить до',
+  act_by: 'Действовать до',
+  in_n_days: 'через {n} дн.',
+  in_one_day: 'завтра',
+  today_label: 'сегодня',
+  days_overdue: 'просрочено на {n} дн.',
+  verify_in_original: 'Всегда сверяйтесь с оригиналом письма.',
+  scam_caution_body: 'Не платите и не передавайте личные данные, пока не подтвердите отправителя.',
+  scam_contact_caution: 'Используйте официальные контактные данные с сайта отправителя, а не только те, что указаны в этом письме.',
+  double_check: 'Пожалуйста, перепроверьте',
+  key_points_title: 'Подробности и ключевые моменты',
+  read_aloud_a11y: 'Прочитать пояснение вслух',
+  sender_unknown: 'Отправитель не определён точно',
+  other_document: 'Другой документ',
+  urgency_unknown: 'Срочность определить не удалось',
+  reply_draft_create: 'Создать черновик ответа',
+  not_alone: 'Вы не одни. Вот что значит это письмо и что делать дальше.',
 };
 
 const es: UIStrings = {
@@ -1314,6 +1428,25 @@ const es: UIStrings = {
   scam_modal_tip_3: 'No hagas clic en enlaces ni llames a números desconocidos de la carta.',
   scam_modal_tip_4: 'Ante la duda, consulta a alguien de confianza o llama directamente a la institución oficial.',
   scam_modal_acknowledge: 'Entendido',
+  // ---- Result Screen 2.0 polish ----
+  main_action_title: 'Lo más importante',
+  respond_by: 'Responde antes del',
+  act_by: 'Actúa antes del',
+  in_n_days: 'en {n} días',
+  in_one_day: 'mañana',
+  today_label: 'hoy',
+  days_overdue: 'vencido hace {n} días',
+  verify_in_original: 'Verifica esto siempre en la carta original.',
+  scam_caution_body: 'No pagues ni compartas datos personales hasta haber verificado al remitente.',
+  scam_contact_caution: 'Usa los datos de contacto oficiales del sitio web del remitente, no solo los de esta carta.',
+  double_check: 'Revisa con cuidado',
+  key_points_title: 'Detalles y puntos clave',
+  read_aloud_a11y: 'Leer la explicación en voz alta',
+  sender_unknown: 'No se pudo identificar al remitente con claridad',
+  other_document: 'Otro documento',
+  urgency_unknown: 'No fue posible evaluar la urgencia con fiabilidad',
+  reply_draft_create: 'Crear borrador de respuesta',
+  not_alone: 'No estás solo. Esto es lo que significa la carta y qué hacer a continuación.',
 };
 
 // Simple German — Leichte / Einfache Sprache. Short sentences, common words,
@@ -1500,6 +1633,25 @@ const de_simple: UIStrings = {
   scam_modal_tip_3: 'Klicken Sie nicht auf Links und rufen Sie keine unbekannten Telefonnummern aus dem Brief an.',
   scam_modal_tip_4: 'Bei Zweifel: Fragen Sie eine Vertrauensperson oder rufen Sie die echte Behörde direkt an.',
   scam_modal_acknowledge: 'Verstanden',
+  // ---- Result Screen 2.0 polish ----
+  main_action_title: 'Das Wichtigste',
+  respond_by: 'Antworten bis',
+  act_by: 'Erledigen bis',
+  in_n_days: 'in {n} Tagen',
+  in_one_day: 'morgen',
+  today_label: 'heute',
+  days_overdue: 'seit {n} Tagen überfällig',
+  verify_in_original: 'Bitte immer im Originalbrief nachprüfen.',
+  scam_caution_body: 'Bitte nicht zahlen oder persönliche Daten teilen, bevor Sie den Absender geprüft haben.',
+  scam_contact_caution: 'Nutzen Sie die Kontaktdaten von der offiziellen Website des Absenders, nicht nur die aus diesem Brief.',
+  double_check: 'Bitte prüfen',
+  key_points_title: 'Details und wichtige Punkte',
+  read_aloud_a11y: 'Erklärung vorlesen',
+  sender_unknown: 'Absender nicht klar erkannt',
+  other_document: 'Anderes Dokument',
+  urgency_unknown: 'Dringlichkeit konnte nicht sicher bewertet werden',
+  reply_draft_create: 'Antwort-Entwurf erstellen',
+  not_alone: 'Sie sind nicht allein. Hier ist, was dieser Brief bedeutet und was Sie tun können.',
 };
 
 const STRINGS: Record<LanguageCode, UIStrings> = { en, zh, vi, tr, ru, es, de_simple };

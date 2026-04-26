@@ -85,6 +85,9 @@ export function ReadAloudButton({
       style={({ pressed }) => [styles.btn, pressed && { opacity: 0.7 }]}
       hitSlop={6}
       testID={testID || 'read-aloud-btn'}
+      accessibilityRole="button"
+      accessibilityLabel={t(lang, 'read_aloud_a11y')}
+      accessibilityState={{ busy: speaking }}
     >
       <View style={styles.icon}>
         {speaking ? (

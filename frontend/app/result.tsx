@@ -38,10 +38,8 @@ import {
   ListTodo,
   MessageCircle,
   Reply,
-  RotateCcw,
   Share2,
   ShieldAlert,
-  Sparkles,
   Trash2,
   XCircle,
 } from 'lucide-react-native';
@@ -116,6 +114,138 @@ function tryParseDeadlineDate(raw: string): Date | null {
   return null;
 }
 
+// Days from now to the given date. Returns 0 for today, negative for past.
+function daysUntil(d: Date): number {
+  const now = new Date();
+  const a = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  const b = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  return Math.round((a.getTime() - b.getTime()) / 86400000);
+}
+
+// Build a calm, language-aware "in N days / tomorrow / overdue" label.
+function formatRelativeDays(days: number, lang: LanguageCode): string {
+  if (days === 0) return t(lang, 'today_label');
+  if (days === 1) return t(lang, 'in_one_day');
+  if (days > 0) return t(lang, 'in_n_days').replace('{n}', String(days));
+  return t(lang, 'days_overdue').replace('{n}', String(Math.abs(days)));
+}
+
+// Pick the SINGLE most-important thing to surface in the Main Action card.
+// Heuristic:
+//   1) The soonest non-past deadline (with parseable date) wins.
+//   2) Else the first high-urgency required action.
+//   3) Else the first required action.
+//   4) Else null → don't render the card.
+type MainAction =
+  | {
+      kind: 'deadline';
+      date: Date;
+      raw: string;
+      description: string;
+      days: number;
+      requiresResponse: boolean;
+    }
+  | { kind: 'action'; action: string; reason?: string; urgency?: string }
+  | null;
+
+const REPLY_TOKENS = [
+  // EN
+  'reply', 'respond', 'response', 'answer', 'submit', 'confirm', 'object',
+  'objection', 'contact', 'send back', 'return',
+  // DE
+  'antwort', 'rückantwort', 'rückmeld', 'antworten', 'einreich', 'bestätig',
+  'widerspruch', 'einspruch', 'kontakt', 'zurücksend', 'rücksend',
+  // ES
+  'respond', 'contest', 'envia', 'confirm',
+  // RU
+  'отвеч', 'ответ', 'подтверд', 'возраж',
+  // TR
+  'yanıtla', 'cevap', 'itiraz', 'onayla',
+  // VI
+  'trả lời', 'phản hồi', 'xác nhận', 'phản đối',
+  // ZH
+  '回复', '回答', '确认', '反对',
+];
+
+function tokenSearch(haystack: string, needles: string[]): boolean {
+  const h = haystack.toLowerCase();
+  return needles.some((n) => h.includes(n));
+}
+
+function replyRequired(r: any): boolean {
+  const fields = [
+    ...(r.required_actions || []).map((a: any) => `${a.action || ''} ${a.reason || ''}`),
+    r.simple_explanation_translated || '',
+    r.summary_translated || '',
+  ];
+  if (tokenSearch(fields.join(' '), REPLY_TOKENS)) return true;
+  // If there's a reply draft and a deadline, we treat that as "reply needed".
+  if (r.german_reply_draft && (r.deadlines || []).length > 0) return true;
+  return false;
+}
+
+function pickMainAction(r: any): MainAction {
+  const deadlines = (r.deadlines || []) as Array<{ date: string; description: string }>;
+  // 1) soonest non-past deadline
+  const dated = deadlines
+    .map((d) => ({ d, parsed: tryParseDeadlineDate(d.date || '') }))
+    .filter((x) => !!x.parsed && x.parsed!.getTime() >= Date.now() - 86400000) // include today
+    .sort((a, b) => a.parsed!.getTime() - b.parsed!.getTime());
+  if (dated.length > 0) {
+    const top = dated[0];
+    return {
+      kind: 'deadline',
+      date: top.parsed!,
+      raw: top.d.date,
+      description: top.d.description || '',
+      days: daysUntil(top.parsed!),
+      requiresResponse: replyRequired(r),
+    };
+  }
+  // 2) highest urgency action
+  const acts = (r.required_actions || []) as Array<{
+    action: string;
+    urgency?: string;
+    reason?: string;
+  }>;
+  const high = acts.find((a) => a.urgency === 'high');
+  if (high) {
+    return { kind: 'action', action: high.action, reason: high.reason, urgency: 'high' };
+  }
+  if (acts.length > 0) {
+    const a = acts[0];
+    return { kind: 'action', action: a.action, reason: a.reason, urgency: a.urgency };
+  }
+  return null;
+}
+
+function hasImportantUncertainty(r: any): boolean {
+  // "Important" = anything that mentions money, dates, payment, sender,
+  // legal/medical/tax. We're generous here so the user errs on the side of
+  // double-checking. If there are no uncertainties at all, this returns
+  // false and the section stays hidden.
+  const un = (r.uncertainties || []) as string[];
+  if (un.length === 0) return false;
+  const importantHints = [
+    // EN
+    'date', 'amount', 'pay', 'paid', 'iban', 'sender', 'identity',
+    'legal', 'medical', 'tax',
+    // DE
+    'datum', 'betrag', 'zahl', 'absender', 'recht', 'medizin', 'steuer',
+    // ES
+    'fecha', 'monto', 'pago', 'remitente',
+    // RU
+    'дата', 'сумм', 'плат', 'отправит',
+    // TR
+    'tarih', 'tutar', 'ödem', 'gönder',
+    // VI
+    'ngày', 'số tiền', 'thanh toán', 'người gửi',
+    // ZH
+    '日期', '金额', '付款', '发件人',
+  ];
+  return un.some((u) => tokenSearch(u, importantHints));
+}
+
 export default function ResultScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id?: string }>();
@@ -125,16 +255,18 @@ export default function ResultScreen() {
   const [copied, setCopied] = useState(false);
   const [reminders, setReminders] = useState<ReminderRecord[]>([]);
   const [originalSaved, setOriginalSaved] = useState(false);
-  // Which detail accordions are open. Start closed so the screen feels
-  // calm; the Risk Hero + Action Pyramid are the immediate focus.
-  const [openSections, setOpenSections] = useState<Record<string, boolean>>({
-    summary: true, // default-open the most useful card
-    explanation: true,
-  });
+  // Per-section open state. Default values are computed lazily from the
+  // analysis result via `defaultOpenSections(record)` below — that lets us
+  // smartly auto-open Reply Draft only when a reply is required, etc.
+  // After the user toggles, their explicit choice wins (stored as bool).
+  const [openSections, setOpenSections] = useState<Record<string, boolean>>({});
 
-  const toggleSection = useCallback((key: string) => {
+  const toggleSection = useCallback((key: string, currentlyOpen: boolean) => {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-    setOpenSections((prev) => ({ ...prev, [key]: !prev[key] }));
+    // Pass the *visible* current state so we honour smart defaults: when
+    // a section is open via fallback (no explicit user choice), tapping it
+    // must move to closed (false), not flip from undefined to true.
+    setOpenSections((prev) => ({ ...prev, [key]: !currentlyOpen }));
   }, []);
 
   const refreshReminders = useCallback(async (recordId: string) => {
@@ -253,10 +385,50 @@ export default function ResultScreen() {
   };
 
 
-  // ---- Risk Hero color tokens (chosen so the hero has a confident, calm feel) ----
+  // ---- Per-analysis derived state ----
   const heroPalette = risk.palette;
   const hasActions = (r.required_actions?.length ?? 0) > 0;
   const hasDeadlines = (r.deadlines?.length ?? 0) > 0;
+  const hasScam = !!r.scam_warning;
+  const hasReplyDraft = !!r.german_reply_draft;
+  const hasQuestions = (r.questions_to_ask?.length ?? 0) > 0;
+  const hasUncertainties = (r.uncertainties?.length ?? 0) > 0;
+  const hasKeyPoints = (r.key_points?.length ?? 0) > 0;
+  const hasSenderText = !!(r.sender && r.sender.trim());
+  const mainAct = pickMainAction(r);
+  const replyNeeded = replyRequired(r);
+  const importantUncertainty = hasImportantUncertainty(r);
+
+  // First non-past deadline (used by the sticky-bar "Add reminder" button)
+  const firstFutureDeadline = (() => {
+    const idx = (r.deadlines || []).findIndex((d) => {
+      const p = tryParseDeadlineDate(d.date || '');
+      return p && p.getTime() >= Date.now() - 86400000;
+    });
+    if (idx < 0) return null;
+    const d = r.deadlines![idx];
+    const parsed = tryParseDeadlineDate(d.date || '');
+    return parsed ? { idx, d, parsed } : null;
+  })();
+
+  // Smart accordion defaults — calm, scannable, no overwhelming open list.
+  // User toggles override these via openSections[id].
+  const isOpen = (id: string, fallback: boolean): boolean =>
+    openSections[id] === undefined ? fallback : openSections[id];
+
+  // Sticky action: jump to reminder picker for the soonest deadline.
+  const onStickyRemind = () => {
+    if (!firstFutureDeadline) return;
+    router.push({
+      pathname: '/reminder',
+      params: {
+        analysisId: record.id,
+        deadlineKey: deadlineKeyFor(firstFutureDeadline.idx, firstFutureDeadline.d),
+        deadlineIso: firstFutureDeadline.parsed.toISOString(),
+        description: firstFutureDeadline.d.description || '',
+      },
+    });
+  };
 
   return (
     <SafeAreaView style={styles.safe} testID="result-screen">
@@ -265,7 +437,7 @@ export default function ResultScreen() {
           <ArrowLeft color={colors.textPrimary} size={26} strokeWidth={2.4} />
         </Pressable>
         <Text style={styles.headerTitle} numberOfLines={1}>
-          {r.document_type || t(lang, 'document_type')}
+          {r.document_type || t(lang, 'other_document')}
         </Text>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
           {originalSaved ? (
@@ -273,31 +445,39 @@ export default function ResultScreen() {
               onPress={() => router.push(`/original?id=${encodeURIComponent(record.id)}`)}
               testID="result-view-original"
               hitSlop={12}
+              accessibilityRole="button"
+              accessibilityLabel={t(lang, 'view_original')}
             >
               <Eye color={colors.primary} size={22} strokeWidth={2.4} />
             </Pressable>
           ) : null}
-          <Pressable onPress={onShare} testID="result-share" hitSlop={12}>
-            <Share2 color={colors.primary} size={22} strokeWidth={2.4} />
-          </Pressable>
-          <Pressable onPress={onDelete} testID="result-delete" hitSlop={12}>
+          <Pressable
+            onPress={onDelete}
+            testID="result-delete"
+            hitSlop={12}
+            accessibilityRole="button"
+            accessibilityLabel={t(lang, 'delete')}
+          >
             <Trash2 color={colors.textSecondary} size={22} strokeWidth={2.2} />
           </Pressable>
         </View>
       </View>
 
       {/* Auto-pop scam-warning modal — visible once per analysis the first time
-          the user lands here. Shown above any other content with a clear CTA. */}
+          the user lands here. Tone is calm, not panic-inducing. */}
       <ScamWarningModal
-        analysisId={r.scam_warning ? record.id : null}
-        reason={r.scam_warning ? (r.scam_reason || t(lang, 'scam_warning_body')) : ''}
+        analysisId={hasScam ? record.id : null}
+        reason={hasScam ? (r.scam_reason || t(lang, 'scam_warning_body')) : ''}
         lang={lang}
       />
 
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        {/* ============== RISK HERO ============== */}
-        {/* Big calm color-coded banner. The single most important thing on
-            screen so the user immediately knows urgency level. */}
+      <ScrollView
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* ============================================================
+            1. RISK HERO
+            ============================================================ */}
         <View
           style={[
             styles.heroCard,
@@ -313,15 +493,14 @@ export default function ResultScreen() {
               <Text style={[styles.heroKicker, { color: heroPalette.text }]}>
                 {t(lang, 'risk_level')}
               </Text>
-              <Text style={[styles.heroTitle, { color: heroPalette.text }]} numberOfLines={2}>
+              <Text style={[styles.heroTitle, { color: heroPalette.text }]} numberOfLines={3}>
                 {risk.label}
               </Text>
             </View>
           </View>
-          {r.risk_reason ? (
-            <Text style={[styles.heroBody, { color: heroPalette.text }]}>{r.risk_reason}</Text>
-          ) : null}
-          {/* Category pill, sender chip — small metadata at hero foot */}
+          <Text style={[styles.heroBody, { color: heroPalette.text }]}>
+            {r.risk_reason || t(lang, 'urgency_unknown')}
+          </Text>
           <View style={styles.heroChipsRow}>
             {r.category ? (
               <View style={styles.heroChip} testID="result-category-pill">
@@ -329,20 +508,81 @@ export default function ResultScreen() {
                   {categoryLabel(lang, r.category)}
                 </Text>
               </View>
-            ) : null}
-            {r.sender ? (
+            ) : (
               <View style={styles.heroChip}>
-                <Building2 color={heroPalette.text} size={12} strokeWidth={2.5} />
-                <Text style={[styles.heroChipText, { color: heroPalette.text }]} numberOfLines={1}>
-                  {r.sender}
+                <Text style={[styles.heroChipText, { color: heroPalette.text }]}>
+                  {t(lang, 'other_document')}
                 </Text>
               </View>
-            ) : null}
+            )}
+            <View style={styles.heroChip}>
+              <Building2 color={heroPalette.text} size={12} strokeWidth={2.5} />
+              <Text
+                style={[styles.heroChipText, { color: heroPalette.text }]}
+                numberOfLines={1}
+              >
+                {hasSenderText ? r.sender : t(lang, 'sender_unknown')}
+              </Text>
+            </View>
           </View>
+          {/* Calm reassurance line — keeps the emotional message warm */}
+          <Text style={[styles.heroReassurance, { color: heroPalette.text }]}>
+            {t(lang, 'not_alone')}
+          </Text>
         </View>
 
-        {/* ============== SCAM BANNER (persistent) ============== */}
-        {r.scam_warning ? (
+        {/* ============================================================
+            2. MAIN ACTION CARD — single most-important thing
+            ============================================================ */}
+        {mainAct ? (
+          <View style={styles.mainActionCard} testID="main-action-card">
+            <View style={styles.mainActionHeader}>
+              <View style={styles.mainActionIcon}>
+                {mainAct.kind === 'deadline' ? (
+                  <CalendarClock color={colors.white} size={20} strokeWidth={2.6} />
+                ) : (
+                  <ListTodo color={colors.white} size={20} strokeWidth={2.6} />
+                )}
+              </View>
+              <Text style={styles.mainActionKicker}>{t(lang, 'main_action_title')}</Text>
+            </View>
+            {mainAct.kind === 'deadline' ? (
+              <>
+                <Text style={styles.mainActionTitle} numberOfLines={3}>
+                  {mainAct.requiresResponse ? t(lang, 'respond_by') : t(lang, 'act_by')}{' '}
+                  {mainAct.raw}
+                </Text>
+                <View style={styles.mainActionMetaRow}>
+                  <View style={styles.mainActionDaysPill}>
+                    <Text style={styles.mainActionDaysText}>
+                      {formatRelativeDays(mainAct.days, lang)}
+                    </Text>
+                  </View>
+                  {mainAct.description ? (
+                    <Text style={styles.mainActionMeta} numberOfLines={3}>
+                      {mainAct.description}
+                    </Text>
+                  ) : null}
+                </View>
+                <Text style={styles.mainActionVerify}>{t(lang, 'verify_in_original')}</Text>
+              </>
+            ) : (
+              <>
+                <Text style={styles.mainActionTitle} numberOfLines={3}>
+                  {mainAct.action}
+                </Text>
+                {mainAct.reason ? (
+                  <Text style={styles.mainActionMeta}>{mainAct.reason}</Text>
+                ) : null}
+              </>
+            )}
+          </View>
+        ) : null}
+
+        {/* ============================================================
+            3. SCAM WARNING (near top per Rule 3 — calm tone)
+            ============================================================ */}
+        {hasScam ? (
           <View style={styles.scamCard} testID="scam-warning-card">
             <View style={styles.scamRow}>
               <View style={styles.scamIcon}>
@@ -353,21 +593,53 @@ export default function ResultScreen() {
                 <Text style={styles.scamBody}>
                   {r.scam_reason || t(lang, 'scam_warning_body')}
                 </Text>
+                <Text style={[styles.scamBody, { marginTop: 8, fontWeight: fontWeight.bold }]}>
+                  {t(lang, 'scam_caution_body')}
+                </Text>
               </View>
             </View>
           </View>
         ) : null}
 
-        {/* ============== ACTION PYRAMID ============== */}
-        {/* The "what should I do" block — surfaced before any explanations
-            because elderly users tell us deadlines + actions are why they
-            opened the letter in the first place. */}
+        {/* ============================================================
+            4. PLAIN SUMMARY (default open)
+            ============================================================ */}
+        {r.simple_explanation_translated || r.summary_translated ? (
+          <Accordion
+            id="summary"
+            title={t(lang, 'what_this_means')}
+            icon={<Info color={colors.primary} size={18} strokeWidth={2.5} />}
+            open={isOpen('summary', true)}
+            onToggle={toggleSection}
+            testID="summary-card"
+          >
+            {r.simple_explanation_translated ? (
+              <View style={{ marginBottom: spacing.sm }}>
+                <ReadAloudButton
+                  text={r.simple_explanation_translated}
+                  lang={lang}
+                  testID="read-aloud-explanation"
+                />
+              </View>
+            ) : null}
+            <Text style={styles.body}>
+              {r.simple_explanation_translated || r.summary_translated}
+            </Text>
+          </Accordion>
+        ) : null}
+
+        {/* ============================================================
+            5. NEXT STEPS CHECKLIST (default open)
+            ============================================================ */}
         {hasActions ? (
-          <View style={styles.pyramidCard} testID="actions-card">
-            <SectionRow
-              icon={<ListTodo color={colors.primary} size={18} strokeWidth={2.5} />}
-              title={t(lang, 'what_to_do_next')}
-            />
+          <Accordion
+            id="actions"
+            title={t(lang, 'what_to_do_next')}
+            icon={<ListTodo color={colors.primary} size={18} strokeWidth={2.5} />}
+            open={isOpen('actions', true)}
+            onToggle={toggleSection}
+            testID="actions-card"
+          >
             <View style={{ gap: spacing.sm }}>
               {r.required_actions!.map((a, i) => (
                 <View key={i} style={styles.actionItem}>
@@ -386,21 +658,25 @@ export default function ResultScreen() {
                 </View>
               ))}
             </View>
-          </View>
+          </Accordion>
         ) : null}
 
-        <View style={styles.pyramidCard} testID="deadlines-card">
-          <SectionRow
-            icon={<CalendarClock color={colors.primary} size={18} strokeWidth={2.5} />}
-            title={t(lang, 'deadlines')}
-          />
-          {hasDeadlines ? (
+        {/* ============================================================
+            6. DEADLINES — only if any exist (no empty state)
+            ============================================================ */}
+        {hasDeadlines ? (
+          <View style={styles.pyramidCard} testID="deadlines-card">
+            <SectionRow
+              icon={<CalendarClock color={colors.primary} size={18} strokeWidth={2.5} />}
+              title={t(lang, 'deadlines')}
+            />
             <View style={{ gap: spacing.sm }}>
               {r.deadlines!.map((d, i) => {
                 const key = deadlineKeyFor(i, d);
                 const existing = reminders.find((rm) => rm.deadlineKey === key);
                 const parsed = tryParseDeadlineDate(d.date);
                 const isPast = parsed ? parsed.getTime() < Date.now() : false;
+                const days = parsed ? daysUntil(parsed) : null;
                 const onToggleReminder = () => {
                   if (existing) {
                     Alert.alert(t(lang, 'cancel_reminder'), '', [
@@ -446,17 +722,22 @@ export default function ResultScreen() {
                           flexWrap: 'wrap',
                         }}
                       >
-                        {d.confidence ? (
-                          <Badge
-                            label={d.confidence}
-                            variant={
-                              d.confidence === 'high'
-                                ? 'green'
-                                : d.confidence === 'medium'
-                                ? 'yellow'
-                                : 'neutral'
-                            }
-                          />
+                        {days !== null ? (
+                          <View
+                            style={[
+                              styles.daysPill,
+                              days < 0 && { backgroundColor: colors.red.bg },
+                            ]}
+                          >
+                            <Text
+                              style={[
+                                styles.daysPillText,
+                                days < 0 && { color: colors.red.text },
+                              ]}
+                            >
+                              {formatRelativeDays(days, lang)}
+                            </Text>
+                          </View>
                         ) : null}
                         <Pressable
                           onPress={onToggleReminder}
@@ -468,6 +749,10 @@ export default function ResultScreen() {
                             },
                           ]}
                           testID={`reminder-toggle-${i}`}
+                          accessibilityRole="button"
+                          accessibilityLabel={
+                            existing ? t(lang, 'reminder_set') : t(lang, 'remind_me')
+                          }
                         >
                           {existing ? (
                             <BellRing color={colors.green.text} size={14} strokeWidth={2.5} />
@@ -492,98 +777,32 @@ export default function ResultScreen() {
                 );
               })}
             </View>
-          ) : (
-            <Text style={[styles.body, { color: colors.textSecondary }]}>
-              {t(lang, 'no_deadlines')}
-            </Text>
-          )}
-        </View>
-
-        {/* ============== PRIMARY CTAs ============== */}
-        <Button
-          label={t(lang, 'ask_question')}
-          onPress={() => router.push(`/chat?id=${encodeURIComponent(record.id)}`)}
-          icon={<MessageCircle color={colors.white} size={18} strokeWidth={2.5} />}
-          testID="result-ask-question"
-        />
-
-        {/* ============== DETAIL ACCORDIONS ============== */}
-        {r.summary_translated ? (
-          <Accordion
-            id="summary"
-            title={t(lang, 'summary')}
-            icon={<Sparkles color={colors.primary} size={18} strokeWidth={2.5} />}
-            open={!!openSections.summary}
-            onToggle={toggleSection}
-            testID="summary-card"
-          >
-            <Text style={styles.body}>{r.summary_translated}</Text>
-          </Accordion>
+            <Text style={styles.verifyNote}>{t(lang, 'verify_in_original')}</Text>
+          </View>
         ) : null}
 
-        {r.simple_explanation_translated ? (
-          <Accordion
-            id="explanation"
-            title={t(lang, 'what_this_means')}
-            icon={<Info color={colors.primary} size={18} strokeWidth={2.5} />}
-            open={!!openSections.explanation}
-            onToggle={toggleSection}
-            testID="explanation-card"
-          >
-            {/* Read-aloud uses ONLY the simple_explanation_translated so users
-                hear the calm plain-language version in their target language. */}
-            <View style={{ marginBottom: spacing.sm }}>
-              <ReadAloudButton
-                text={r.simple_explanation_translated}
-                lang={lang}
-                testID="read-aloud-explanation"
-              />
-            </View>
-            <Text style={styles.body}>{r.simple_explanation_translated}</Text>
-            {r.key_points && r.key_points.length > 0 ? (
-              <View style={{ gap: 8, marginTop: spacing.md }}>
-                {r.key_points.map((kp, i) => (
-                  <View key={i} style={styles.bullet}>
-                    <View style={styles.bulletDot} />
-                    <Text style={styles.bulletText}>{kp}</Text>
-                  </View>
-                ))}
-              </View>
-            ) : null}
-          </Accordion>
-        ) : null}
-
-        <Accordion
-          id="sender"
-          title={t(lang, 'sender')}
-          icon={<Building2 color={colors.primary} size={18} strokeWidth={2.5} />}
-          open={!!openSections.sender}
-          onToggle={toggleSection}
-          testID="sender-card"
-        >
-          <View style={styles.kvRow}>
-            <Text style={styles.kvKey}>{t(lang, 'sender')}</Text>
-            <Text style={styles.kvValue}>{r.sender || '—'}</Text>
-          </View>
-          <View style={styles.kvRow}>
-            <Text style={styles.kvKey}>{t(lang, 'document_type')}</Text>
-            <Text style={styles.kvValue}>{r.document_type || '—'}</Text>
-          </View>
-        </Accordion>
-
-        {r.german_reply_draft ? (
+        {/* ============================================================
+            7. REPLY DRAFT — auto-open ONLY if a reply is needed AND not scam
+            ============================================================ */}
+        {hasReplyDraft ? (
           <Accordion
             id="reply"
             title={t(lang, 'reply_draft')}
             icon={<Reply color={colors.primary} size={18} strokeWidth={2.5} />}
-            open={!!openSections.reply}
+            open={isOpen('reply', replyNeeded && !hasScam)}
             onToggle={toggleSection}
             testID="reply-card"
           >
             <View style={styles.replyBox}>
               <Text style={styles.replyText}>{r.german_reply_draft}</Text>
             </View>
-            <Pressable onPress={copyReply} style={styles.copyBtn} testID="reply-copy">
+            <Pressable
+              onPress={copyReply}
+              style={styles.copyBtn}
+              testID="reply-copy"
+              accessibilityRole="button"
+              accessibilityLabel={t(lang, 'copy')}
+            >
               {copied ? (
                 <CheckCircle2 color={colors.green.text} size={18} strokeWidth={2.5} />
               ) : (
@@ -591,6 +810,14 @@ export default function ResultScreen() {
               )}
               <Text style={styles.copyLabel}>{copied ? t(lang, 'copied') : t(lang, 'copy')}</Text>
             </Pressable>
+            {hasScam ? (
+              <View style={styles.scamInlineCaution}>
+                <ShieldAlert color={colors.red.text} size={16} strokeWidth={2.5} />
+                <Text style={styles.scamInlineCautionText}>
+                  {t(lang, 'scam_contact_caution')}
+                </Text>
+              </View>
+            ) : null}
             {r.reply_draft_explanation_translated ? (
               <View style={{ marginTop: spacing.sm }}>
                 <Text style={styles.subSectionTitle}>{t(lang, 'reply_explanation')}</Text>
@@ -602,17 +829,20 @@ export default function ResultScreen() {
           </Accordion>
         ) : null}
 
-        {r.questions_to_ask && r.questions_to_ask.length > 0 ? (
+        {/* ============================================================
+            8. QUESTIONS TO ASK (default closed)
+            ============================================================ */}
+        {hasQuestions ? (
           <Accordion
             id="questions"
             title={t(lang, 'questions_to_ask')}
             icon={<HelpCircle color={colors.primary} size={18} strokeWidth={2.5} />}
-            open={!!openSections.questions}
+            open={isOpen('questions', false)}
             onToggle={toggleSection}
             testID="questions-card"
           >
             <View style={{ gap: 8 }}>
-              {r.questions_to_ask.map((q, i) => (
+              {r.questions_to_ask!.map((q, i) => (
                 <View key={i} style={styles.bullet}>
                   <View style={[styles.bulletDot, { backgroundColor: colors.primary }]} />
                   <Text style={styles.bulletText}>{q}</Text>
@@ -622,17 +852,59 @@ export default function ResultScreen() {
           </Accordion>
         ) : null}
 
-        {r.uncertainties && r.uncertainties.length > 0 ? (
+        {/* ============================================================
+            9. DETAILS / KEY POINTS (default closed) — also holds sender
+            ============================================================ */}
+        {hasKeyPoints || hasSenderText || r.document_type ? (
+          <Accordion
+            id="details"
+            title={t(lang, 'key_points_title')}
+            icon={<FileText color={colors.primary} size={18} strokeWidth={2.5} />}
+            open={isOpen('details', false)}
+            onToggle={toggleSection}
+            testID="details-card"
+          >
+            <View style={styles.kvRow}>
+              <Text style={styles.kvKey}>{t(lang, 'sender')}</Text>
+              <Text style={styles.kvValue} numberOfLines={2}>
+                {hasSenderText ? r.sender : t(lang, 'sender_unknown')}
+              </Text>
+            </View>
+            <View style={styles.kvRow}>
+              <Text style={styles.kvKey}>{t(lang, 'document_type')}</Text>
+              <Text style={styles.kvValue} numberOfLines={2}>
+                {r.document_type || t(lang, 'other_document')}
+              </Text>
+            </View>
+            {hasKeyPoints ? (
+              <View style={{ gap: 8, marginTop: spacing.sm }}>
+                {r.key_points!.map((kp, i) => (
+                  <View key={i} style={styles.bullet}>
+                    <View style={styles.bulletDot} />
+                    <Text style={styles.bulletText}>{kp}</Text>
+                  </View>
+                ))}
+              </View>
+            ) : null}
+          </Accordion>
+        ) : null}
+
+        {/* ============================================================
+            10. PLEASE DOUBLE-CHECK (uncertainties)
+            Open by default if scam_warning OR an "important" uncertainty is
+            detected (date / amount / payment / sender / legal / medical).
+            ============================================================ */}
+        {hasUncertainties ? (
           <Accordion
             id="uncertainties"
-            title={t(lang, 'uncertainties')}
+            title={t(lang, 'double_check')}
             icon={<AlertTriangle color={colors.yellow.text} size={18} strokeWidth={2.5} />}
-            open={!!openSections.uncertainties}
+            open={isOpen('uncertainties', hasScam || importantUncertainty)}
             onToggle={toggleSection}
             testID="uncertainties-card"
           >
             <View style={{ gap: 8 }}>
-              {r.uncertainties.map((u, i) => (
+              {r.uncertainties!.map((u, i) => (
                 <View key={i} style={styles.bullet}>
                   <View style={[styles.bulletDot, { backgroundColor: colors.yellow.solid }]} />
                   <Text style={styles.bulletText}>{u}</Text>
@@ -642,24 +914,57 @@ export default function ResultScreen() {
           </Accordion>
         ) : null}
 
-        {/* ============== DISCLAIMER ============== */}
+        {/* ============================================================
+            DISCLAIMER
+            ============================================================ */}
         <View style={styles.disclaimer} testID="disclaimer-card">
           <FileText color={colors.textSecondary} size={16} strokeWidth={2.4} />
           <Text style={styles.disclaimerText}>{r.disclaimer}</Text>
         </View>
 
-        <Button
-          label={t(lang, 'analyze_again')}
-          onPress={() => router.replace('/home')}
-          variant="secondary"
-          icon={<RotateCcw color={colors.primary} size={18} strokeWidth={2.5} />}
-          testID="result-analyze-again"
-        />
-        <View style={{ height: spacing.lg }} />
+        {/* Spacer for sticky bar */}
+        <View style={{ height: spacing.xl + 56 }} />
       </ScrollView>
+
+      {/* ============================================================
+          STICKY ACTION BAR — Ask KlarPost (primary), Share, Reminder
+          ============================================================ */}
+      <View style={styles.stickyBar} testID="sticky-action-bar">
+        <Pressable
+          onPress={onShare}
+          style={styles.stickyIconBtn}
+          accessibilityRole="button"
+          accessibilityLabel={t(lang, 'share')}
+          testID="sticky-share"
+        >
+          <Share2 color={colors.primary} size={20} strokeWidth={2.5} />
+        </Pressable>
+        {firstFutureDeadline ? (
+          <Pressable
+            onPress={onStickyRemind}
+            style={styles.stickyIconBtn}
+            accessibilityRole="button"
+            accessibilityLabel={t(lang, 'remind_me')}
+            testID="sticky-reminder"
+          >
+            <Bell color={colors.primary} size={20} strokeWidth={2.5} />
+          </Pressable>
+        ) : null}
+        <Pressable
+          onPress={() => router.push(`/chat?id=${encodeURIComponent(record.id)}`)}
+          style={styles.stickyAskBtn}
+          accessibilityRole="button"
+          accessibilityLabel={t(lang, 'ask_question')}
+          testID="sticky-ask"
+        >
+          <MessageCircle color={colors.white} size={18} strokeWidth={2.6} />
+          <Text style={styles.stickyAskLabel}>{t(lang, 'ask_question')}</Text>
+        </Pressable>
+      </View>
     </SafeAreaView>
   );
 }
+
 
 function SectionRow({ icon, title }: { icon: React.ReactNode; title: string }) {
   return (
@@ -685,7 +990,7 @@ function Accordion({
   title: string;
   icon: React.ReactNode;
   open: boolean;
-  onToggle: (id: string) => void;
+  onToggle: (id: string, currentlyOpen: boolean) => void;
   testID?: string;
   children: React.ReactNode;
 }) {
@@ -708,10 +1013,13 @@ function Accordion({
   return (
     <View style={styles.accordionCard} testID={testID}>
       <Pressable
-        onPress={() => onToggle(id)}
+        onPress={() => onToggle(id, open)}
         style={({ pressed }) => [styles.accordionHeader, pressed && { opacity: 0.7 }]}
         hitSlop={4}
         testID={testID ? `${testID}-header` : undefined}
+        accessibilityRole="button"
+        accessibilityState={{ expanded: open }}
+        accessibilityLabel={title}
       >
         <View style={styles.sectionIcon}>{icon}</View>
         <Text style={styles.accordionTitle} numberOfLines={2}>
@@ -817,6 +1125,172 @@ const styles = StyleSheet.create({
     fontSize: fontSize.xs,
     fontWeight: fontWeight.bold,
     letterSpacing: 0.3,
+  },
+  heroReassurance: {
+    fontSize: fontSize.sm,
+    fontWeight: fontWeight.medium,
+    lineHeight: 20,
+    opacity: 0.85,
+    fontStyle: 'italic',
+  },
+
+  // ---- Main Action card (the single most-urgent thing) ----
+  mainActionCard: {
+    backgroundColor: colors.primary,
+    borderRadius: radius.xxl,
+    padding: spacing.lg,
+    gap: 10,
+    ...shadows.card,
+  },
+  mainActionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  mainActionIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: radius.md,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  mainActionKicker: {
+    color: colors.white,
+    fontSize: fontSize.xs,
+    fontWeight: fontWeight.bold,
+    letterSpacing: 1.4,
+    textTransform: 'uppercase',
+    opacity: 0.9,
+  },
+  mainActionTitle: {
+    color: colors.white,
+    fontSize: fontSize.xl,
+    fontWeight: fontWeight.bold,
+    lineHeight: 28,
+    letterSpacing: -0.2,
+  },
+  mainActionMetaRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    gap: 10,
+  },
+  mainActionDaysPill: {
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: radius.full,
+  },
+  mainActionDaysText: {
+    color: colors.white,
+    fontSize: fontSize.sm,
+    fontWeight: fontWeight.bold,
+  },
+  mainActionMeta: {
+    flex: 1,
+    color: colors.white,
+    fontSize: fontSize.sm,
+    lineHeight: 20,
+    opacity: 0.95,
+  },
+  mainActionVerify: {
+    color: colors.white,
+    fontSize: fontSize.xs,
+    fontStyle: 'italic',
+    opacity: 0.85,
+    marginTop: 4,
+  },
+
+  // ---- Deadline countdown pill (inside deadlines card) ----
+  daysPill: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: radius.full,
+    backgroundColor: colors.primarySoft,
+  },
+  daysPillText: {
+    color: colors.primary,
+    fontSize: fontSize.xs,
+    fontWeight: fontWeight.bold,
+  },
+  verifyNote: {
+    fontSize: fontSize.xs,
+    color: colors.textMuted,
+    fontStyle: 'italic',
+    marginTop: spacing.xs,
+  },
+
+  // ---- Inline scam caution (inside Reply Draft when scam is present) ----
+  scamInlineCaution: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+    backgroundColor: colors.red.bg,
+    borderRadius: radius.md,
+    padding: spacing.sm,
+    marginTop: spacing.sm,
+    borderWidth: 1,
+    borderColor: colors.red.border,
+  },
+  scamInlineCautionText: {
+    flex: 1,
+    fontSize: fontSize.sm,
+    color: colors.red.text,
+    fontWeight: fontWeight.semibold,
+    lineHeight: 18,
+  },
+
+  // ---- Sticky Action Bar ----
+  stickyBar: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    paddingBottom: spacing.lg,
+    backgroundColor: colors.surface,
+    borderTopWidth: 1,
+    borderTopColor: colors.borderLight,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#0F172A',
+        shadowOffset: { width: 0, height: -4 },
+        shadowOpacity: 0.06,
+        shadowRadius: 12,
+      },
+      android: { elevation: 8 },
+      default: {},
+    }),
+  },
+  stickyIconBtn: {
+    width: 48,
+    height: 48,
+    borderRadius: radius.md,
+    backgroundColor: colors.primarySoft,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  stickyAskBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    height: 48,
+    borderRadius: radius.md,
+    backgroundColor: colors.primary,
+    ...shadows.button,
+  },
+  stickyAskLabel: {
+    color: colors.white,
+    fontSize: fontSize.base,
+    fontWeight: fontWeight.bold,
+    letterSpacing: 0.2,
   },
 
   // ---- Scam banner ----
