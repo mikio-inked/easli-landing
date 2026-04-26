@@ -383,6 +383,17 @@ const en: UIStrings = {
   usage_plus_until: 'Active until',
   usage_plus_remaining: 'Plus analyses this month',
   usage_chat_total: 'Questions',
+  // ---- Result Screen 2.0 ----
+  read_aloud_play: 'Listen',
+  read_aloud_stop: 'Stop',
+  scam_modal_title: 'This may be a scam',
+  scam_modal_subtitle: 'KlarPost found warning signs in this letter. Please read carefully before doing anything.',
+  scam_modal_tips_title: 'Stay safe',
+  scam_modal_tip_1: 'Never pay with gift cards, crypto or vouchers — real authorities never ask for that.',
+  scam_modal_tip_2: 'Check the sender carefully. Real authorities use their own letterhead and email domain.',
+  scam_modal_tip_3: 'Do not click links or call unknown phone numbers from the letter.',
+  scam_modal_tip_4: 'When in doubt, ask a trusted person or call the official institution directly.',
+  scam_modal_acknowledge: 'I understand',
 };
 
 const zh: UIStrings = {
@@ -556,6 +567,17 @@ const zh: UIStrings = {
   usage_plus_until: '有效期至',
   usage_plus_remaining: '本月 Plus 分析',
   usage_chat_total: '问题',
+  // ---- Result Screen 2.0 ----
+  read_aloud_play: '朗读',
+  read_aloud_stop: '停止',
+  scam_modal_title: '这可能是诈骗',
+  scam_modal_subtitle: 'KlarPost 在此信件中发现可疑信号。请仔细阅读后再做决定。',
+  scam_modal_tips_title: '保持警惕',
+  scam_modal_tip_1: '永远不要用礼品卡、加密货币或代金券付款——真正的政府机构不会要求这些。',
+  scam_modal_tip_2: '仔细核对发件人。真正的机构使用自己的信纸和邮箱域名。',
+  scam_modal_tip_3: '不要点击信中的链接，也不要拨打陌生电话号码。',
+  scam_modal_tip_4: '如有疑问，请咨询信任的人或直接致电相关机构。',
+  scam_modal_acknowledge: '我已知晓',
 };
 
 const vi: UIStrings = {
@@ -729,6 +751,17 @@ const vi: UIStrings = {
   usage_plus_until: 'Hoạt động đến',
   usage_plus_remaining: 'Phân tích Plus tháng này',
   usage_chat_total: 'Câu hỏi',
+  // ---- Result Screen 2.0 ----
+  read_aloud_play: 'Nghe',
+  read_aloud_stop: 'Dừng',
+  scam_modal_title: 'Đây có thể là lừa đảo',
+  scam_modal_subtitle: 'KlarPost phát hiện dấu hiệu đáng ngờ trong thư này. Hãy đọc kỹ trước khi làm bất cứ điều gì.',
+  scam_modal_tips_title: 'Hãy an toàn',
+  scam_modal_tip_1: 'Đừng bao giờ thanh toán bằng thẻ quà tặng, tiền mã hóa hoặc voucher — cơ quan thật không yêu cầu vậy.',
+  scam_modal_tip_2: 'Kiểm tra người gửi cẩn thận. Cơ quan thật dùng giấy tiêu đề và tên miền email riêng.',
+  scam_modal_tip_3: 'Không bấm vào liên kết và không gọi số điện thoại lạ trong thư.',
+  scam_modal_tip_4: 'Nếu nghi ngờ, hãy hỏi người thân tin cậy hoặc gọi trực tiếp cho cơ quan chính thức.',
+  scam_modal_acknowledge: 'Đã hiểu',
 };
 
 const tr: UIStrings = {
@@ -902,6 +935,17 @@ const tr: UIStrings = {
   usage_plus_until: 'Şu tarihe kadar geçerli',
   usage_plus_remaining: 'Bu ayki Plus analizleri',
   usage_chat_total: 'Sorular',
+  // ---- Result Screen 2.0 ----
+  read_aloud_play: 'Dinle',
+  read_aloud_stop: 'Durdur',
+  scam_modal_title: 'Bu bir dolandırıcılık olabilir',
+  scam_modal_subtitle: 'KlarPost bu mektupta uyarı işaretleri buldu. Bir şey yapmadan önce dikkatlice okuyun.',
+  scam_modal_tips_title: 'Güvende kalın',
+  scam_modal_tip_1: 'Hediye kart, kripto veya hediye çekiyle asla ödeme yapmayın — gerçek makamlar bunu istemez.',
+  scam_modal_tip_2: 'Göndereni dikkatle kontrol edin. Gerçek makamlar kendi antetli kağıdını ve e-posta alan adını kullanır.',
+  scam_modal_tip_3: 'Mektuptaki bağlantılara tıklamayın, bilinmeyen telefon numaralarını aramayın.',
+  scam_modal_tip_4: 'Şüpheniz varsa güvendiğiniz birine sorun veya kurumu doğrudan arayın.',
+  scam_modal_acknowledge: 'Anladım',
 };
 
 const ru: UIStrings = {
@@ -1075,6 +1119,17 @@ const ru: UIStrings = {
   usage_plus_until: 'Активен до',
   usage_plus_remaining: 'Plus-анализы в этом месяце',
   usage_chat_total: 'Вопросы',
+  // ---- Result Screen 2.0 ----
+  read_aloud_play: 'Слушать',
+  read_aloud_stop: 'Стоп',
+  scam_modal_title: 'Возможно, это мошенничество',
+  scam_modal_subtitle: 'KlarPost обнаружил тревожные признаки в этом письме. Прочитайте внимательно, прежде чем что-либо делать.',
+  scam_modal_tips_title: 'Будьте осторожны',
+  scam_modal_tip_1: 'Никогда не платите подарочными картами, криптовалютой или ваучерами — настоящие органы власти этого не просят.',
+  scam_modal_tip_2: 'Проверьте отправителя. У настоящих органов есть свой бланк и почтовый домен.',
+  scam_modal_tip_3: 'Не переходите по ссылкам и не звоните по неизвестным номерам из письма.',
+  scam_modal_tip_4: 'В случае сомнений обратитесь к доверенному лицу или позвоните напрямую в учреждение.',
+  scam_modal_acknowledge: 'Понятно',
 };
 
 const es: UIStrings = {
@@ -1248,6 +1303,17 @@ const es: UIStrings = {
   usage_plus_until: 'Activo hasta',
   usage_plus_remaining: 'Análisis Plus este mes',
   usage_chat_total: 'Preguntas',
+  // ---- Result Screen 2.0 ----
+  read_aloud_play: 'Escuchar',
+  read_aloud_stop: 'Detener',
+  scam_modal_title: 'Esto podría ser una estafa',
+  scam_modal_subtitle: 'KlarPost detectó señales de alerta en esta carta. Léala con cuidado antes de hacer nada.',
+  scam_modal_tips_title: 'Mantente a salvo',
+  scam_modal_tip_1: 'Nunca pagues con tarjetas de regalo, criptomonedas o vales — las autoridades reales jamás piden eso.',
+  scam_modal_tip_2: 'Revisa el remitente con cuidado. Las autoridades reales usan su propio membrete y dominio de correo.',
+  scam_modal_tip_3: 'No hagas clic en enlaces ni llames a números desconocidos de la carta.',
+  scam_modal_tip_4: 'Ante la duda, consulta a alguien de confianza o llama directamente a la institución oficial.',
+  scam_modal_acknowledge: 'Entendido',
 };
 
 // Simple German — Leichte / Einfache Sprache. Short sentences, common words,
@@ -1423,6 +1489,17 @@ const de_simple: UIStrings = {
   usage_plus_until: 'Aktiv bis',
   usage_plus_remaining: 'Plus-Analysen diesen Monat',
   usage_chat_total: 'Fragen',
+  // ---- Result Screen 2.0 ----
+  read_aloud_play: 'Vorlesen',
+  read_aloud_stop: 'Stopp',
+  scam_modal_title: 'Vorsicht: möglicher Betrug',
+  scam_modal_subtitle: 'KlarPost hat Warnsignale in diesem Brief gefunden. Bitte lesen Sie sorgfältig, bevor Sie etwas tun.',
+  scam_modal_tips_title: 'Sicher bleiben',
+  scam_modal_tip_1: 'Niemals mit Gutscheinkarten, Krypto oder iTunes-Karten zahlen. Echte Behörden fragen das nie.',
+  scam_modal_tip_2: 'Prüfen Sie den Absender genau. Echte Behörden nutzen eigenes Briefpapier und eigene E-Mail-Adressen.',
+  scam_modal_tip_3: 'Klicken Sie nicht auf Links und rufen Sie keine unbekannten Telefonnummern aus dem Brief an.',
+  scam_modal_tip_4: 'Bei Zweifel: Fragen Sie eine Vertrauensperson oder rufen Sie die echte Behörde direkt an.',
+  scam_modal_acknowledge: 'Verstanden',
 };
 
 const STRINGS: Record<LanguageCode, UIStrings> = { en, zh, vi, tr, ru, es, de_simple };

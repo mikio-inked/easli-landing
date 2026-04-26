@@ -1,13 +1,21 @@
-// Result screen — renders the structured analysis as stacked cards.
+// Result screen 2.0 — Risk Hero + Action Pyramid + Detail Accordions.
+// Goal: scannable for elderly / non-native speakers. The most important
+// safety + action info is visible without scrolling; details collapse
+// behind tap-to-expand cards so the screen never feels overwhelming.
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Animated,
+  Easing,
+  LayoutAnimation,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
+  UIManager,
   View,
 } from 'react-native';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
@@ -21,6 +29,7 @@ import {
   Building2,
   CalendarClock,
   CheckCircle2,
+  ChevronDown,
   Copy,
   Eye,
   FileText,
@@ -36,7 +45,7 @@ import {
   Trash2,
   XCircle,
 } from 'lucide-react-native';
-import { Badge, Button, Card, SectionTitle } from '../src/ui';
+import { Badge, Button, SectionTitle } from '../src/ui';
 import {
   ensureDeviceId,
   getLastResult,
@@ -53,7 +62,14 @@ import {
   ReminderRecord,
 } from '../src/notifications';
 import { deleteOriginal, hasOriginal } from '../src/originals';
-import { colors, fontSize, fontWeight, radius, spacing } from '../src/theme';
+import { colors, fontSize, fontWeight, radius, shadows, spacing } from '../src/theme';
+import { ReadAloudButton } from '../src/components/ReadAloudButton';
+import { ScamWarningModal } from '../src/components/ScamWarningModal';
+
+// Enable LayoutAnimation on Android (iOS supports it natively).
+if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
 
 function riskMeta(level: 'green' | 'yellow' | 'red', lang: LanguageCode) {
   if (level === 'green') {
@@ -109,6 +125,17 @@ export default function ResultScreen() {
   const [copied, setCopied] = useState(false);
   const [reminders, setReminders] = useState<ReminderRecord[]>([]);
   const [originalSaved, setOriginalSaved] = useState(false);
+  // Which detail accordions are open. Start closed so the screen feels
+  // calm; the Risk Hero + Action Pyramid are the immediate focus.
+  const [openSections, setOpenSections] = useState<Record<string, boolean>>({
+    summary: true, // default-open the most useful card
+    explanation: true,
+  });
+
+  const toggleSection = useCallback((key: string) => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    setOpenSections((prev) => ({ ...prev, [key]: !prev[key] }));
+  }, []);
 
   const refreshReminders = useCallback(async (recordId: string) => {
     const list = await getReminders(recordId);
@@ -226,6 +253,11 @@ export default function ResultScreen() {
   };
 
 
+  // ---- Risk Hero color tokens (chosen so the hero has a confident, calm feel) ----
+  const heroPalette = risk.palette;
+  const hasActions = (r.required_actions?.length ?? 0) > 0;
+  const hasDeadlines = (r.deadlines?.length ?? 0) > 0;
+
   return (
     <SafeAreaView style={styles.safe} testID="result-screen">
       <View style={styles.header}>
@@ -254,8 +286,62 @@ export default function ResultScreen() {
         </View>
       </View>
 
+      {/* Auto-pop scam-warning modal — visible once per analysis the first time
+          the user lands here. Shown above any other content with a clear CTA. */}
+      <ScamWarningModal
+        analysisId={r.scam_warning ? record.id : null}
+        reason={r.scam_warning ? (r.scam_reason || t(lang, 'scam_warning_body')) : ''}
+        lang={lang}
+      />
+
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        {/* Scam warning — surfaces the highest-priority safety signal first */}
+        {/* ============== RISK HERO ============== */}
+        {/* Big calm color-coded banner. The single most important thing on
+            screen so the user immediately knows urgency level. */}
+        <View
+          style={[
+            styles.heroCard,
+            { backgroundColor: heroPalette.bg, borderColor: heroPalette.border },
+          ]}
+          testID={`risk-card-${r.risk_level}`}
+        >
+          <View style={styles.heroTopRow}>
+            <View style={[styles.heroIconWrap, { backgroundColor: 'rgba(255,255,255,0.85)' }]}>
+              {risk.icon}
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.heroKicker, { color: heroPalette.text }]}>
+                {t(lang, 'risk_level')}
+              </Text>
+              <Text style={[styles.heroTitle, { color: heroPalette.text }]} numberOfLines={2}>
+                {risk.label}
+              </Text>
+            </View>
+          </View>
+          {r.risk_reason ? (
+            <Text style={[styles.heroBody, { color: heroPalette.text }]}>{r.risk_reason}</Text>
+          ) : null}
+          {/* Category pill, sender chip — small metadata at hero foot */}
+          <View style={styles.heroChipsRow}>
+            {r.category ? (
+              <View style={styles.heroChip} testID="result-category-pill">
+                <Text style={[styles.heroChipText, { color: heroPalette.text }]}>
+                  {categoryLabel(lang, r.category)}
+                </Text>
+              </View>
+            ) : null}
+            {r.sender ? (
+              <View style={styles.heroChip}>
+                <Building2 color={heroPalette.text} size={12} strokeWidth={2.5} />
+                <Text style={[styles.heroChipText, { color: heroPalette.text }]} numberOfLines={1}>
+                  {r.sender}
+                </Text>
+              </View>
+            ) : null}
+          </View>
+        </View>
+
+        {/* ============== SCAM BANNER (persistent) ============== */}
         {r.scam_warning ? (
           <View style={styles.scamCard} testID="scam-warning-card">
             <View style={styles.scamRow}>
@@ -272,73 +358,18 @@ export default function ResultScreen() {
           </View>
         ) : null}
 
-        {/* Category pill (compact, glanceable) */}
-        {r.category ? (
-          <View style={styles.categoryPill} testID="result-category-pill">
-            <Text style={styles.categoryPillText}>
-              {t(lang, 'category_label')}: {categoryLabel(lang, r.category)}
-            </Text>
-          </View>
-        ) : null}
-
-        {/* Risk level */}
-        <View
-          style={[
-            styles.riskCard,
-            { backgroundColor: risk.palette.bg, borderColor: risk.palette.border },
-          ]}
-          testID={`risk-card-${r.risk_level}`}
-        >
-          <View style={styles.riskTop}>
-            <View style={[styles.riskIcon, { backgroundColor: 'rgba(255,255,255,0.6)' }]}>
-              {risk.icon}
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={[styles.riskKicker, { color: risk.palette.text }]}>
-                {t(lang, 'risk_level')}
-              </Text>
-              <Text style={[styles.riskTitle, { color: risk.palette.text }]}>
-                {risk.label}
-              </Text>
-            </View>
-          </View>
-          {r.risk_reason ? (
-            <Text style={[styles.riskBody, { color: risk.palette.text }]}>{r.risk_reason}</Text>
-          ) : null}
-        </View>
-
-        {/* Summary */}
-        {r.summary_translated ? (
-          <Card testID="summary-card">
-            <SectionRow icon={<Sparkles color={colors.primary} size={18} strokeWidth={2.5} />} title={t(lang, 'summary')} />
-            <Text style={styles.body}>{r.summary_translated}</Text>
-          </Card>
-        ) : null}
-
-        {/* What this means */}
-        {r.simple_explanation_translated ? (
-          <Card testID="explanation-card">
-            <SectionRow icon={<Info color={colors.primary} size={18} strokeWidth={2.5} />} title={t(lang, 'what_this_means')} />
-            <Text style={styles.body}>{r.simple_explanation_translated}</Text>
-            {r.key_points && r.key_points.length > 0 ? (
-              <View style={{ gap: 8, marginTop: spacing.sm }}>
-                {r.key_points.map((kp, i) => (
-                  <View key={i} style={styles.bullet}>
-                    <View style={styles.bulletDot} />
-                    <Text style={styles.bulletText}>{kp}</Text>
-                  </View>
-                ))}
-              </View>
-            ) : null}
-          </Card>
-        ) : null}
-
-        {/* What to do next */}
-        {r.required_actions && r.required_actions.length > 0 ? (
-          <Card testID="actions-card">
-            <SectionRow icon={<ListTodo color={colors.primary} size={18} strokeWidth={2.5} />} title={t(lang, 'what_to_do_next')} />
+        {/* ============== ACTION PYRAMID ============== */}
+        {/* The "what should I do" block — surfaced before any explanations
+            because elderly users tell us deadlines + actions are why they
+            opened the letter in the first place. */}
+        {hasActions ? (
+          <View style={styles.pyramidCard} testID="actions-card">
+            <SectionRow
+              icon={<ListTodo color={colors.primary} size={18} strokeWidth={2.5} />}
+              title={t(lang, 'what_to_do_next')}
+            />
             <View style={{ gap: spacing.sm }}>
-              {r.required_actions.map((a, i) => (
+              {r.required_actions!.map((a, i) => (
                 <View key={i} style={styles.actionItem}>
                   <View
                     style={[
@@ -355,15 +386,17 @@ export default function ResultScreen() {
                 </View>
               ))}
             </View>
-          </Card>
+          </View>
         ) : null}
 
-        {/* Deadlines */}
-        <Card testID="deadlines-card">
-          <SectionRow icon={<CalendarClock color={colors.primary} size={18} strokeWidth={2.5} />} title={t(lang, 'deadlines')} />
-          {r.deadlines && r.deadlines.length > 0 ? (
+        <View style={styles.pyramidCard} testID="deadlines-card">
+          <SectionRow
+            icon={<CalendarClock color={colors.primary} size={18} strokeWidth={2.5} />}
+            title={t(lang, 'deadlines')}
+          />
+          {hasDeadlines ? (
             <View style={{ gap: spacing.sm }}>
-              {r.deadlines.map((d, i) => {
+              {r.deadlines!.map((d, i) => {
                 const key = deadlineKeyFor(i, d);
                 const existing = reminders.find((rm) => rm.deadlineKey === key);
                 const parsed = tryParseDeadlineDate(d.date);
@@ -404,12 +437,24 @@ export default function ResultScreen() {
                     </View>
                     <View style={{ flex: 1 }}>
                       <Text style={styles.deadlineDesc}>{d.description}</Text>
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 6, flexWrap: 'wrap' }}>
+                      <View
+                        style={{
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          gap: 8,
+                          marginTop: 6,
+                          flexWrap: 'wrap',
+                        }}
+                      >
                         {d.confidence ? (
                           <Badge
                             label={d.confidence}
                             variant={
-                              d.confidence === 'high' ? 'green' : d.confidence === 'medium' ? 'yellow' : 'neutral'
+                              d.confidence === 'high'
+                                ? 'green'
+                                : d.confidence === 'medium'
+                                ? 'yellow'
+                                : 'neutral'
                             }
                           />
                         ) : null}
@@ -417,7 +462,10 @@ export default function ResultScreen() {
                           onPress={onToggleReminder}
                           style={[
                             styles.reminderBtn,
-                            existing && { backgroundColor: colors.green.bg, borderColor: colors.green.border },
+                            existing && {
+                              backgroundColor: colors.green.bg,
+                              borderColor: colors.green.border,
+                            },
                           ]}
                           testID={`reminder-toggle-${i}`}
                         >
@@ -445,13 +493,74 @@ export default function ResultScreen() {
               })}
             </View>
           ) : (
-            <Text style={[styles.body, { color: colors.textSecondary }]}>{t(lang, 'no_deadlines')}</Text>
+            <Text style={[styles.body, { color: colors.textSecondary }]}>
+              {t(lang, 'no_deadlines')}
+            </Text>
           )}
-        </Card>
+        </View>
 
-        {/* Sender + Doc type */}
-        <Card testID="sender-card">
-          <SectionRow icon={<Building2 color={colors.primary} size={18} strokeWidth={2.5} />} title={t(lang, 'sender')} />
+        {/* ============== PRIMARY CTAs ============== */}
+        <Button
+          label={t(lang, 'ask_question')}
+          onPress={() => router.push(`/chat?id=${encodeURIComponent(record.id)}`)}
+          icon={<MessageCircle color={colors.white} size={18} strokeWidth={2.5} />}
+          testID="result-ask-question"
+        />
+
+        {/* ============== DETAIL ACCORDIONS ============== */}
+        {r.summary_translated ? (
+          <Accordion
+            id="summary"
+            title={t(lang, 'summary')}
+            icon={<Sparkles color={colors.primary} size={18} strokeWidth={2.5} />}
+            open={!!openSections.summary}
+            onToggle={toggleSection}
+            testID="summary-card"
+          >
+            <Text style={styles.body}>{r.summary_translated}</Text>
+          </Accordion>
+        ) : null}
+
+        {r.simple_explanation_translated ? (
+          <Accordion
+            id="explanation"
+            title={t(lang, 'what_this_means')}
+            icon={<Info color={colors.primary} size={18} strokeWidth={2.5} />}
+            open={!!openSections.explanation}
+            onToggle={toggleSection}
+            testID="explanation-card"
+          >
+            {/* Read-aloud uses ONLY the simple_explanation_translated so users
+                hear the calm plain-language version in their target language. */}
+            <View style={{ marginBottom: spacing.sm }}>
+              <ReadAloudButton
+                text={r.simple_explanation_translated}
+                lang={lang}
+                testID="read-aloud-explanation"
+              />
+            </View>
+            <Text style={styles.body}>{r.simple_explanation_translated}</Text>
+            {r.key_points && r.key_points.length > 0 ? (
+              <View style={{ gap: 8, marginTop: spacing.md }}>
+                {r.key_points.map((kp, i) => (
+                  <View key={i} style={styles.bullet}>
+                    <View style={styles.bulletDot} />
+                    <Text style={styles.bulletText}>{kp}</Text>
+                  </View>
+                ))}
+              </View>
+            ) : null}
+          </Accordion>
+        ) : null}
+
+        <Accordion
+          id="sender"
+          title={t(lang, 'sender')}
+          icon={<Building2 color={colors.primary} size={18} strokeWidth={2.5} />}
+          open={!!openSections.sender}
+          onToggle={toggleSection}
+          testID="sender-card"
+        >
           <View style={styles.kvRow}>
             <Text style={styles.kvKey}>{t(lang, 'sender')}</Text>
             <Text style={styles.kvValue}>{r.sender || '—'}</Text>
@@ -460,12 +569,17 @@ export default function ResultScreen() {
             <Text style={styles.kvKey}>{t(lang, 'document_type')}</Text>
             <Text style={styles.kvValue}>{r.document_type || '—'}</Text>
           </View>
-        </Card>
+        </Accordion>
 
-        {/* German reply draft */}
         {r.german_reply_draft ? (
-          <Card testID="reply-card">
-            <SectionRow icon={<Reply color={colors.primary} size={18} strokeWidth={2.5} />} title={t(lang, 'reply_draft')} />
+          <Accordion
+            id="reply"
+            title={t(lang, 'reply_draft')}
+            icon={<Reply color={colors.primary} size={18} strokeWidth={2.5} />}
+            open={!!openSections.reply}
+            onToggle={toggleSection}
+            testID="reply-card"
+          >
             <View style={styles.replyBox}>
               <Text style={styles.replyText}>{r.german_reply_draft}</Text>
             </View>
@@ -475,9 +589,7 @@ export default function ResultScreen() {
               ) : (
                 <Copy color={colors.primary} size={18} strokeWidth={2.5} />
               )}
-              <Text style={styles.copyLabel}>
-                {copied ? t(lang, 'copied') : t(lang, 'copy')}
-              </Text>
+              <Text style={styles.copyLabel}>{copied ? t(lang, 'copied') : t(lang, 'copy')}</Text>
             </Pressable>
             {r.reply_draft_explanation_translated ? (
               <View style={{ marginTop: spacing.sm }}>
@@ -487,13 +599,18 @@ export default function ResultScreen() {
                 </Text>
               </View>
             ) : null}
-          </Card>
+          </Accordion>
         ) : null}
 
-        {/* Questions to ask */}
         {r.questions_to_ask && r.questions_to_ask.length > 0 ? (
-          <Card testID="questions-card">
-            <SectionRow icon={<HelpCircle color={colors.primary} size={18} strokeWidth={2.5} />} title={t(lang, 'questions_to_ask')} />
+          <Accordion
+            id="questions"
+            title={t(lang, 'questions_to_ask')}
+            icon={<HelpCircle color={colors.primary} size={18} strokeWidth={2.5} />}
+            open={!!openSections.questions}
+            onToggle={toggleSection}
+            testID="questions-card"
+          >
             <View style={{ gap: 8 }}>
               {r.questions_to_ask.map((q, i) => (
                 <View key={i} style={styles.bullet}>
@@ -502,13 +619,18 @@ export default function ResultScreen() {
                 </View>
               ))}
             </View>
-          </Card>
+          </Accordion>
         ) : null}
 
-        {/* Uncertainties */}
         {r.uncertainties && r.uncertainties.length > 0 ? (
-          <Card testID="uncertainties-card">
-            <SectionRow icon={<AlertTriangle color={colors.yellow.text} size={18} strokeWidth={2.5} />} title={t(lang, 'uncertainties')} />
+          <Accordion
+            id="uncertainties"
+            title={t(lang, 'uncertainties')}
+            icon={<AlertTriangle color={colors.yellow.text} size={18} strokeWidth={2.5} />}
+            open={!!openSections.uncertainties}
+            onToggle={toggleSection}
+            testID="uncertainties-card"
+          >
             <View style={{ gap: 8 }}>
               {r.uncertainties.map((u, i) => (
                 <View key={i} style={styles.bullet}>
@@ -517,21 +639,15 @@ export default function ResultScreen() {
                 </View>
               ))}
             </View>
-          </Card>
+          </Accordion>
         ) : null}
 
-        {/* Disclaimer */}
+        {/* ============== DISCLAIMER ============== */}
         <View style={styles.disclaimer} testID="disclaimer-card">
           <FileText color={colors.textSecondary} size={16} strokeWidth={2.4} />
           <Text style={styles.disclaimerText}>{r.disclaimer}</Text>
         </View>
 
-        <Button
-          label={t(lang, 'ask_question')}
-          onPress={() => router.push(`/chat?id=${encodeURIComponent(record.id)}`)}
-          icon={<MessageCircle color={colors.white} size={18} strokeWidth={2.5} />}
-          testID="result-ask-question"
-        />
         <Button
           label={t(lang, 'analyze_again')}
           onPress={() => router.replace('/home')}
@@ -550,6 +666,62 @@ function SectionRow({ icon, title }: { icon: React.ReactNode; title: string }) {
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
       <View style={styles.sectionIcon}>{icon}</View>
       <SectionTitle>{title}</SectionTitle>
+    </View>
+  );
+}
+
+// Accordion: collapsible card. Header is fully tappable (44pt min target).
+// Animated chevron rotates on toggle for clear affordance.
+function Accordion({
+  id,
+  title,
+  icon,
+  open,
+  onToggle,
+  testID,
+  children,
+}: {
+  id: string;
+  title: string;
+  icon: React.ReactNode;
+  open: boolean;
+  onToggle: (id: string) => void;
+  testID?: string;
+  children: React.ReactNode;
+}) {
+  const rotation = useRef(new Animated.Value(open ? 1 : 0)).current;
+
+  useEffect(() => {
+    Animated.timing(rotation, {
+      toValue: open ? 1 : 0,
+      duration: 220,
+      easing: Easing.out(Easing.ease),
+      useNativeDriver: true,
+    }).start();
+  }, [open, rotation]);
+
+  const rotateInterpolate = rotation.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['0deg', '180deg'],
+  });
+
+  return (
+    <View style={styles.accordionCard} testID={testID}>
+      <Pressable
+        onPress={() => onToggle(id)}
+        style={({ pressed }) => [styles.accordionHeader, pressed && { opacity: 0.7 }]}
+        hitSlop={4}
+        testID={testID ? `${testID}-header` : undefined}
+      >
+        <View style={styles.sectionIcon}>{icon}</View>
+        <Text style={styles.accordionTitle} numberOfLines={2}>
+          {title}
+        </Text>
+        <Animated.View style={{ transform: [{ rotate: rotateInterpolate }] }}>
+          <ChevronDown color={colors.textSecondary} size={22} strokeWidth={2.4} />
+        </Animated.View>
+      </Pressable>
+      {open ? <View style={styles.accordionBody}>{children}</View> : null}
     </View>
   );
 }
@@ -578,8 +750,76 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.lg,
     gap: spacing.md,
   },
-  loadingWrap: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing.md, paddingHorizontal: spacing.lg },
+  loadingWrap: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.md,
+    paddingHorizontal: spacing.lg,
+  },
   errorText: { fontSize: fontSize.base, color: colors.textSecondary, textAlign: 'center' },
+
+  // ---- Risk Hero ----
+  heroCard: {
+    borderRadius: radius.xxl,
+    padding: spacing.lg,
+    borderWidth: 1.5,
+    gap: spacing.md,
+    ...shadows.card,
+  },
+  heroTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+  },
+  heroIconWrap: {
+    width: 64,
+    height: 64,
+    borderRadius: radius.lg,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  heroKicker: {
+    fontSize: fontSize.xs,
+    fontWeight: fontWeight.bold,
+    letterSpacing: 1.4,
+    textTransform: 'uppercase',
+    opacity: 0.85,
+  },
+  heroTitle: {
+    fontSize: fontSize['2xl'],
+    fontWeight: fontWeight.extrabold,
+    letterSpacing: -0.4,
+    marginTop: 4,
+    lineHeight: 30,
+  },
+  heroBody: {
+    fontSize: fontSize.base,
+    lineHeight: 23,
+    fontWeight: fontWeight.medium,
+  },
+  heroChipsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  heroChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 999,
+    backgroundColor: 'rgba(255,255,255,0.7)',
+    maxWidth: '100%',
+  },
+  heroChipText: {
+    fontSize: fontSize.xs,
+    fontWeight: fontWeight.bold,
+    letterSpacing: 0.3,
+  },
+
+  // ---- Scam banner ----
   scamCard: {
     borderRadius: radius.xxl,
     padding: spacing.lg,
@@ -611,56 +851,49 @@ const styles = StyleSheet.create({
     lineHeight: 20,
     color: colors.red.text,
   },
-  categoryPill: {
-    alignSelf: 'flex-start',
-    paddingHorizontal: spacing.md,
-    paddingVertical: 6,
-    borderRadius: 999,
-    backgroundColor: colors.primarySoft,
-  },
-  categoryPillText: {
-    fontSize: fontSize.xs,
-    fontWeight: fontWeight.semibold,
-    color: colors.primary,
-    letterSpacing: 0.3,
-  },
 
-  riskCard: {
+  // ---- Action Pyramid (always-visible cards) ----
+  pyramidCard: {
+    backgroundColor: colors.surface,
     borderRadius: radius.xxl,
     padding: spacing.lg,
     borderWidth: 1,
+    borderColor: colors.borderLight,
     gap: spacing.md,
+    ...shadows.card,
   },
-  riskTop: {
+
+  // ---- Detail Accordions ----
+  accordionCard: {
+    backgroundColor: colors.surface,
+    borderRadius: radius.xxl,
+    borderWidth: 1,
+    borderColor: colors.borderLight,
+    overflow: 'hidden',
+    ...shadows.card,
+  },
+  accordionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 12,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    minHeight: 56, // ≥44pt touch target
+  },
+  accordionTitle: {
+    flex: 1,
+    color: colors.textPrimary,
+    fontSize: fontSize.lg,
+    fontWeight: fontWeight.bold,
+    letterSpacing: -0.2,
+  },
+  accordionBody: {
+    paddingHorizontal: spacing.lg,
+    paddingBottom: spacing.lg,
     gap: spacing.md,
   },
-  riskIcon: {
-    width: 56,
-    height: 56,
-    borderRadius: radius.lg,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  riskKicker: {
-    fontSize: fontSize.xs,
-    fontWeight: fontWeight.bold,
-    letterSpacing: 1.2,
-    textTransform: 'uppercase',
-    opacity: 0.8,
-  },
-  riskTitle: {
-    fontSize: fontSize['2xl'],
-    fontWeight: fontWeight.extrabold,
-    letterSpacing: -0.4,
-    marginTop: 2,
-  },
-  riskBody: {
-    fontSize: fontSize.base,
-    lineHeight: 22,
-    fontWeight: fontWeight.medium,
-  },
+
+  // ---- Shared content styles ----
   body: {
     color: colors.textPrimary,
     fontSize: fontSize.lg,

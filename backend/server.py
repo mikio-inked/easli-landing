@@ -1,4 +1,5 @@
 from fastapi import FastAPI, APIRouter, HTTPException, Header, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
@@ -60,6 +61,11 @@ MAX_PAGES_PER_DOCUMENT = _int_env('MAX_PAGES_PER_DOCUMENT', 5)
 MAX_CHAT_QUESTIONS_PER_DOCUMENT = _int_env('MAX_CHAT_QUESTIONS_PER_DOCUMENT', 5)
 MAX_TOTAL_CHAT_QUESTIONS_PER_TESTER = _int_env('MAX_TOTAL_CHAT_QUESTIONS_PER_TESTER', 20)
 PLUS_MONTHLY_ANALYSES = _int_env('PLUS_MONTHLY_ANALYSES', 20)
+
+# DSGVO storage minimisation: stored analyses auto-delete after this many
+# days. Enforced via a MongoDB TTL index on `analyses.created_at_dt`. Set
+# to 0 to disable auto-deletion (not recommended for production).
+ANALYSIS_TTL_DAYS = _int_env('ANALYSIS_TTL_DAYS', 90)
 
 REVENUECAT_WEBHOOK_AUTH_HEADER = os.environ.get('REVENUECAT_WEBHOOK_AUTH_HEADER', '').strip()
 DEV_TOOLS_ENABLED = os.environ.get('DEV_TOOLS_ENABLED', '0').strip() == '1' or PAYWALL_MODE != 'hard'
@@ -921,7 +927,10 @@ async def chat_endpoint(analysis_id: str, req: ChatRequest):
     if len(req.message) > 2000:
         raise HTTPException(status_code=400, detail="Message too long")
 
-    doc = await db.analyses.find_one({"id": analysis_id, "device_id": req.device_id}, {"_id": 0})
+    doc = await db.analyses.find_one(
+        {"id": analysis_id, "device_id": req.device_id},
+        {"_id": 0, "created_at_dt": 0},
+    )
     if not doc:
         raise HTTPException(status_code=404, detail="Analysis not found")
 
@@ -1119,8 +1128,11 @@ async def analyze_document(req: AnalyzeRequest):
         result=result,
     )
 
-    # Store analysis result only — never the original document
+    # Store analysis result only — never the original document.
+    # Add a BSON Date field for the MongoDB TTL index (auto-deletes after
+    # ANALYSIS_TTL_DAYS). The ISO-string `created_at` is kept for the API.
     doc = record.dict()
+    doc["created_at_dt"] = datetime.now(timezone.utc)
     await db.analyses.insert_one(doc)
 
     # Now — and only now — consume usage. If the analyze call had failed
@@ -1187,7 +1199,7 @@ async def list_analyses(device_id: str):
 async def get_analysis(analysis_id: str, device_id: str):
     doc = await db.analyses.find_one(
         {"id": analysis_id, "device_id": device_id},
-        {"_id": 0}
+        {"_id": 0, "created_at_dt": 0}
     )
     if not doc:
         raise HTTPException(status_code=404, detail="Analysis not found")
@@ -1256,7 +1268,10 @@ async def export_my_data(device_id: str):
     """
     if not device_id:
         raise HTTPException(status_code=400, detail="device_id is required")
-    cursor = db.analyses.find({"device_id": device_id}, {"_id": 0}).sort("created_at", -1)
+    cursor = db.analyses.find(
+        {"device_id": device_id},
+        {"_id": 0, "created_at_dt": 0},  # strip TTL helper field
+    ).sort("created_at", -1)
     records: List[dict] = []
     async for doc in cursor:
         records.append(doc)
@@ -1520,6 +1535,80 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+# DSGVO + privacy: never let a malformed request body end up in a stack
+# trace (the default FastAPI 422 echoes the offending body, which for
+# /api/analyze can include a base64-encoded image). This handler returns a
+# stripped-down 422 with only field paths and the error type — no body, no
+# values, no document content.
+@app.exception_handler(RequestValidationError)
+async def safe_validation_exception_handler(request: Request, exc: RequestValidationError):
+    safe_errors = []
+    for err in exc.errors():
+        safe_errors.append({
+            "loc": list(err.get("loc", [])),
+            "type": err.get("type", "value_error"),
+            "msg": err.get("msg", "Invalid input"),
+        })
+    logger.info(
+        "request_validation_error path=%s n_errors=%s",
+        request.url.path, len(safe_errors),
+    )
+    return JSONResponse(status_code=422, content={"detail": safe_errors})
+
+
+@app.on_event("startup")
+async def klarpost_startup():
+    """Bootstrap MongoDB indexes on every backend start. Idempotent."""
+    # 1. TTL on analyses for storage minimisation (DSGVO Art. 5(1)(e)).
+    if ANALYSIS_TTL_DAYS > 0:
+        try:
+            await db.analyses.create_index(
+                "created_at_dt",
+                expireAfterSeconds=ANALYSIS_TTL_DAYS * 86400,
+                name="ttl_created_at_dt",
+                background=True,
+            )
+            # Backfill `created_at_dt` (BSON Date) for legacy docs that only
+            # carry the ISO-string `created_at`. Done in chunks so a large
+            # collection doesn't block startup.
+            backfilled = 0
+            cursor = db.analyses.find(
+                {"created_at_dt": {"$exists": False}},
+                {"_id": 1, "created_at": 1},
+            ).limit(500)
+            async for legacy in cursor:
+                ts = legacy.get("created_at")
+                if not ts:
+                    continue
+                try:
+                    parsed = datetime.fromisoformat(ts.replace("Z", "+00:00"))
+                except (ValueError, AttributeError):
+                    parsed = datetime.now(timezone.utc)
+                await db.analyses.update_one(
+                    {"_id": legacy["_id"]},
+                    {"$set": {"created_at_dt": parsed}},
+                )
+                backfilled += 1
+            logger.info(
+                "ttl_index_ready collection=analyses ttl_days=%s backfilled=%s",
+                ANALYSIS_TTL_DAYS, backfilled,
+            )
+        except Exception as e:
+            # Non-fatal: index creation can fail on read-only secondaries or
+            # if Mongo is busy. Surface as a warning so it shows up in logs.
+            logger.warning(
+                "ttl_index_setup_failed error_type=%s",
+                type(e).__name__,
+            )
+
+    # 2. Helpful indexes for hot read paths (idempotent).
+    try:
+        await db.analyses.create_index([("device_id", 1), ("created_at", -1)], name="device_created_idx")
+        await db.usage_records.create_index("device_id", unique=True, name="device_unique_idx")
+    except Exception as e:
+        logger.warning("index_setup_failed error_type=%s", type(e).__name__)
 
 
 @app.on_event("shutdown")
