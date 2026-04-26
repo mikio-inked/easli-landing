@@ -16,7 +16,7 @@ import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ArrowRight, ShieldCheck, ScanLine, Languages } from 'lucide-react-native';
 import { Button } from '../src/ui';
-import { getLanguage, setOnboarded } from '../src/store';
+import { getLanguage, setConsent, setOnboarded } from '../src/store';
 import { colors, fontSize, fontWeight, radius, spacing } from '../src/theme';
 import { LanguageCode, t } from '../src/i18n';
 
@@ -62,7 +62,12 @@ export default function Onboarding() {
   };
 
   const finish = async () => {
+    // Tapping the final CTA on the privacy slide is treated as the user's
+    // active opt-in: they have read what KlarPost does with their data and
+    // explicitly chose to continue. Recorded as a timestamped consent
+    // record so we can reflect it later (e.g. on the Privacy screen).
     await setOnboarded();
+    await setConsent();
     router.replace('/home');
   };
 

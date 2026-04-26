@@ -133,9 +133,12 @@ export async function deleteAnalysis(id: string, deviceId: string): Promise<void
 }
 
 export async function deleteAllAnalyses(deviceId: string): Promise<void> {
-  const res = await fetch(`${BASE_URL}/api/analyses?device_id=${encodeURIComponent(deviceId)}`, {
-    method: 'DELETE',
-  });
+  // DSGVO Art. 17 — calls the explicit /api/history/{device_id} endpoint
+  // which wipes both analyses AND chat messages in one shot.
+  const res = await fetch(
+    `${BASE_URL}/api/history/${encodeURIComponent(deviceId)}`,
+    { method: 'DELETE' }
+  );
   await jsonOrThrow(res);
 }
 

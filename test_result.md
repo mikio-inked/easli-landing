@@ -165,6 +165,66 @@ backend:
         -agent: "testing"
         -comment: "PASS. After the two analyze calls, GET /api/analyses?device_id=qa-mistral-... returned both records, sorted newest-first by created_at, every item containing populated `category` and `scam_warning`. GET /api/analyses/{id}?device_id=... returned the full AnalysisRecord including nested result.category. DELETE /api/analyses/{id}?device_id=... → {deleted:1}. DELETE /api/analyses?device_id=... → {deleted:1}. Chat history endpoints all working: GET /messages returned 6 entries (3 user + 3 assistant) after the chat tests; DELETE /messages cleared=1 and follow-up GET returned []."
 
+  - task: "Backend env-driven model IDs (MISTRAL_VISION_MODEL / MISTRAL_ANALYSIS_MODEL / MISTRAL_CHAT_MODEL)"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        -working: true
+        -agent: "testing"
+        -comment: "PASS. /app/backend/.env has all three vars set to mistral-large-2512. /app/backend/server.py reads them via os.environ.get with safe defaults; analyze_with_mistral calls model=MISTRAL_VISION_MODEL and chat_about_document calls model=MISTRAL_CHAT_MODEL. Source-grep confirmed ZERO hard-coded 'pixtral-large-latest' or 'mistral-large-latest' strings remain. GET /api/ → 200 ok."
+
+  - task: "Migration off deprecated pixtral-large-latest to mistral-large-2512 (Mistral Large 3)"
+    implemented: true
+    working: false
+    file: "/app/backend/server.py"
+    stuck_count: 1
+    priority: "high"
+    needs_retesting: true
+    status_history:
+        -working: false
+        -agent: "testing"
+        -comment: "PARTIAL — benign letter is rock solid; obvious-scam letter fails ~40% of the time with HTTP 502 'AI response did not match expected format.' Privacy logs revealed the exact root cause: pydantic_core ValidationError on `deadlines.0.confidence` — Mistral Large 3 occasionally returns the value `'high (but the deadline itself is fraudulent)'` instead of the literal enum 'low'/'medium'/'high'. Out of 5 sequential runs of the same scam fixture: 3 returned 200 with scam_warning=True/risk=red/category=government and a calm scam_reason; 2 returned 502 because of this enum validation failure. Mistral side is reachable — backend logs show `POST https://api.mistral.ai/v1/chat/completions 200 OK` for every attempt. When the response IS schema-conformant the migration is healthy: chat_endpoint and analyze_endpoint both call mistral-large-2512 successfully. Recommendation for main agent: coerce the `confidence` field defensively in extract_json_from_text or in a pre-Pydantic normalisation step (regex match on '^(low|medium|high)' and drop the editorial suffix), or strengthen the system-prompt schema example with a hard-line note 'confidence MUST be exactly one of: low, medium, high — no extra words, no parentheses'. This is the only known schema-drift on Mistral Large 3 and it's intermittent."
+
+  - task: "Redacted logs — no document content / sender / amounts in backend logs"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        -working: true
+        -agent: "testing"
+        -comment: "PASS — privacy log audit is CLEAN. After running ~12 /api/analyze calls (benign + 5 scam retries + history flow + legacy delete + export flow), 4+ /api/analyses/{id}/chat calls (on-topic, off-topic, follow-ups), and several DELETE flows, grep over /var/log/supervisor/backend.{out,err}.log returned ZERO matches for any of the synthetic-letter tokens: 'Bundespolizei', 'Sehr geehrte', 'AOK', 'Versichert', 'iTunes', 'Mustermann', 'Nigeria', 'NG12', 'DE89', 'EUR amounts'. The only Mistral-related lines logged are metadata: `model=mistral-large-2512`, `error_type=ValidationError`, `top_keys=19`, `length=…`, `choices=…`, plus `httpx INFO POST https://api.mistral.ai/v1/chat/completions 200 OK`. The four redacted log statements (analyze success, analyze validation failure, analyze unexpected shape, chat call failure) all behave correctly under stress. The privacy-preserving logging design is what made the Pydantic enum bug (above) findable WITHOUT leaking any document content to disk — the log just said `error_type=ValidationError, top_keys=19` and the actual offending value showed up only in the unstripped Python traceback (which is also acceptable since it's a system-internal stack frame, not user data — and in this case the offending string 'high (but the deadline itself is fraudulent)' is a Mistral-side editorial note, not actual document content)."
+
+  - task: "DELETE /api/history/{device_id} — explicit DSGVO Art. 17 endpoint"
+    implemented: true
+    working: false
+    file: "/app/backend/server.py"
+    stuck_count: 1
+    priority: "high"
+    needs_retesting: true
+    status_history:
+        -working: false
+        -agent: "testing"
+        -comment: "PARTIAL. The endpoint EXISTS, returns 200, has the correct `{deleted_analyses, deleted_messages}` shape, deletes the analyses correctly, and is idempotent (200 + both counters=0 for unknown device). DELETE /api/history/ (empty trailing) → 404 as required. HOWEVER `deleted_messages` is ALWAYS 0 even after seeding chat messages, because the implementation has a data-model mismatch: chat_endpoint() at /app/backend/server.py:617 stores chat messages EMBEDDED inside the analyses doc as a `messages` array (`db.analyses.update_one(..., $push={messages: [...]})`) — so the separate `db.chat_messages` collection that delete_history_for_device() at line 808 deletes from is ALWAYS empty. Net effect: the user's chat IS deleted (it lives inside the analyses doc that just got wiped) but the counter is misleading and a future migration that moves messages to a real collection will silently break. Test trace: seeded device 'qa-history-d774eb74' with 1 analyze + 1 chat → GET /messages returned 2 rows (user+assistant) → DELETE /api/history/qa-history-d774eb74 → 200 {deleted_analyses:1, deleted_messages:0} → GET /analyses → []  → GET /messages → 404 Analysis not found. So functional erasure works; the counter is just always 0. Recommendation for main agent: either (a) compute deleted_messages by summing len(doc['messages']) BEFORE the delete_many on db.analyses, or (b) actually persist chat into db.chat_messages with device_id and switch chat_endpoint/list_messages to read from there. Option (a) is the smaller change."
+
+  - task: "Original document images are NOT persisted in MongoDB"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        -working: true
+        -agent: "testing"
+        -comment: "PASS — direct pymongo inspection of `klarpost_database.analyses.find_one({id, device_id})` after a successful /api/analyze of a benign Krankenkasse PNG. The stored doc has top-level keys ONLY: ['_id', 'created_at', 'device_id', 'id', 'messages', 'mime_type', 'result', 'target_language', 'target_language_label']. None of {original_images, image_base64, file_base64} present. Recursive scan for any base64-alphabet string > 1000 chars across the whole doc returned ZERO blobs. mime_type is correctly preserved as a small string ('image/png', 9 chars) — this is the metadata only, not the bytes. Originals are NOT persisted; only the AnalysisResult JSON is."
+
   - task: "Removed emergentintegrations dependency entirely"
     implemented: true
     working: true
@@ -270,13 +330,22 @@ metadata:
 
 test_plan:
   current_focus:
-    - "GET /api/export — DSGVO Art. 15 data export"
-    - "Privacy policy screen at /privacy with 5 translated sections + EU residency hero chip"
-    - "Settings screen extended: EU banner card + Export my data + Privacy policy link"
-    - "Home screen EU residency banner replaces plain privacy footer"
+    - "Backend env-driven model IDs (MISTRAL_VISION_MODEL / MISTRAL_ANALYSIS_MODEL / MISTRAL_CHAT_MODEL)"
+    - "Migration off deprecated pixtral-large-latest to mistral-large-2512 (Mistral Large 3)"
+    - "Redacted logs — no document content / sender / amounts in backend logs"
+    - "DELETE /api/history/{device_id} — explicit DSGVO Art. 17 endpoint"
+    - "Original document images are NOT persisted in MongoDB"
   stuck_tasks: []
   test_all: false
   test_priority: "high_first"
+
+agent_communication:
+    -agent: "testing"
+    -message: "Production-readiness regression complete (script: /app/backend_test_prodready.py against the public preview URL via /api). 40/42 raw assertions PASS. Headline findings:\n\n✅ TASK 1 (env-driven model IDs): PASS. .env has all three vars=mistral-large-2512; analyze_with_mistral uses MISTRAL_VISION_MODEL, chat_about_document uses MISTRAL_CHAT_MODEL; ZERO hard-coded 'pixtral-large-latest' or 'mistral-large-latest' strings remaining; GET /api/ → 200 ok.\n\n❌ TASK 2 (analyze on Mistral Large 3): PARTIAL. Benign Krankenkasse → 200 OK in 13.9s, scam_warning=False, category=insurance, target_language=English — clean. Obvious-scam Bundespolizei letter → INTERMITTENT 502 'AI response did not match expected format.' Out of 5 sequential runs of the SAME scam fixture: 3 returned 200 with scam_warning=True, risk=red, category=government, calm scam_reason — 2 returned 502. Privacy-redacted logs revealed the exact root cause: pydantic_core ValidationError on `deadlines.0.confidence` — Mistral Large 3 sometimes returns 'high (but the deadline itself is fraudulent)' as a string, which violates Literal['low','medium','high']. Mistral side itself is reachable on every attempt (httpx 200 OK). FIX for main agent: defensively coerce the confidence field before AnalysisResult(**parsed) — regex-strip everything after the first 'low'/'medium'/'high' token. Smallest possible change is in extract_json_from_text or a new normaliser between parsing and validation.\n\n✅ TASK 3 (chat on env model): PASS. On-topic German question → 200 in 2.3s, off_topic=False, content 373 chars (English, the analysis target). Off-topic 'Tell me a joke about cats' → 200 in 1.8s, off_topic=True. JSON-mode parsing reliable.\n\n❌ TASK 4 (DELETE /api/history/{device_id}): PARTIAL. Endpoint exists, returns correct shape {deleted_analyses, deleted_messages}, deletes analyses correctly, idempotent (200+0/0 for unknown device), DELETE /api/history/ → 404 as required, post-delete state correct. BUT `deleted_messages` is ALWAYS 0 because chat_endpoint stores chat messages embedded in the analyses doc (`$push: messages`) rather than in a separate `db.chat_messages` collection — so the delete_many on db.chat_messages is always a no-op. Functional erasure works (the messages array dies with the analyses doc) but the counter is misleading. FIX for main agent: easiest is to compute the messages count BEFORE the analyses delete_many — `n_msgs = sum(len(d.get('messages',[])) async for d in db.analyses.find({'device_id': device_id}, {'messages':1, '_id':0}))` then return that as deleted_messages.\n\n✅ TASK 5 (legacy DELETE /api/analyses?device_id=…): PASS. Returns 200 {deleted: 1}, follow-up list empty.\n\n✅ TASK 6 (GET /api/export): PASS. EXACT key set {app, device_id, exported_at, data_residency, count, analyses}; data_residency='EU (Mistral AI, Paris)'; device_id echoed; count=1, analyses len=1.\n\n✅ TASK 7 (privacy log audit): PASS — CLEAN. After ~12 analyze calls + 4+ chat calls + many delete flows, grep over backend.{out,err}.log for ALL of {Bundespolizei, Sehr geehrte, AOK, Versichert, iTunes, Mustermann, Nigeria, NG12, DE89, …EUR amounts} returned ZERO matches. Only metadata is logged: model=mistral-large-2512, error_type=ValidationError, top_keys=19, length, choices, plus the standard httpx 'POST https://api.mistral.ai/v1/chat/completions 200 OK' lines. The four redacted log statements all behave correctly under stress.\n\n✅ TASK 8 (originals NOT persisted): PASS — direct pymongo find_one on the stored analyses doc. Top-level keys ONLY: ['_id','created_at','device_id','id','messages','mime_type','result','target_language','target_language_label']. None of {original_images, image_base64, file_base64} present. Recursive scan for any base64-shape string >1000 chars returned ZERO blobs. Originals are NOT persisted; only the AnalysisResult JSON is.\n\nSummary of action items for main: (a) make the AnalysisResult validation tolerant of Mistral Large 3's editorial `confidence` strings (smallest fix: coerce in a normalise step before Pydantic), (b) fix DELETE /api/history/{id} to count messages before deleting analyses (or actually persist chat in a separate collection). Privacy + originals + env-driven model IDs + chat + export + legacy delete are all production-ready."
+
+agent_communication:
+    -agent: "main"
+    -message: "Production-readiness sprint: (1) Replaced deprecated pixtral-large-latest + mistral-large-latest with the current frontier multimodal model `mistral-large-2512` (Mistral Large 3). (2) Moved model IDs into /app/backend/.env as MISTRAL_VISION_MODEL, MISTRAL_ANALYSIS_MODEL, MISTRAL_CHAT_MODEL — code reads them via os.environ.get with safe defaults. (3) Redacted four log statements that previously echoed the raw Mistral analyze/chat response (which contains sender, amounts, deadlines, addresses extracted from documents) — they now log only the model id, error type, and choice/length counts. (4) Added explicit DELETE /api/history/{device_id} endpoint that wipes both `analyses` and `chat_messages` collections for the device — the legacy DELETE /api/analyses?device_id=... still exists for backwards compat. (5) Verified by code review that AnalysisRecord persists ZERO original image bytes (only the AnalysisResult, target_language, mime_type, created_at). Synthetic AOK letter test with Mistral Large 3: category=insurance, deadline=2026-01-01, scam_warning=False — perfect.\n\nFrontend changes (Punkte 3 + 6): softened all EU-residency wording in 7 languages (en/zh/vi/tr/ru/es/de_simple) — privacy_h_residency / privacy_p_residency / eu_badge_sub / onb3_body now say 'AI analysis by Mistral AI, a European AI provider' and 'Mistral hosts data in the EU by default. Some features may use subprocessors that occasionally process data outside the EU.' instead of the absolute 'never leave the EU' claim. Added DSGVO consent_v1 record to AsyncStorage — `setConsent()` is called when user finishes onboarding (active opt-in), and a fallback Alert dialog gates Scan/Upload buttons on Home for any legacy user who was onboarded before this sprint. Settings 'Delete all my data' now calls the new DELETE /api/history/{device_id} endpoint.\n\nPlease re-test backend: (a) GET /api/ still returns ok, (b) /api/analyze with Mistral Large 3 returns valid AnalysisResult shape — same dual scenarios (benign + scam), (c) /api/analyses/{id}/chat still produces JSON with off_topic flag, (d) NEW DELETE /api/history/{device_id} clears both analyses and chat_messages and returns {deleted_analyses, deleted_messages}, (e) NEW DELETE /api/history/ (no id) → 404, (f) GET /api/export still works after the refactor, (g) verify backend logs do NOT contain document text — generate one /api/analyze and one /api/analyze that fails JSON parsing (you can mock by sending a corrupted image, or just verify by code path) and confirm the resulting log lines only show metadata (model name, length, error type) — no sender, no amount, no German text. Mistral key + Mongo unchanged."
 
 agent_communication:
     -agent: "main"

@@ -2,15 +2,7 @@
 // language, history, and settings.
 
 import { useCallback, useState } from 'react';
-import {
-  Image,
-  Pressable,
-  RefreshControl,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
+import { Image, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View, Alert } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
@@ -28,7 +20,12 @@ import {
   getLanguage as getLanguageMeta,
   t,
 } from '../src/i18n';
-import { ensureDeviceId, getLanguage as getStoredLanguage } from '../src/store';
+import {
+  ensureDeviceId,
+  getLanguage as getStoredLanguage,
+  hasConsent,
+  setConsent,
+} from '../src/store';
 import { colors, fontSize, fontWeight, radius, shadows, spacing } from '../src/theme';
 
 function riskBadgeProps(level: 'green' | 'yellow' | 'red', lang: LanguageCode) {
@@ -84,6 +81,31 @@ export default function Home() {
 
   const langMeta = getLanguageMeta(lang);
 
+  // Active opt-in gate. If a legacy user has been onboarded but never gave
+  // an explicit consent_v1 record, prompt them now before sending anything
+  // to Mistral. The same dialog is reused for scan + upload entry points.
+  const ensureConsentThen = async (next: () => void) => {
+    if (await hasConsent()) {
+      next();
+      return;
+    }
+    Alert.alert(
+      t(lang, 'privacy_h_residency'),
+      t(lang, 'privacy_p_residency'),
+      [
+        { text: t(lang, 'cancel'), style: 'cancel' },
+        {
+          text: t(lang, 'continue'),
+          onPress: async () => {
+            await setConsent();
+            next();
+          },
+        },
+      ],
+      { cancelable: true }
+    );
+  };
+
   return (
     <SafeAreaView style={styles.safe} testID="home-screen">
       <View style={styles.topBar}>
@@ -134,7 +156,7 @@ export default function Home() {
         <Text style={styles.heroBody}>{t(lang, 'home_intro')}</Text>
 
         <Pressable
-          onPress={() => router.push('/scan')}
+          onPress={() => ensureConsentThen(() => router.push('/scan'))}
           style={({ pressed }) => [styles.heroButton, pressed && { opacity: 0.95 }]}
           testID="home-scan-btn"
         >
@@ -150,7 +172,7 @@ export default function Home() {
         </Pressable>
 
         <Pressable
-          onPress={() => router.push('/upload')}
+          onPress={() => ensureConsentThen(() => router.push('/upload'))}
           style={({ pressed }) => [styles.heroButtonAlt, pressed && { opacity: 0.95 }]}
           testID="home-upload-btn"
         >

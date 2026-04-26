@@ -28,11 +28,14 @@ client = AsyncIOMotorClient(mongo_url)
 db = client[os.environ['DB_NAME']]
 
 # Mistral AI — EU-hosted (Paris). DSGVO-friendly replacement for OpenAI.
-# `pixtral-large-latest` handles OCR + analysis of document images in a single
-# call (vision + reasoning). `mistral-large-latest` powers the document chat.
+# Model IDs are pinned via env vars to dated releases so we don't silently
+# adopt new models. Mistral Large 3 (`mistral-large-2512`) is the current
+# multimodal frontier model and replaces both pixtral-large-2411 and
+# mistral-large-2411 (both deprecated, retiring Feb 27, 2026).
 MISTRAL_API_KEY = os.environ.get('MISTRAL_API_KEY', '')
-MISTRAL_VISION_MODEL = "pixtral-large-latest"
-MISTRAL_CHAT_MODEL = "mistral-large-latest"
+MISTRAL_VISION_MODEL = os.environ.get('MISTRAL_VISION_MODEL', 'mistral-large-2512')
+MISTRAL_ANALYSIS_MODEL = os.environ.get('MISTRAL_ANALYSIS_MODEL', 'mistral-large-2512')
+MISTRAL_CHAT_MODEL = os.environ.get('MISTRAL_CHAT_MODEL', 'mistral-large-2512')
 
 mistral_client: Optional[Mistral] = Mistral(api_key=MISTRAL_API_KEY) if MISTRAL_API_KEY else None
 
@@ -391,21 +394,34 @@ async def analyze_with_mistral(
             temperature=0.2,
         )
     except Exception as e:
-        logger.exception("Mistral vision call failed")
-        raise HTTPException(status_code=502, detail=f"AI analysis failed: {str(e)}")
+        # Privacy: log only the model + exception type, never the messages.
+        logger.exception(
+            "Mistral vision call failed (model=%s, error_type=%s)",
+            MISTRAL_VISION_MODEL,
+            type(e).__name__,
+        )
+        raise HTTPException(status_code=502, detail="AI analysis failed.")
 
     response_text = ""
     try:
         response_text = (response.choices[0].message.content or "").strip()
     except Exception:
-        logger.exception("Unexpected Mistral response shape: %s", response)
+        # Privacy: never log the raw Mistral response — it contains sender
+        # names, deadlines, amounts, addresses extracted from the document.
+        logger.exception(
+            "Unexpected Mistral response shape (model=%s, choices=%d)",
+            MISTRAL_VISION_MODEL,
+            len(getattr(response, "choices", []) or []),
+        )
         raise HTTPException(status_code=502, detail="AI returned an empty response")
 
     parsed = extract_json_from_text(response_text)
     if not parsed:
+        # Privacy: never log the raw response_text — log only metadata.
         logger.error(
-            "Could not parse JSON from Mistral response. Raw: %s",
-            response_text[:500] if response_text else "",
+            "Could not parse JSON from Mistral analyze response (model=%s, length=%d)",
+            MISTRAL_VISION_MODEL,
+            len(response_text or ""),
         )
         raise HTTPException(
             status_code=502,
@@ -419,10 +435,18 @@ async def analyze_with_mistral(
     try:
         result = AnalysisResult(**parsed)
     except Exception as e:
-        logger.exception("Validation failed for AI response: %s", parsed)
+        # Privacy: never log `parsed` — it contains the analyzed document.
+        # Log only the validation error type and the missing/extra keys count
+        # so we can debug schema drift without leaking PII.
+        logger.exception(
+            "Validation failed for AI response (model=%s, error_type=%s, top_keys=%d)",
+            MISTRAL_VISION_MODEL,
+            type(e).__name__,
+            len(parsed.keys()) if isinstance(parsed, dict) else 0,
+        )
         raise HTTPException(
             status_code=502,
-            detail=f"AI response did not match expected format: {str(e)}",
+            detail="AI response did not match expected format.",
         )
 
     # Always enforce a default disclaimer if empty
@@ -531,14 +555,25 @@ async def chat_about_document(
             temperature=0.3,
         )
     except Exception as e:
-        logger.exception("Mistral chat call failed")
-        raise HTTPException(status_code=502, detail=f"AI chat failed: {str(e)}")
+        # Privacy: only log the model + exception type, never the messages.
+        logger.exception(
+            "Mistral chat call failed (model=%s, error_type=%s)",
+            MISTRAL_CHAT_MODEL,
+            type(e).__name__,
+        )
+        raise HTTPException(status_code=502, detail="AI chat failed.")
 
     response_text = ""
     try:
         response_text = (response.choices[0].message.content or "").strip()
     except Exception:
-        logger.exception("Unexpected Mistral chat response shape: %s", response)
+        # Privacy: never log the raw chat response — it may contain document
+        # content the user asked the assistant to summarize.
+        logger.exception(
+            "Unexpected Mistral chat response shape (model=%s, choices=%d)",
+            MISTRAL_CHAT_MODEL,
+            len(getattr(response, "choices", []) or []),
+        )
         return ChatResponse(reply="", off_topic=False)
 
     parsed = extract_json_from_text(response_text)
@@ -756,6 +791,25 @@ async def delete_all_analyses(device_id: str):
         raise HTTPException(status_code=400, detail="device_id is required")
     res = await db.analyses.delete_many({"device_id": device_id})
     return {"deleted": res.deleted_count}
+
+
+@api_router.delete("/history/{device_id}")
+async def delete_history_for_device(device_id: str):
+    """DSGVO Art. 17 — right to erasure.
+
+    Wipes every analysis and every chat message for the given anonymous
+    device_id. This is the explicit "Delete my data" endpoint called from the
+    Settings screen. Backed by the same MongoDB collections as the legacy
+    `DELETE /api/analyses?device_id=...`, but uses a clearer REST shape.
+    """
+    if not device_id:
+        raise HTTPException(status_code=400, detail="device_id is required")
+    analyses_res = await db.analyses.delete_many({"device_id": device_id})
+    messages_res = await db.chat_messages.delete_many({"device_id": device_id})
+    return {
+        "deleted_analyses": analyses_res.deleted_count,
+        "deleted_messages": messages_res.deleted_count,
+    }
 
 
 @api_router.get("/export")

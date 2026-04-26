@@ -11,6 +11,7 @@ import { LanguageCode } from './i18n';
 const KEY_LANG = 'klarpost.language';
 const KEY_DEVICE = 'klarpost.deviceId';
 const KEY_ONBOARDED = 'klarpost.onboarded';
+const KEY_CONSENT = 'klarpost.consent_v1';
 
 function uuid(): string {
   // RFC4122-ish, fine for an anonymous device id.
@@ -49,8 +50,43 @@ export async function isOnboarded(): Promise<boolean> {
   return v === '1';
 }
 
+// ---- DSGVO consent (active opt-in before first analyze) ----
+
+export interface ConsentRecord {
+  acceptedAt: string; // ISO timestamp
+  version: 'v1';
+}
+
+export async function setConsent(): Promise<void> {
+  const record: ConsentRecord = {
+    acceptedAt: new Date().toISOString(),
+    version: 'v1',
+  };
+  await AsyncStorage.setItem(KEY_CONSENT, JSON.stringify(record));
+}
+
+export async function getConsent(): Promise<ConsentRecord | null> {
+  const raw = await AsyncStorage.getItem(KEY_CONSENT);
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw);
+    if (parsed && typeof parsed.acceptedAt === 'string') return parsed as ConsentRecord;
+  } catch {
+    // fallthrough
+  }
+  return null;
+}
+
+export async function hasConsent(): Promise<boolean> {
+  return (await getConsent()) !== null;
+}
+
+export async function revokeConsent(): Promise<void> {
+  await AsyncStorage.removeItem(KEY_CONSENT);
+}
+
 export async function resetAll(): Promise<void> {
-  await AsyncStorage.multiRemove([KEY_LANG, KEY_DEVICE, KEY_ONBOARDED]);
+  await AsyncStorage.multiRemove([KEY_LANG, KEY_DEVICE, KEY_ONBOARDED, KEY_CONSENT]);
 }
 
 // ---- Transient pending-analysis store (memory only) ----
