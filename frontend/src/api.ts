@@ -106,15 +106,22 @@ export interface AnalyzePage {
 // importing everything from `api.ts`.
 export {
   PaymentRequiredError,
+  RateLimitError,
   TestLimitReachedError,
   type UsageState,
 } from './usage';
 
 import {
   PaymentRequiredError,
+  RateLimitError,
   TestLimitReachedError,
   type UsageState,
 } from './usage';
+
+/** Hard ceiling for /api/analyze. Long enough that big-picture multipage
+ *  scans still succeed, short enough that a stuck connection eventually
+ *  gives the user a clean error instead of an indefinite spinner. */
+const ANALYZE_TIMEOUT_MS = 120_000;
 
 export async function analyzeDocument(params: {
   device_id: string;
@@ -124,11 +131,31 @@ export async function analyzeDocument(params: {
    *  "Analyze". Same key sent twice → backend will not double-consume. */
   idempotency_key?: string;
 }): Promise<AnalysisRecord & { usage?: UsageState }> {
-  const res = await fetch(`${BASE_URL}/api/analyze`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(params),
-  });
+  // AbortController + setTimeout gives us a deterministic upper bound on
+  // the request. Without this, iOS URLSession defaults to 60 s — which is
+  // too tight for multi-page scans on slow networks. RN's Web/iOS/Android
+  // all support AbortController in modern builds.
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), ANALYZE_TIMEOUT_MS);
+
+  let res: Response;
+  try {
+    res = await fetch(`${BASE_URL}/api/analyze`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(params),
+      signal: controller.signal,
+    });
+  } catch (e: any) {
+    if (e?.name === 'AbortError') {
+      throw new Error(
+        'The upload took too long. Please check your connection and try again.',
+      );
+    }
+    throw e;
+  } finally {
+    clearTimeout(timer);
+  }
 
   // Special-case the entitlement-gate responses BEFORE the generic error
   // handler so callers can route the user to the paywall / test-limit
@@ -140,6 +167,7 @@ export async function analyzeDocument(params: {
     } catch {
       // ignore — fall through to a generic error
     }
+    // Branch 1 — entitlement gate (backend includes `usage` in the body).
     if (body?.usage) {
       const message: string = body.message || '';
       if (res.status === 402 || body.error === 'payment_required') {
@@ -148,6 +176,19 @@ export async function analyzeDocument(params: {
       throw new TestLimitReachedError(
         message || 'Dein Testkontingent ist erreicht. Danke fürs Testen von KlarPost.',
         body.usage as UsageState,
+      );
+    }
+    // Branch 2 — Mistral rate-limit propagated through (no `usage` field).
+    // The backend has already retried twice with backoff before sending
+    // this. Surface a typed RateLimitError so the analyzing screen can
+    // show "Server is busy, try again in N seconds" instead of the
+    // generic "AI analysis failed" toast.
+    if (res.status === 429) {
+      const headerVal = res.headers.get('retry-after') || res.headers.get('Retry-After');
+      const retryAfter = parseInt(headerVal || '8', 10);
+      throw new RateLimitError(
+        (body && body.detail) || 'AI is busy. Please try again in a moment.',
+        Number.isFinite(retryAfter) ? retryAfter : 8,
       );
     }
   }

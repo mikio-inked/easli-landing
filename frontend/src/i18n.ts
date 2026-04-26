@@ -82,6 +82,7 @@ export type UIKey =
   | 'pick_pdf'
   | 'pick_image'
   | 'error_generic'
+  | 'error_rate_limited'
   | 'error_unsupported_file'
   | 'error_no_image'
   | 'confirm_delete_one'
@@ -302,6 +303,7 @@ const en: UIStrings = {
   pick_pdf: 'Choose a PDF',
   pick_image: 'Choose an image',
   error_generic: 'Something went wrong. Please try again.',
+  error_rate_limited: 'KlarPost is busy right now. Please try again in {n} seconds.',
   error_unsupported_file: 'This file type is not supported. Use JPG, PNG, WEBP or PDF.',
   error_no_image: 'No image selected.',
   confirm_delete_one: 'Delete this analysis?',
@@ -525,6 +527,7 @@ const zh: UIStrings = {
   pick_pdf: '选择 PDF',
   pick_image: '选择图片',
   error_generic: '出了点问题，请再试一次。',
+  error_rate_limited: 'KlarPost 当前繁忙，请 {n} 秒后再试。',
   error_unsupported_file: '不支持此文件类型。请使用 JPG、PNG、WEBP 或 PDF。',
   error_no_image: '未选择图片。',
   confirm_delete_one: '删除此分析？',
@@ -744,6 +747,7 @@ const vi: UIStrings = {
   pick_pdf: 'Chọn tệp PDF',
   pick_image: 'Chọn ảnh',
   error_generic: 'Đã có lỗi xảy ra. Vui lòng thử lại.',
+  error_rate_limited: 'KlarPost đang bận. Vui lòng thử lại sau {n} giây.',
   error_unsupported_file: 'Loại tệp này không được hỗ trợ. Hãy dùng JPG, PNG, WEBP hoặc PDF.',
   error_no_image: 'Chưa chọn ảnh.',
   confirm_delete_one: 'Xoá phân tích này?',
@@ -965,6 +969,7 @@ const tr: UIStrings = {
   pick_pdf: 'PDF seç',
   pick_image: 'Resim seç',
   error_generic: 'Bir şeyler ters gitti. Lütfen tekrar deneyin.',
+  error_rate_limited: 'KlarPost şu an meşgul. Lütfen {n} saniye sonra tekrar deneyin.',
   error_unsupported_file: 'Bu dosya türü desteklenmiyor. JPG, PNG, WEBP veya PDF kullanın.',
   error_no_image: 'Resim seçilmedi.',
   confirm_delete_one: 'Bu analiz silinsin mi?',
@@ -1186,6 +1191,7 @@ const ru: UIStrings = {
   pick_pdf: 'Выбрать PDF',
   pick_image: 'Выбрать изображение',
   error_generic: 'Что-то пошло не так. Пожалуйста, попробуйте ещё раз.',
+  error_rate_limited: 'KlarPost сейчас занят. Попробуйте через {n} секунд.',
   error_unsupported_file: 'Этот тип файла не поддерживается. Используйте JPG, PNG, WEBP или PDF.',
   error_no_image: 'Изображение не выбрано.',
   confirm_delete_one: 'Удалить этот анализ?',
@@ -1407,6 +1413,7 @@ const es: UIStrings = {
   pick_pdf: 'Elegir un PDF',
   pick_image: 'Elegir una imagen',
   error_generic: 'Algo salió mal. Inténtalo de nuevo.',
+  error_rate_limited: 'KlarPost está ocupado. Inténtalo de nuevo en {n} segundos.',
   error_unsupported_file: 'Este tipo de archivo no es compatible. Usa JPG, PNG, WEBP o PDF.',
   error_no_image: 'No se ha elegido una imagen.',
   confirm_delete_one: '¿Eliminar este análisis?',
@@ -1630,6 +1637,7 @@ const de_simple: UIStrings = {
   pick_pdf: 'PDF wählen',
   pick_image: 'Bild wählen',
   error_generic: 'Etwas ging schief. Bitte noch einmal.',
+  error_rate_limited: 'KlarPost ist gerade beschäftigt. Bitte in {n} Sekunden erneut versuchen.',
   error_unsupported_file: 'Dieses Format geht nicht. Bitte JPG, PNG, WEBP oder PDF.',
   error_no_image: 'Kein Bild gewählt.',
   confirm_delete_one: 'Diesen Brief löschen?',

@@ -67,6 +67,23 @@ export class TestLimitReachedError extends Error {
   }
 }
 
+/**
+ * Thrown when Mistral rate-limits us (HTTP 429 from /api/analyze or
+ * /api/analyses/{id}/chat). The route handler in server.py already retries
+ * twice with backoff before surfacing this — by the time the client sees
+ * it the AI provider really is busy. We expose `retryAfterSeconds` so the
+ * UI can show a friendly "try again in N seconds" message instead of the
+ * generic "AI analysis failed" toast.
+ */
+export class RateLimitError extends Error {
+  retryAfterSeconds: number;
+  constructor(message: string, retryAfterSeconds: number) {
+    super(message);
+    this.name = 'RateLimitError';
+    this.retryAfterSeconds = retryAfterSeconds;
+  }
+}
+
 async function jsonOrThrow<T>(res: Response): Promise<T> {
   if (!res.ok) {
     let body: any = null;

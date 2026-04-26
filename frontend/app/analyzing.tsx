@@ -19,10 +19,11 @@ import {
   setLastResult,
   getLanguage as getStoredLanguage,
 } from '../src/store';
-import { analyzeDocument, PaymentRequiredError, TestLimitReachedError } from '../src/api';
+import { analyzeDocument, PaymentRequiredError, RateLimitError, TestLimitReachedError } from '../src/api';
 import { LanguageCode, t } from '../src/i18n';
 import { saveOriginal } from '../src/originals';
 import { getSaveOriginals } from '../src/settings';
+import { compressPagesForUpload } from '../src/imageCompression';
 import { colors, fontSize, fontWeight, radius, spacing } from '../src/theme';
 
 type Status = 'running' | 'error';
@@ -57,10 +58,18 @@ export default function Analyzing() {
       }, 1300);
 
       try {
+        // Compress every page to vision-friendly size BEFORE the upload.
+        // This is where we save the most bandwidth + battery: a 4-page
+        // VisionKit scan can be 25-40 MB raw → typically becomes ~400 KB.
+        // compressPagesForUpload() always returns a list of the same length
+        // (falls back to the original page on any failure) so this is safe
+        // to drop in front of the API call.
+        const compressed = await compressPagesForUpload(pending.pages);
+
         const record = await analyzeDocument({
           device_id: deviceId,
           target_language: l,
-          pages: pending.pages.map((p) => ({ file_base64: p.base64, mime_type: p.mimeType })),
+          pages: compressed.map((p) => ({ file_base64: p.base64, mime_type: p.mimeType })),
           idempotency_key: pending.idempotencyKey,
         });
         if (intervalRef.current) clearInterval(intervalRef.current);
@@ -89,6 +98,15 @@ export default function Analyzing() {
         }
         if (e instanceof PaymentRequiredError) {
           router.replace('/paywall?reason=payment_required');
+          return;
+        }
+        // Mistral rate-limited us (after 2 retries on the server). Tell the
+        // user they can try again in a moment instead of the generic toast.
+        if (e instanceof RateLimitError) {
+          setStatus('error');
+          setErrorMsg(
+            t(l, 'error_rate_limited').replace('{n}', String(e.retryAfterSeconds || 8)),
+          );
           return;
         }
         setStatus('error');
