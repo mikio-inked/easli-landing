@@ -16,7 +16,7 @@ import uuid
 from datetime import datetime, timezone
 
 import fitz  # PyMuPDF
-from emergentintegrations.llm.chat import LlmChat, UserMessage, ImageContent
+from mistralai import Mistral
 
 
 ROOT_DIR = Path(__file__).parent
@@ -27,7 +27,14 @@ mongo_url = os.environ['MONGO_URL']
 client = AsyncIOMotorClient(mongo_url)
 db = client[os.environ['DB_NAME']]
 
-EMERGENT_LLM_KEY = os.environ.get('EMERGENT_LLM_KEY', '')
+# Mistral AI — EU-hosted (Paris). DSGVO-friendly replacement for OpenAI.
+# `pixtral-large-latest` handles OCR + analysis of document images in a single
+# call (vision + reasoning). `mistral-large-latest` powers the document chat.
+MISTRAL_API_KEY = os.environ.get('MISTRAL_API_KEY', '')
+MISTRAL_VISION_MODEL = "pixtral-large-latest"
+MISTRAL_CHAT_MODEL = "mistral-large-latest"
+
+mistral_client: Optional[Mistral] = Mistral(api_key=MISTRAL_API_KEY) if MISTRAL_API_KEY else None
 
 # Create the main app without a prefix
 app = FastAPI(title="KlarPost API")
@@ -324,48 +331,86 @@ def extract_json_from_text(text: str) -> Optional[dict]:
     return None
 
 
-async def analyze_with_gpt(
+async def analyze_with_mistral(
     images: List[Tuple[str, str]],
     target_language_label: str,
     target_language_code: str = "",
 ) -> AnalysisResult:
-    if not EMERGENT_LLM_KEY:
-        raise HTTPException(status_code=500, detail="LLM key not configured")
+    """Analyze a German document (one or many pages) with Mistral Pixtral.
+
+    Pixtral handles OCR + reasoning in a single multimodal call, so we don't
+    need a separate OCR step. The whole pipeline stays in the EU.
+    """
+    if not mistral_client:
+        raise HTTPException(
+            status_code=500,
+            detail="Mistral API key not configured. Please set MISTRAL_API_KEY in backend/.env",
+        )
     if not images:
         raise HTTPException(status_code=400, detail="No image content to analyze")
 
-    session_id = f"klarpost-{uuid.uuid4()}"
-    chat = LlmChat(
-        api_key=EMERGENT_LLM_KEY,
-        session_id=session_id,
-        system_message=build_system_prompt(target_language_label, target_language_code),
-    ).with_model("openai", "gpt-5.2")
-
-    image_contents = [ImageContent(image_base64=b64) for b64, _ in images]
     page_note = (
         f"This document has {len(images)} page(s). They are provided in order from page 1. "
         "Treat them as ONE document and produce a single combined analysis."
         if len(images) > 1
         else ""
     )
-    user_message = UserMessage(
-        text=(
-            f"Please analyze this German document and respond ONLY with the JSON object as specified. "
-            f"The user's selected target language is {target_language_label}. {page_note}"
-        ).strip(),
-        file_contents=image_contents,
-    )
+
+    user_content: List[dict] = [
+        {
+            "type": "text",
+            "text": (
+                f"Please analyze this German document and respond ONLY with the JSON object as specified. "
+                f"The user's selected target language is {target_language_label}. {page_note}"
+            ).strip(),
+        }
+    ]
+    for b64, mime in images:
+        # Pixtral expects data URLs. Default to image/png if mime is empty.
+        url_mime = mime or "image/png"
+        user_content.append(
+            {
+                "type": "image_url",
+                "image_url": f"data:{url_mime};base64,{b64}",
+            }
+        )
+
+    messages = [
+        {
+            "role": "system",
+            "content": build_system_prompt(target_language_label, target_language_code),
+        },
+        {"role": "user", "content": user_content},
+    ]
 
     try:
-        response_text = await chat.send_message(user_message)
+        response = await mistral_client.chat.complete_async(
+            model=MISTRAL_VISION_MODEL,
+            messages=messages,
+            response_format={"type": "json_object"},
+            temperature=0.2,
+        )
     except Exception as e:
-        logger.exception("LLM call failed")
+        logger.exception("Mistral vision call failed")
         raise HTTPException(status_code=502, detail=f"AI analysis failed: {str(e)}")
+
+    response_text = ""
+    try:
+        response_text = (response.choices[0].message.content or "").strip()
+    except Exception:
+        logger.exception("Unexpected Mistral response shape: %s", response)
+        raise HTTPException(status_code=502, detail="AI returned an empty response")
 
     parsed = extract_json_from_text(response_text)
     if not parsed:
-        logger.error("Could not parse JSON from LLM response. Raw: %s", response_text[:500] if response_text else "")
-        raise HTTPException(status_code=502, detail="AI returned an invalid response. Please try again.")
+        logger.error(
+            "Could not parse JSON from Mistral response. Raw: %s",
+            response_text[:500] if response_text else "",
+        )
+        raise HTTPException(
+            status_code=502,
+            detail="AI returned an invalid response. Please try again.",
+        )
 
     # Ensure target_language is set
     parsed["target_language"] = target_language_label
@@ -375,7 +420,10 @@ async def analyze_with_gpt(
         result = AnalysisResult(**parsed)
     except Exception as e:
         logger.exception("Validation failed for AI response: %s", parsed)
-        raise HTTPException(status_code=502, detail=f"AI response did not match expected format: {str(e)}")
+        raise HTTPException(
+            status_code=502,
+            detail=f"AI response did not match expected format: {str(e)}",
+        )
 
     # Always enforce a default disclaimer if empty
     if not result.disclaimer:
@@ -446,42 +494,52 @@ async def chat_about_document(
     target_language_label: str,
     target_language_code: str = "",
 ) -> ChatResponse:
-    if not EMERGENT_LLM_KEY:
-        raise HTTPException(status_code=500, detail="LLM key not configured")
+    if not mistral_client:
+        raise HTTPException(
+            status_code=500,
+            detail="Mistral API key not configured. Please set MISTRAL_API_KEY in backend/.env",
+        )
 
     system_prompt = build_chat_system_prompt(record_dict, target_language_label, target_language_code)
-    session_id = f"klarpost-chat-{uuid.uuid4()}"
-    chat = LlmChat(
-        api_key=EMERGENT_LLM_KEY,
-        session_id=session_id,
-        system_message=system_prompt,
-    ).with_model("openai", "gpt-5.2")
 
-    # Bake history into the user turn so we don't depend on cross-process state.
-    recent = history[-12:]
-    if recent:
-        history_block = "\n".join(
-            f"{m.get('role','user').upper()}: {m.get('content','')}" for m in recent
-        )
-        user_text = (
-            "Previous conversation:\n"
-            f"{history_block}\n\n"
-            f"USER: {user_message}\n\n"
-            f"Reply now as the assistant in {target_language_label}, following ALL rules. "
-            "Output ONLY the JSON object."
-        )
-    else:
-        user_text = (
-            f"USER: {user_message}\n\n"
-            f"Reply now as the assistant in {target_language_label}, following ALL rules. "
-            "Output ONLY the JSON object."
-        )
+    # Build a proper Mistral message list — system + last 12 turns + current user.
+    messages: List[dict] = [{"role": "system", "content": system_prompt}]
+    for m in (history or [])[-12:]:
+        role = m.get("role")
+        if role not in ("user", "assistant"):
+            continue
+        content = m.get("content") or ""
+        if not content:
+            continue
+        messages.append({"role": role, "content": content})
+    messages.append(
+        {
+            "role": "user",
+            "content": (
+                f"{user_message}\n\n"
+                f"Reply now as the assistant in {target_language_label}, following ALL rules. "
+                "Output ONLY the JSON object."
+            ),
+        }
+    )
 
     try:
-        response_text = await chat.send_message(UserMessage(text=user_text))
+        response = await mistral_client.chat.complete_async(
+            model=MISTRAL_CHAT_MODEL,
+            messages=messages,
+            response_format={"type": "json_object"},
+            temperature=0.3,
+        )
     except Exception as e:
-        logger.exception("LLM chat call failed")
+        logger.exception("Mistral chat call failed")
         raise HTTPException(status_code=502, detail=f"AI chat failed: {str(e)}")
+
+    response_text = ""
+    try:
+        response_text = (response.choices[0].message.content or "").strip()
+    except Exception:
+        logger.exception("Unexpected Mistral chat response shape: %s", response)
+        return ChatResponse(reply="", off_topic=False)
 
     parsed = extract_json_from_text(response_text)
     if not parsed or "reply" not in parsed:
@@ -619,8 +677,8 @@ async def analyze_document(req: AnalyzeRequest):
     if not images:
         raise HTTPException(status_code=400, detail="No readable pages found")
 
-    # Call GPT
-    result = await analyze_with_gpt(images, target_language_label, req.target_language)
+    # Call Mistral Pixtral (vision + reasoning in one EU-hosted call)
+    result = await analyze_with_mistral(images, target_language_label, req.target_language)
 
     record = AnalysisRecord(
         device_id=req.device_id,
