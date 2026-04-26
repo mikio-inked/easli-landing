@@ -6,6 +6,7 @@ from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
 import os
 import io
+import asyncio
 import json
 import base64
 import logging
@@ -480,6 +481,197 @@ def _sanitize_literal_fields(parsed: dict) -> None:
                 )
 
 
+# ---- Image compression helper ----------------------------------------------
+#
+# Mistral Vision charges per image-token. Large iPhone scans (4-8 MB JPEG) blow
+# through both the per-request token budget AND the per-minute token-rate-limit
+# very fast and have caused HTTP 429s in production. To prevent that we
+# downscale any image whose base64 payload exceeds ~1.5 MB binary to a sane
+# vision-friendly size (max 1600 x 2200 px, JPEG quality 70) BEFORE the call.
+#
+# The compression is lossless w.r.t. OCR readability for German letters — we've
+# verified 1600px is more than enough for "Sehr geehrte Frau ..." letterhead
+# Bodoni/Helvetica resolutions.
+#
+# Privacy: this function never logs the binary, the base64 string, the EXIF
+# data, or any metadata derived from the image content. Only sizes (input vs
+# output) and an opaque page index are logged.
+
+# Threshold above which we always re-encode. 1.5 MB is the size at which Mistral
+# rate-limit pressure starts on the free / mid tiers.
+COMPRESS_THRESHOLD_BYTES = int(1.5 * 1024 * 1024)
+# Max pixel dimensions the vision model needs (German A4 letters fit easily).
+MAX_VISION_WIDTH_PX = 1600
+MAX_VISION_HEIGHT_PX = 2200
+JPEG_QUALITY_FOR_VISION = 70
+
+# Lazy-import Pillow so import errors only surface when we actually compress.
+try:
+    from PIL import Image, ImageOps  # type: ignore[import-not-found]
+    _PIL_AVAILABLE = True
+except ImportError:  # pragma: no cover — Pillow is in requirements.txt
+    _PIL_AVAILABLE = False
+
+
+def compress_image_for_vision(
+    page_index: int,
+    b64: str,
+    mime: str,
+) -> Tuple[str, str]:
+    """Return (compressed_b64, 'image/jpeg') if compression triggered, else
+    pass-through (b64, mime).
+
+    Idempotent: small images skip compression entirely. Errors degrade
+    gracefully to the original payload — we'd rather try a slightly oversized
+    image than fail the whole request.
+    """
+    # Cheap, accurate-enough binary-size estimate from the base64 length.
+    binary_size_estimate = (len(b64) * 3) // 4
+    if binary_size_estimate <= COMPRESS_THRESHOLD_BYTES:
+        return b64, mime
+    if not _PIL_AVAILABLE:
+        logger.warning(
+            "image_compress_skipped_no_pil page=%d est_bytes=%d",
+            page_index, binary_size_estimate,
+        )
+        return b64, mime
+
+    try:
+        import base64 as _b64
+        from io import BytesIO
+
+        raw = _b64.b64decode(b64, validate=False)
+        before_bytes = len(raw)
+
+        with Image.open(BytesIO(raw)) as img:
+            # Honour EXIF rotation so text isn't sideways for Mistral.
+            img = ImageOps.exif_transpose(img)
+            # Convert to RGB (drop alpha for JPEG, normalise CMYK / palette).
+            if img.mode not in ("RGB", "L"):
+                img = img.convert("RGB")
+
+            # Pillow's thumbnail() preserves aspect ratio in-place, only
+            # downscales (never upscales) — exactly what we want.
+            img.thumbnail(
+                (MAX_VISION_WIDTH_PX, MAX_VISION_HEIGHT_PX),
+                Image.Resampling.LANCZOS,
+            )
+
+            buf = BytesIO()
+            img.save(
+                buf,
+                format="JPEG",
+                quality=JPEG_QUALITY_FOR_VISION,
+                optimize=True,
+                progressive=True,
+            )
+            after_bytes = buf.tell()
+            new_b64 = _b64.b64encode(buf.getvalue()).decode("ascii")
+
+        # Privacy: log only sizes — never the bytes.
+        logger.info(
+            "image_compressed page=%d before_bytes=%d after_bytes=%d ratio=%.2f",
+            page_index, before_bytes, after_bytes,
+            (after_bytes / before_bytes) if before_bytes else 1.0,
+        )
+        return new_b64, "image/jpeg"
+    except Exception as e:
+        # Never let a Pillow failure poison the whole analysis — fall back
+        # to the original bytes and let Mistral decide. We log only the type.
+        logger.warning(
+            "image_compress_failed page=%d error_type=%s — passing original through",
+            page_index, type(e).__name__,
+        )
+        return b64, mime
+
+
+# ---- Mistral 429 retry helper ----------------------------------------------
+#
+# Mistral's rate-limit responses are HTTP 429 with body
+#   {"object":"error","message":"Rate limit exceeded","type":"rate_limited",
+#    "code":"1300","raw_status_code":429}
+# The mistralai SDK surfaces this as `SDKError` with an .status_code attribute
+# (in modern versions) or a status string in str(e). We detect both.
+
+class MistralRateLimited(Exception):
+    """Final-attempt rate limit. The route handler maps this to HTTP 429."""
+
+    def __init__(self, retry_after: int):
+        super().__init__("rate_limited")
+        self.retry_after = retry_after
+
+
+def _is_rate_limit_error(exc: Exception) -> bool:
+    """Best-effort detection across mistralai SDK versions.
+
+    We're conservative: only signals that *unambiguously* mean HTTP 429 trigger
+    a retry. We do NOT match the bare phrase "rate limit" anywhere — that
+    would be too loose and could pick up unrelated text.
+    """
+    # 1) Explicit attribute set by modern mistralai SDK.
+    sc = getattr(exc, "status_code", None)
+    if sc == 429:
+        return True
+    # 2) HTTPx-style nested response object.
+    res = getattr(exc, "http_res", None) or getattr(exc, "response", None)
+    if res is not None and getattr(res, "status_code", None) == 429:
+        return True
+    # 3) Cheap string scrape — but only on the very specific markers Mistral
+    #    emits ("Status 429" comes straight from the SDK formatter; "1300" is
+    #    Mistral's documented rate-limit error code).
+    msg = str(exc)
+    if "Status 429" in msg or '"code":"1300"' in msg or "raw_status_code\":429" in msg:
+        return True
+    return False
+
+
+# Backoff sequence (seconds): try, wait 2s, try, wait 4s, try → fail.
+_RATE_LIMIT_BACKOFF_SECONDS = [2, 4]
+
+
+async def mistral_complete_with_retry(
+    *,
+    label: str,  # 'vision' or 'chat' — for logs only
+    model: str,
+    **kwargs,
+):
+    """Call mistral_client.chat.complete_async with up to 2 retries on 429.
+
+    On the final attempt, if Mistral still answers 429 we raise
+    MistralRateLimited so the route handler can convert it into a clean
+    HTTP 429 with a Retry-After header. Other errors propagate untouched.
+    """
+    last_exc: Exception | None = None
+    for attempt in range(len(_RATE_LIMIT_BACKOFF_SECONDS) + 1):
+        try:
+            return await mistral_client.chat.complete_async(model=model, **kwargs)
+        except Exception as e:
+            if _is_rate_limit_error(e):
+                last_exc = e
+                if attempt < len(_RATE_LIMIT_BACKOFF_SECONDS):
+                    wait = _RATE_LIMIT_BACKOFF_SECONDS[attempt]
+                    logger.warning(
+                        "mistral_rate_limited label=%s model=%s attempt=%d retry_in=%ds",
+                        label, model, attempt + 1, wait,
+                    )
+                    await asyncio.sleep(wait)
+                    continue
+                # Final attempt also rate-limited — surface a clean exception.
+                logger.error(
+                    "mistral_rate_limited_final label=%s model=%s attempts=%d",
+                    label, model, attempt + 1,
+                )
+                # Suggest a polite retry window matching the longest backoff
+                # we just used. Apple/Android clients respect Retry-After.
+                raise MistralRateLimited(retry_after=8) from e
+            # Non-429 → propagate so existing 502 handler runs.
+            raise
+    # Defensive: should be unreachable.
+    if last_exc is not None:
+        raise MistralRateLimited(retry_after=8) from last_exc
+    raise RuntimeError("mistral_complete_with_retry: unreachable")
+
+
 async def analyze_with_mistral(
     images: List[Tuple[str, str]],
     target_language_label: str,
@@ -505,6 +697,13 @@ async def analyze_with_mistral(
         if len(images) > 1
         else ""
     )
+
+    # Compress / downscale every page before we hand it to Mistral. Privacy-
+    # preserving: compress_image_for_vision() never logs the bytes.
+    images = [
+        compress_image_for_vision(idx, b64, mime)
+        for idx, (b64, mime) in enumerate(images)
+    ]
 
     user_content: List[dict] = [
         {
@@ -534,11 +733,21 @@ async def analyze_with_mistral(
     ]
 
     try:
-        response = await mistral_client.chat.complete_async(
+        response = await mistral_complete_with_retry(
+            label="vision",
             model=MISTRAL_VISION_MODEL,
             messages=messages,
             response_format={"type": "json_object"},
             temperature=0.2,
+        )
+    except MistralRateLimited as rl:
+        # Surface a clean 429 with a Retry-After header — the iOS client can
+        # show "server is busy, try again in N seconds" instead of the generic
+        # "AI analysis failed" toast.
+        raise HTTPException(
+            status_code=429,
+            detail="AI is rate-limited. Please try again in a moment.",
+            headers={"Retry-After": str(rl.retry_after)},
         )
     except Exception as e:
         # Privacy: log only the model + exception type, never the messages.
@@ -881,11 +1090,18 @@ async def chat_about_document(
     )
 
     try:
-        response = await mistral_client.chat.complete_async(
+        response = await mistral_complete_with_retry(
+            label="chat",
             model=MISTRAL_CHAT_MODEL,
             messages=messages,
             response_format={"type": "json_object"},
             temperature=0.3,
+        )
+    except MistralRateLimited as rl:
+        raise HTTPException(
+            status_code=429,
+            detail="AI is rate-limited. Please try again in a moment.",
+            headers={"Retry-After": str(rl.retry_after)},
         )
     except Exception as e:
         # Privacy: only log the model + exception type, never the messages.
