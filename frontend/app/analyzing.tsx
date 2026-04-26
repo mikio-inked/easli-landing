@@ -2,7 +2,7 @@
 // progress display. On success navigates to /result; on failure shows a
 // retry/back path.
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import {
   ActivityIndicator,
   StyleSheet,
@@ -28,14 +28,111 @@ import { colors, fontSize, fontWeight, radius, spacing } from '../src/theme';
 
 type Status = 'running' | 'error';
 
+/**
+ * Everything we need to *re-fire* an /api/analyze call without going back to
+ * /scan. Cached after the (potentially expensive) compression pass so retries
+ * don't redo it. idempotencyKey stays the same so the server can dedupe if
+ * the previous attempt was actually accepted but the response was lost.
+ */
+type AnalysisCtx = {
+  deviceId: string;
+  pages: { base64: string; mimeType: string }[];
+  idempotencyKey: string;
+  lang: LanguageCode;
+};
+
 export default function Analyzing() {
   const router = useRouter();
   const [lang, setLang] = useState<LanguageCode>('en');
   const [step, setStep] = useState(0);
   const [status, setStatus] = useState<Status>('running');
   const [errorMsg, setErrorMsg] = useState<string>('');
+  // Live countdown shown on the retry button while we politely wait for
+  // Mistral's rate-limit window to reset. 0 = button is enabled.
+  const [retryCountdown, setRetryCountdown] = useState<number>(0);
+  // True when the failure is something we can re-fire from this screen
+  // (rate-limit, network, generic). False for terminal states (paywall,
+  // missing image) where retry doesn't make sense.
+  const [retryable, setRetryable] = useState<boolean>(false);
   const startedRef = useRef(false);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  // Cached analysis input — populated after the first successful compression
+  // pass so that the retry button can re-fire the API call without going
+  // back to /scan and forcing the user to re-take photos.
+  const ctxRef = useRef<AnalysisCtx | null>(null);
+
+  /**
+   * Drives one /api/analyze call and routes the user accordingly.
+   * Used both by the initial run and by the retry button. Caller is
+   * responsible for populating ctxRef before calling this.
+   */
+  const runAnalysis = useCallback(async (ctx: AnalysisCtx) => {
+    setStatus('running');
+    setStep(0);
+    setErrorMsg('');
+    setRetryable(false);
+
+    // Slowly advance the visual step indicator while the API call is in
+    // flight. Caps at the second-to-last step until the network finishes.
+    if (intervalRef.current) clearInterval(intervalRef.current);
+    intervalRef.current = setInterval(() => {
+      setStep((s) => Math.min(s + 1, 2));
+    }, 1300);
+
+    try {
+      const record = await analyzeDocument({
+        device_id: ctx.deviceId,
+        target_language: ctx.lang,
+        pages: ctx.pages.map((p) => ({ file_base64: p.base64, mime_type: p.mimeType })),
+        idempotency_key: ctx.idempotencyKey,
+      });
+      if (intervalRef.current) clearInterval(intervalRef.current);
+      setStep(3);
+      setLastResult(record);
+      // Optional on-device storage of the original document — opt-in only.
+      // For multi-page captures we store only the first page (preview only).
+      try {
+        if (await getSaveOriginals() && ctx.pages.length > 0) {
+          const first = ctx.pages[0];
+          await saveOriginal(record.id, first.base64, first.mimeType);
+        }
+      } catch {
+        // Non-fatal: result is already saved on the server.
+      }
+      // Small pause so the user sees the final tick before navigating.
+      setTimeout(() => router.replace(`/result?id=${encodeURIComponent(record.id)}`), 350);
+    } catch (e: any) {
+      if (intervalRef.current) clearInterval(intervalRef.current);
+      // Backend entitlement gates — these are terminal, retry doesn't help.
+      if (e instanceof TestLimitReachedError) {
+        router.replace('/paywall?reason=test_limit_reached');
+        return;
+      }
+      if (e instanceof PaymentRequiredError) {
+        router.replace('/paywall?reason=payment_required');
+        return;
+      }
+      // Mistral rate-limited us. Show the truthful Retry-After window the
+      // server gave us, start a live countdown on the retry button, and
+      // keep the analysis context cached so the user can re-fire from this
+      // screen instead of going back to /scan.
+      if (e instanceof RateLimitError) {
+        const seconds = Math.max(1, Math.min(120, e.retryAfterSeconds || 8));
+        setStatus('error');
+        setErrorMsg(
+          t(ctx.lang, 'error_rate_limited').replace('{n}', String(seconds)),
+        );
+        setRetryable(true);
+        setRetryCountdown(seconds);
+        return;
+      }
+      // Any other error (network, 502, parse, etc.). The user can re-fire
+      // immediately — no countdown needed.
+      setStatus('error');
+      setErrorMsg(e?.message || t(ctx.lang, 'error_generic'));
+      setRetryable(true);
+    }
+  }, [router]);
 
   useEffect(() => {
     if (startedRef.current) return;
@@ -47,78 +144,67 @@ export default function Analyzing() {
       if (!pending || pending.pages.length === 0) {
         setStatus('error');
         setErrorMsg(t(l, 'error_no_image'));
+        // No pages cached — only path forward is to go back and re-scan.
+        setRetryable(false);
         return;
       }
       const deviceId = await ensureDeviceId();
 
-      // Slowly advance the visual step indicator while the API call is in
-      // flight. Caps at the second-to-last step until the network finishes.
-      intervalRef.current = setInterval(() => {
-        setStep((s) => Math.min(s + 1, 2));
-      }, 1300);
+      // Compress every page to vision-friendly size BEFORE the upload.
+      // This is where we save the most bandwidth + battery: a 4-page
+      // VisionKit scan can be 25-40 MB raw → typically becomes ~400 KB.
+      // compressPagesForUpload() always returns a list of the same length
+      // (falls back to the original page on any failure) so this is safe
+      // to drop in front of the API call.
+      const compressed = await compressPagesForUpload(pending.pages);
 
-      try {
-        // Compress every page to vision-friendly size BEFORE the upload.
-        // This is where we save the most bandwidth + battery: a 4-page
-        // VisionKit scan can be 25-40 MB raw → typically becomes ~400 KB.
-        // compressPagesForUpload() always returns a list of the same length
-        // (falls back to the original page on any failure) so this is safe
-        // to drop in front of the API call.
-        const compressed = await compressPagesForUpload(pending.pages);
+      // Cache so the retry button can re-fire without recompressing or
+      // re-asking for permissions.
+      ctxRef.current = {
+        deviceId,
+        pages: compressed,
+        idempotencyKey: pending.idempotencyKey,
+        lang: l,
+      };
 
-        const record = await analyzeDocument({
-          device_id: deviceId,
-          target_language: l,
-          pages: compressed.map((p) => ({ file_base64: p.base64, mime_type: p.mimeType })),
-          idempotency_key: pending.idempotencyKey,
-        });
-        if (intervalRef.current) clearInterval(intervalRef.current);
-        setStep(3);
-        setLastResult(record);
-        // Optional on-device storage of the original document — opt-in only.
-        // For multi-page captures we store only the first page (preview only).
-        try {
-          if (await getSaveOriginals() && pending.pages.length > 0) {
-            const first = pending.pages[0];
-            await saveOriginal(record.id, first.base64, first.mimeType);
-          }
-        } catch {
-          // Non-fatal: result is already saved on the server.
-        }
-        // Small pause so the user sees the final tick before navigating.
-        setTimeout(() => router.replace(`/result?id=${encodeURIComponent(record.id)}`), 350);
-      } catch (e: any) {
-        if (intervalRef.current) clearInterval(intervalRef.current);
-        // Backend entitlement gate fired. Route the user to the paywall
-        // (test_limit_reached → with a clear non-bypassable banner;
-        //  payment_required → standard 3-option paywall).
-        if (e instanceof TestLimitReachedError) {
-          router.replace('/paywall?reason=test_limit_reached');
-          return;
-        }
-        if (e instanceof PaymentRequiredError) {
-          router.replace('/paywall?reason=payment_required');
-          return;
-        }
-        // Mistral rate-limited us (after 2 retries on the server). Tell the
-        // user they can try again in a moment instead of the generic toast.
-        if (e instanceof RateLimitError) {
-          setStatus('error');
-          setErrorMsg(
-            t(l, 'error_rate_limited').replace('{n}', String(e.retryAfterSeconds || 8)),
-          );
-          return;
-        }
-        setStatus('error');
-        setErrorMsg(e?.message || t(l, 'error_generic'));
-      }
+      await runAnalysis(ctxRef.current);
     })();
     return () => {
       if (intervalRef.current) clearInterval(intervalRef.current);
     };
-  }, [router]);
+  }, [runAnalysis]);
+
+  // Live countdown for the retry button. Re-fires every second while > 0,
+  // self-terminates at 0. We use setTimeout (not setInterval) so each tick
+  // only schedules the next one — no cleanup-leak risk if React unmounts
+  // mid-tick.
+  useEffect(() => {
+    if (retryCountdown <= 0) return;
+    const timer = setTimeout(() => {
+      setRetryCountdown((c) => Math.max(0, c - 1));
+    }, 1000);
+    return () => clearTimeout(timer);
+  }, [retryCountdown]);
+
+  /**
+   * Retry button handler. If we have a cached analysis context and the
+   * countdown is at 0, re-fire the same /api/analyze call (server is
+   * idempotent on idempotency_key). Otherwise fall back to going back to
+   * /scan so the user can reshoot.
+   */
+  const onRetry = useCallback(() => {
+    if (retryCountdown > 0) return;
+    if (ctxRef.current) {
+      runAnalysis(ctxRef.current);
+      return;
+    }
+    router.back();
+  }, [retryCountdown, runAnalysis, router]);
 
   if (status === 'error') {
+    const retryLabel = retryCountdown > 0
+      ? `${t(lang, 'retry')} (${retryCountdown}s)`
+      : t(lang, 'retry');
     return (
       <SafeAreaView style={styles.safe} testID="analyzing-error">
         <View style={styles.centerWrap}>
@@ -129,7 +215,12 @@ export default function Analyzing() {
           <Text style={styles.errorBody}>{errorMsg}</Text>
         </View>
         <View style={styles.footer}>
-          <Button label={t(lang, 'retry')} onPress={() => router.back()} testID="analyzing-retry" />
+          <Button
+            label={retryLabel}
+            onPress={onRetry}
+            disabled={retryCountdown > 0 || !retryable}
+            testID="analyzing-retry"
+          />
           <Button
             label={t(lang, 'back')}
             onPress={() => router.replace('/home')}
