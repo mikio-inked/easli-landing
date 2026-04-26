@@ -68,7 +68,13 @@
         }
       ],
       "expo-secure-store",
-      "@react-native-community/datetimepicker"
+      "@react-native-community/datetimepicker",
+      [
+        "react-native-document-scanner-plugin",
+        {
+          "cameraPermission": "Scan German documents to translate and explain them."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true

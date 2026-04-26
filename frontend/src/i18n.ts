@@ -232,7 +232,16 @@ export type UIKey =
   | 'impressum'
   | 'impressum_subtitle'
   | 'contact'
-  | 'contact_subtitle';
+  | 'contact_subtitle'
+  // ---- Native document scanner ----
+  | 'start_scan'
+  | 'scan_another'
+  | 'start_analysis'
+  | 'scanner_unavailable_msg'
+  | 'scanner_intro_tip'
+  | 'pages_count_one'
+  | 'pages_count_other'
+  | 'delete_page_confirm';
 
 type UIStrings = Record<UIKey, string>;
 
@@ -446,6 +455,17 @@ const en: UIStrings = {
   impressum_subtitle: 'Legal disclosure (§ 5 TMG)',
   contact: 'Contact',
   contact_subtitle: 'Reach us by email',
+  // ---- Native document scanner ----
+  start_scan: 'Scan now',
+  scan_another: 'Scan another page',
+  start_analysis: 'Start analysis',
+  scanner_unavailable_msg:
+    'Document scan is not available on this device. You can take a photo or upload a PDF instead.',
+  scanner_intro_tip:
+    'Place the letter on a bright surface and hold the phone steady. KlarPost will detect the edges automatically.',
+  pages_count_one: '1 page scanned',
+  pages_count_other: '{n} pages scanned',
+  delete_page_confirm: 'Delete this page?',
 };
 
 const zh: UIStrings = {
@@ -656,6 +676,15 @@ const zh: UIStrings = {
   impressum_subtitle: '依据德国 § 5 TMG 法律披露',
   contact: '联系方式',
   contact_subtitle: '通过电子邮件与我们联系',
+  // ---- Native document scanner ----
+  start_scan: '立即扫描',
+  scan_another: '扫描下一页',
+  start_analysis: '开始分析',
+  scanner_unavailable_msg: '此设备不支持文档扫描。您可以拍照或上传 PDF。',
+  scanner_intro_tip: '将信件放在明亮的平面上，保持手机稳定。KlarPost 会自动识别边缘。',
+  pages_count_one: '已扫描 1 页',
+  pages_count_other: '已扫描 {n} 页',
+  delete_page_confirm: '是否删除此页？',
 };
 
 const vi: UIStrings = {
@@ -866,6 +895,17 @@ const vi: UIStrings = {
   impressum_subtitle: 'Thông báo pháp lý theo § 5 TMG',
   contact: 'Liên hệ',
   contact_subtitle: 'Liên hệ qua email',
+  // ---- Native document scanner ----
+  start_scan: 'Quét ngay',
+  scan_another: 'Quét trang khác',
+  start_analysis: 'Bắt đầu phân tích',
+  scanner_unavailable_msg:
+    'Không thể quét tài liệu trên thiết bị này. Bạn có thể chụp ảnh hoặc tải lên PDF.',
+  scanner_intro_tip:
+    'Đặt thư trên bề mặt sáng và giữ điện thoại ổn định. KlarPost sẽ tự động nhận diện viền giấy.',
+  pages_count_one: 'Đã quét 1 trang',
+  pages_count_other: 'Đã quét {n} trang',
+  delete_page_confirm: 'Xoá trang này?',
 };
 
 const tr: UIStrings = {
@@ -1076,6 +1116,17 @@ const tr: UIStrings = {
   impressum_subtitle: '§ 5 TMG uyarınca yasal bilgiler',
   contact: 'İletişim',
   contact_subtitle: 'E-posta ile bize ulaşın',
+  // ---- Native document scanner ----
+  start_scan: 'Hemen tara',
+  scan_another: 'Başka sayfa tara',
+  start_analysis: 'Analizi başlat',
+  scanner_unavailable_msg:
+    'Belge tarama bu cihazda kullanılamıyor. Bunun yerine fotoğraf çekebilir veya PDF yükleyebilirsiniz.',
+  scanner_intro_tip:
+    'Mektubu aydınlık bir yüzeye koyun ve telefonu sabit tutun. KlarPost kenarları otomatik algılar.',
+  pages_count_one: '1 sayfa tarandı',
+  pages_count_other: '{n} sayfa tarandı',
+  delete_page_confirm: 'Bu sayfa silinsin mi?',
 };
 
 const ru: UIStrings = {
@@ -1286,6 +1337,17 @@ const ru: UIStrings = {
   impressum_subtitle: 'Юридическое раскрытие согласно § 5 TMG',
   contact: 'Контакты',
   contact_subtitle: 'Связаться по электронной почте',
+  // ---- Native document scanner ----
+  start_scan: 'Сканировать',
+  scan_another: 'Сканировать ещё страницу',
+  start_analysis: 'Начать анализ',
+  scanner_unavailable_msg:
+    'Сканирование документов недоступно на этом устройстве. Можно сделать фото или загрузить PDF.',
+  scanner_intro_tip:
+    'Положите письмо на хорошо освещённую поверхность и держите телефон ровно. KlarPost определит края автоматически.',
+  pages_count_one: 'Отсканирована 1 страница',
+  pages_count_other: 'Отсканировано {n} страниц',
+  delete_page_confirm: 'Удалить эту страницу?',
 };
 
 const es: UIStrings = {
@@ -1496,6 +1558,17 @@ const es: UIStrings = {
   impressum_subtitle: 'Información legal según § 5 TMG',
   contact: 'Contacto',
   contact_subtitle: 'Contáctanos por correo electrónico',
+  // ---- Native document scanner ----
+  start_scan: 'Escanear ahora',
+  scan_another: 'Escanear otra página',
+  start_analysis: 'Iniciar análisis',
+  scanner_unavailable_msg:
+    'El escaneo de documentos no está disponible en este dispositivo. Puedes hacer una foto o subir un PDF.',
+  scanner_intro_tip:
+    'Coloca la carta sobre una superficie iluminada y mantén el teléfono firme. KlarPost detecta los bordes automáticamente.',
+  pages_count_one: '1 página escaneada',
+  pages_count_other: '{n} páginas escaneadas',
+  delete_page_confirm: '¿Eliminar esta página?',
 };
 
 // Simple German — Leichte / Einfache Sprache. Short sentences, common words,
@@ -1708,6 +1781,17 @@ const de_simple: UIStrings = {
   impressum_subtitle: 'Angaben gemäß § 5 TMG',
   contact: 'Kontakt',
   contact_subtitle: 'Per E-Mail erreichbar',
+  // ---- Native document scanner ----
+  start_scan: 'Jetzt scannen',
+  scan_another: 'Weitere Seite scannen',
+  start_analysis: 'Analyse starten',
+  scanner_unavailable_msg:
+    'Dokumentenscan ist auf diesem Gerät nicht verfügbar. Du kannst stattdessen ein Foto aufnehmen oder eine PDF hochladen.',
+  scanner_intro_tip:
+    'Lege den Brief auf eine helle Fläche und halte das Handy ruhig. KlarPost erkennt die Ränder automatisch.',
+  pages_count_one: '1 Seite gescannt',
+  pages_count_other: '{n} Seiten gescannt',
+  delete_page_confirm: 'Diese Seite löschen?',
 };
 
 const STRINGS: Record<LanguageCode, UIStrings> = { en, zh, vi, tr, ru, es, de_simple };
