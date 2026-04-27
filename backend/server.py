@@ -203,6 +203,12 @@ class AnalysisRecord(BaseModel):
     mime_type: str
     created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
     result: AnalysisResult
+    # Additional language versions of `result`. Key = LANGUAGES code
+    # (e.g. 'en', 'de_simple'). Value = fully localized AnalysisResult where
+    # factual fields (sender, deadlines.date, risk_level, category, scam_warning,
+    # german_reply_draft) are preserved byte-for-byte, and only natural-language
+    # fields are re-localized. Populated on demand by POST /api/analyses/{id}/translate.
+    translations: dict = Field(default_factory=dict)
 
 
 class ChatMessage(BaseModel):
@@ -215,6 +221,16 @@ class ChatMessage(BaseModel):
 class ChatRequest(BaseModel):
     device_id: str
     message: str
+    # Optional per-message language override. If the user switched the result
+    # language on the client, the chat reply should match what they see —
+    # not the original analysis language. Must be one of LANGUAGES keys
+    # when present; silently ignored otherwise.
+    target_language: Optional[str] = None
+
+
+class TranslateRequest(BaseModel):
+    device_id: str
+    target_language: str  # one of LANGUAGES keys
 
 
 class ChatResponse(BaseModel):
@@ -254,6 +270,12 @@ class UsageRecord(BaseModel):
     total_chat_questions_used: int = 0
     per_document_chat_questions: dict = Field(default_factory=dict)
     consumed_idempotency_keys: List[str] = Field(default_factory=list)
+    # Tracking-only counters for the Phase-2 "change language" feature.
+    # Translations are lightweight text-only calls and NEVER count as a
+    # new document analysis. We track them separately so we can monitor
+    # cost and (optionally) apply a soft per-analysis cap for free users.
+    translation_count: int = 0
+    translated_languages: List[str] = Field(default_factory=list)
     last_usage_reset_at: Optional[str] = None
     created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
     updated_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
@@ -275,6 +297,11 @@ class UsageResponse(BaseModel):
     total_chat_questions_used: int
     total_chat_questions_total: int
     per_document_chat_questions: dict
+    # Tracking-only fields for the "change language" feature. Exposed
+    # read-only so the client can show "3 language versions used" badges
+    # later if we want; they do NOT affect the analysis quota.
+    translation_count: int = 0
+    translated_languages: List[str] = Field(default_factory=list)
 
 
 class EntitlementDecision(BaseModel):
@@ -1073,6 +1100,8 @@ def _to_usage_response(rec: UsageRecord) -> UsageResponse:
         total_chat_questions_used=rec.total_chat_questions_used,
         total_chat_questions_total=MAX_TOTAL_CHAT_QUESTIONS_PER_TESTER,
         per_document_chat_questions=rec.per_document_chat_questions,
+        translation_count=rec.translation_count,
+        translated_languages=rec.translated_languages,
     )
 
 
@@ -1349,6 +1378,399 @@ async def chat_about_document(
     )
 
 
+# ==================== TRANSLATION (change-language-after-analysis) ====================
+
+# Optional soft cap on how many language versions a single analysis can be
+# translated into. Protects the free tier from cost abuse without blocking
+# common user flows (the 7 supported languages at most, and in practice
+# users switch 1-2 times). Set to a high number on TestFlight so the soft
+# paywall never actually hits; tighten in production if needed.
+MAX_TRANSLATIONS_PER_ANALYSIS = _int_env('MAX_TRANSLATIONS_PER_ANALYSIS', 6)
+
+
+def build_translation_system_prompt(
+    current_target_label: str,
+    new_target_label: str,
+    new_target_code: str,
+) -> str:
+    """Prompt used to re-localise an existing AnalysisResult into a new
+    language WITHOUT running a new OCR/vision call.
+
+    The input is the full JSON analysis the user is currently reading. The
+    output must be the SAME schema in the new target language. Factual fields
+    stay byte-identical; only natural-language fields get re-written.
+    """
+    extra = ""
+    if new_target_code == "de_simple":
+        extra = (
+            "\n\nSPECIAL — the new target language is **German written in "
+            "Leichte Sprache / Einfache Sprache**:\n"
+            "- Short sentences (ideally 8–12 words).\n"
+            "- Common everyday German words; AVOID legal, tax, medical, or "
+            "bureaucratic jargon.\n"
+            "- Active voice. Concrete nouns. Address the reader with 'Sie'.\n"
+            "- When you must use a formal term (e.g. 'Mahnung', 'Beitrag', "
+            "'Versicherte'), give a one-clause explanation in parentheses.\n"
+            "- Use short bullet points where it helps clarity.\n"
+        )
+    return f"""You are KlarPost's translator. You receive a structured JSON analysis of a German document in {current_target_label}. Your job is to produce the SAME analysis object with the natural-language fields rewritten in {new_target_label}.
+
+PRESERVE EXACTLY (do NOT translate, do NOT modify):
+- "sender" — proper name / organisation as given
+- "deadlines[].date" — the date string as written
+- "deadlines[].confidence" — low|medium|high (enum)
+- "required_actions[].urgency" — low|medium|high (enum)
+- "risk_level" — green|yellow|red (enum)
+- "category" — one of the 12 fixed codes (tax|insurance|rent|bank|health|government|court|utilities|telecom|work|education|other)
+- "scam_warning" — boolean
+- "german_reply_draft" — MUST stay in German (it's a reply TO a German sender)
+- "source_language" — always "German"
+- Any numeric amounts, IBAN/Aktenzeichen/reference numbers appearing inside natural-language fields must stay byte-identical (e.g. "123,45 EUR", "DE89 3704 0044 0532 0130 00", "Az. DE-2026-0001").
+
+TRANSLATE / LOCALISE into {new_target_label}:
+- "document_type"
+- "summary_translated"
+- "simple_explanation_translated"
+- "key_points"
+- "deadlines[].description"
+- "required_actions[].action"
+- "required_actions[].reason"
+- "risk_reason"
+- "reply_draft_explanation_translated" — explanation of what german_reply_draft says
+- "questions_to_ask"
+- "uncertainties"
+- "disclaimer" — one short generic disclaimer stating KlarPost does not provide legal, tax, financial or medical advice
+- "scam_reason" — only if scam_warning is true, otherwise leave empty string
+
+TARGET META:
+- "target_language" must be set to "{new_target_label}"
+- "source_language" must remain "German"
+
+STYLE RULES (all target languages):
+- Friendly, calm, plain. No emojis unless they were in the source.
+- Preserve the factual meaning — never add information that is not in the input JSON.
+- Do NOT provide legal/tax/financial/medical advice.
+- Keep lengths roughly similar to the input.{extra}
+
+OUTPUT FORMAT:
+Respond ONLY with a single valid JSON object matching the input schema. NO markdown code fences, NO prose before or after, NO extra keys.
+"""
+
+
+async def translate_analysis_with_mistral(
+    source_result: dict,
+    current_target_label: str,
+    new_target_label: str,
+    new_target_code: str,
+) -> AnalysisResult:
+    """Re-localise a previously-analyzed AnalysisResult into a new language.
+
+    This is a TEXT-ONLY Mistral call — no OCR, no vision, no original-image
+    access. Cheap (~2-3s) and safe to cache.
+    """
+    if not mistral_client:
+        raise HTTPException(
+            status_code=500,
+            detail="Mistral API key not configured. Please set MISTRAL_API_KEY in backend/.env",
+        )
+
+    # Minimal slimmed-down view of the source — we drop any server-side-only
+    # fields and keep only what AnalysisResult needs. Ensures the model
+    # doesn't get confused by extras.
+    ALLOWED_KEYS = {
+        "source_language", "target_language", "document_type", "sender",
+        "summary_translated", "simple_explanation_translated", "key_points",
+        "deadlines", "required_actions", "risk_level", "risk_reason",
+        "german_reply_draft", "reply_draft_explanation_translated",
+        "questions_to_ask", "uncertainties", "disclaimer", "category",
+        "scam_warning", "scam_reason",
+    }
+    slim = {k: v for k, v in (source_result or {}).items() if k in ALLOWED_KEYS}
+
+    messages = [
+        {
+            "role": "system",
+            "content": build_translation_system_prompt(
+                current_target_label, new_target_label, new_target_code,
+            ),
+        },
+        {
+            "role": "user",
+            "content": (
+                f"Re-localise this analysis into {new_target_label}. "
+                "Return ONLY the JSON object.\n\n"
+                f"INPUT_JSON:\n{json.dumps(slim, ensure_ascii=False)}"
+            ),
+        },
+    ]
+
+    try:
+        response = await mistral_complete_with_retry(
+            label="translate",
+            model=MISTRAL_ANALYSIS_MODEL,
+            messages=messages,
+            response_format={"type": "json_object"},
+            temperature=0.2,
+        )
+    except MistralRateLimited as rl:
+        raise HTTPException(
+            status_code=429,
+            detail="AI is rate-limited. Please try again in a moment.",
+            headers={"Retry-After": str(rl.retry_after)},
+        )
+    except Exception as e:
+        logger.exception(
+            "translation_failed model=%s error_type=%s",
+            MISTRAL_ANALYSIS_MODEL, type(e).__name__,
+        )
+        raise HTTPException(status_code=502, detail="Translation failed.")
+
+    response_text = ""
+    try:
+        response_text = (response.choices[0].message.content or "").strip()
+    except Exception:
+        logger.exception(
+            "translation_failed_shape model=%s choices=%d",
+            MISTRAL_ANALYSIS_MODEL,
+            len(getattr(response, "choices", []) or []),
+        )
+        raise HTTPException(status_code=502, detail="Translation returned empty response")
+
+    parsed = extract_json_from_text(response_text)
+    if not parsed:
+        logger.error(
+            "translation_failed_parse model=%s length=%d",
+            MISTRAL_ANALYSIS_MODEL, len(response_text or ""),
+        )
+        raise HTTPException(
+            status_code=502,
+            detail="Translation returned invalid JSON.",
+        )
+
+    # Enforce factual invariants: regardless of what the model returned,
+    # we OVERWRITE the factual fields with the source's values. This is a
+    # belt-and-braces safety net in case the model "helpfully" localised
+    # a sender name or edited a deadline date.
+    for k in (
+        "sender",
+        "risk_level",
+        "category",
+        "scam_warning",
+        "german_reply_draft",
+    ):
+        if k in slim:
+            parsed[k] = slim[k]
+    # Deep-preserve factual sub-fields of deadlines/required_actions.
+    if isinstance(slim.get("deadlines"), list) and isinstance(parsed.get("deadlines"), list):
+        src_deadlines = slim["deadlines"]
+        for i, d in enumerate(parsed["deadlines"]):
+            if isinstance(d, dict) and i < len(src_deadlines):
+                src = src_deadlines[i] or {}
+                d["date"] = src.get("date", d.get("date", ""))
+                d["confidence"] = src.get("confidence", d.get("confidence", "low"))
+    if isinstance(slim.get("required_actions"), list) and isinstance(parsed.get("required_actions"), list):
+        src_actions = slim["required_actions"]
+        for i, a in enumerate(parsed["required_actions"]):
+            if isinstance(a, dict) and i < len(src_actions):
+                src = src_actions[i] or {}
+                a["urgency"] = src.get("urgency", a.get("urgency", "low"))
+
+    parsed["source_language"] = "German"
+    parsed["target_language"] = new_target_label
+
+    _sanitize_literal_fields(parsed)
+
+    try:
+        result = AnalysisResult(**parsed)
+    except Exception as e:
+        logger.exception(
+            "translation_failed_validation model=%s error_type=%s",
+            MISTRAL_ANALYSIS_MODEL, type(e).__name__,
+        )
+        raise HTTPException(
+            status_code=502,
+            detail="Translation did not match expected format.",
+        )
+
+    if not result.disclaimer:
+        result.disclaimer = (
+            "KlarPost provides general information only and does not give legal, tax, financial, or medical advice. "
+            "Please verify with the sender or a qualified professional."
+        )
+    return result
+
+
+@api_router.post("/analyses/{analysis_id}/translate")
+async def translate_analysis_endpoint(analysis_id: str, req: TranslateRequest):
+    """Return the analysis for `analysis_id` localised into `target_language`.
+
+    Cache semantics:
+      - If target == primary → returns the primary result. Free.
+      - If target already translated → returns the cached translation. Free
+        (no Mistral call). Logs `translation_cache_hit`.
+      - Else: runs a text-only Mistral call, stores the translation, bumps
+        the tracking counters (translation_count, translated_languages).
+        Never counts as a new document analysis — no free/plus analyses
+        quota is consumed.
+
+    Privacy: the log lines below contain only metadata (device + analysis
+    id + target code + cache hit/miss). Never the source text, translations,
+    sender, or amounts.
+    """
+    if req.target_language not in LANGUAGES:
+        raise HTTPException(status_code=400, detail="Unsupported target language")
+    if not req.device_id:
+        raise HTTPException(status_code=400, detail="device_id is required")
+
+    target_code = req.target_language
+    target_label = LANGUAGES[target_code]
+
+    doc = await db.analyses.find_one(
+        {"id": analysis_id, "device_id": req.device_id},
+        {"_id": 0, "created_at_dt": 0},
+    )
+    if not doc:
+        raise HTTPException(status_code=404, detail="Analysis not found")
+
+    logger.info(
+        "translation_requested device=%s analysis=%s target=%s",
+        req.device_id, analysis_id, target_code,
+    )
+
+    primary_code = doc.get("target_language") or ""
+    translations = doc.get("translations") or {}
+
+    # ---- Cache hit: primary language ----------------------------------
+    if target_code == primary_code:
+        logger.info(
+            "translation_cache_hit device=%s analysis=%s target=%s source=primary",
+            req.device_id, analysis_id, target_code,
+        )
+        rec = AnalysisRecord(**doc)
+        usage_rec = await _load_or_create_usage(req.device_id)
+        return {
+            **rec.dict(),
+            "usage": _to_usage_response(usage_rec).dict(),
+        }
+
+    # ---- Cache hit: previously translated -----------------------------
+    if target_code in translations:
+        logger.info(
+            "translation_cache_hit device=%s analysis=%s target=%s source=translations",
+            req.device_id, analysis_id, target_code,
+        )
+        cached_result = translations[target_code]
+        rec_dict = {
+            **doc,
+            "target_language": target_code,
+            "target_language_label": target_label,
+            "result": cached_result,
+        }
+        # Validate before returning so clients never see a malformed cached doc.
+        rec = AnalysisRecord(**rec_dict)
+        usage_rec = await _load_or_create_usage(req.device_id)
+        return {
+            **rec.dict(),
+            "usage": _to_usage_response(usage_rec).dict(),
+        }
+
+    # ---- Miss: call Mistral (text-only) -------------------------------
+    # Optional soft cap: count primary + existing translations. For a typical
+    # free user this never triggers because MAX_TRANSLATIONS_PER_ANALYSIS is
+    # generous (6 by default, configurable via env).
+    distinct_langs = set(translations.keys()) | {primary_code}
+    if len(distinct_langs) >= MAX_TRANSLATIONS_PER_ANALYSIS:
+        logger.info(
+            "translation_blocked_per_doc_limit device=%s analysis=%s target=%s distinct=%d",
+            req.device_id, analysis_id, target_code, len(distinct_langs),
+        )
+        usage_rec = await _load_or_create_usage(req.device_id)
+        return JSONResponse(
+            status_code=429,
+            content={
+                "error": "translation_limit_reached",
+                "message": (
+                    "Du hast das Limit für Sprachwechsel bei diesem Dokument erreicht. "
+                    "Mit KlarPost Plus kannst du mehr Sprachen freischalten."
+                ),
+                "scope": "per_document",
+                "usage": _to_usage_response(usage_rec).dict(),
+            },
+        )
+
+    primary_label = doc.get("target_language_label") or LANGUAGES.get(primary_code, "English")
+    source_result = doc.get("result") or {}
+
+    try:
+        new_result = await translate_analysis_with_mistral(
+            source_result=source_result,
+            current_target_label=primary_label,
+            new_target_label=target_label,
+            new_target_code=target_code,
+        )
+    except HTTPException as http_exc:
+        logger.info(
+            "translation_failed device=%s analysis=%s target=%s status=%d",
+            req.device_id, analysis_id, target_code, http_exc.status_code,
+        )
+        raise
+
+    # Persist into the analysis doc under `translations[<code>]`. Privacy:
+    # the stored payload is AnalysisResult shape (already safe — no original
+    # text, no OCR dump, just the same kind of content we already store).
+    await db.analyses.update_one(
+        {"id": analysis_id, "device_id": req.device_id},
+        {
+            "$set": {
+                f"translations.{target_code}": new_result.dict(),
+            }
+        },
+    )
+
+    # Bump tracking counters (NOT analysis-quota counters). Uses $addToSet
+    # for translated_languages so re-ordering can't cause duplicates.
+    await db.usage_records.update_one(
+        {"device_id": req.device_id},
+        {
+            "$inc": {"translation_count": 1},
+            "$addToSet": {"translated_languages": target_code},
+            "$set": {"updated_at": datetime.now(timezone.utc).isoformat()},
+            "$setOnInsert": {
+                "device_id": req.device_id,
+                "created_at": datetime.now(timezone.utc).isoformat(),
+            },
+        },
+        upsert=True,
+    )
+
+    logger.info(
+        "translation_success device=%s analysis=%s target=%s",
+        req.device_id, analysis_id, target_code,
+    )
+
+    # Build the response in the same envelope shape as /api/analyze so the
+    # frontend can drop it straight into setLastResult().
+    rec_dict = {
+        **doc,
+        "target_language": target_code,
+        "target_language_label": target_label,
+        "result": new_result.dict(),
+        "translations": {
+            **(doc.get("translations") or {}),
+            target_code: new_result.dict(),
+        },
+    }
+    rec = AnalysisRecord(**rec_dict)
+    refreshed = await _load_or_create_usage(req.device_id)
+    return {
+        **rec.dict(),
+        "usage": _to_usage_response(refreshed).dict(),
+    }
+
+
+
+
+
 @api_router.post("/analyses/{analysis_id}/chat", response_model=ChatMessage)
 async def chat_endpoint(analysis_id: str, req: ChatRequest):
     if not req.message or not req.message.strip():
@@ -1401,15 +1823,46 @@ async def chat_endpoint(analysis_id: str, req: ChatRequest):
         )
 
     history = doc.get("messages", []) or []
-    target_label = doc.get("target_language_label") or "English"
-    target_code = doc.get("target_language") or ""
+    # Resolve which language version to use for both the document context
+    # AND the reply. Priority:
+    #   1) explicit req.target_language (user switched language on client)
+    #   2) the analysis record's primary target_language (original)
+    # If the user asked for a language we haven't translated yet, we silently
+    # fall back to the primary — we'd rather reply in the wrong language than
+    # block a chat turn on a missing translation. The frontend calls
+    # /translate BEFORE switching the UI so this fallback is rare in practice.
+    override_code = req.target_language if req.target_language in LANGUAGES else None
+    primary_code = doc.get("target_language") or ""
+    translations = doc.get("translations") or {}
+    if override_code and override_code != primary_code and override_code in translations:
+        target_code = override_code
+        target_label = LANGUAGES[override_code]
+        # Swap in the translated result so document_context reflects what
+        # the user is currently reading.
+        chat_doc = {**doc, "result": translations[override_code]}
+    elif override_code and override_code == primary_code:
+        target_code = primary_code
+        target_label = doc.get("target_language_label") or LANGUAGES.get(primary_code, "English")
+        chat_doc = doc
+    elif override_code and override_code in LANGUAGES:
+        # Override requested but no cached translation — reply in the override
+        # language anyway using the primary-language document context. This
+        # keeps the UX consistent (chat matches what's on screen) without
+        # doing a synchronous translate call inside the chat handler.
+        target_code = override_code
+        target_label = LANGUAGES[override_code]
+        chat_doc = doc
+    else:
+        target_code = primary_code
+        target_label = doc.get("target_language_label") or "English"
+        chat_doc = doc
 
     # Soft per-analysis cap to discourage abuse — 80 user turns.
     user_turns = sum(1 for m in history if m.get("role") == "user")
     if user_turns >= 80:
         raise HTTPException(status_code=429, detail="Chat limit for this document reached")
 
-    response = await chat_about_document(doc, history, req.message.strip(), target_label, target_code)
+    response = await chat_about_document(chat_doc, history, req.message.strip(), target_label, target_code)
 
     user_msg = ChatMessage(role="user", content=req.message.strip()).dict()
     assistant_msg = ChatMessage(

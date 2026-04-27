@@ -42,8 +42,17 @@ interface DisplayMessage extends ChatMessage {
 
 export default function ChatScreen() {
   const router = useRouter();
-  const { id } = useLocalSearchParams<{ id?: string }>();
+  const { id, lang: langParam } = useLocalSearchParams<{ id?: string; lang?: string }>();
+  // `lang` is used for BOTH the UI chrome AND for telling the backend which
+  // language the assistant should reply in. If the user passed ?lang= (from
+  // the result screen's "change language" switcher), that wins — otherwise
+  // fall back to the stored user preference. `contentLang` is the one sent
+  // to the server so chat answers always match what's visible on the
+  // result screen the user came from.
   const [lang, setLang] = useState<LanguageCode>('en');
+  const [contentLang, setContentLang] = useState<LanguageCode | null>(
+    (langParam as LanguageCode) || null,
+  );
   const [messages, setMessages] = useState<DisplayMessage[]>([]);
   const [docTitle, setDocTitle] = useState<string>('');
   const [input, setInput] = useState('');
@@ -106,7 +115,12 @@ export default function ChatScreen() {
     scrollToEnd();
 
     try {
-      const reply = await sendChatMessage(id, did, trimmed);
+      const reply = await sendChatMessage(
+        id,
+        did,
+        trimmed,
+        contentLang ?? undefined,
+      );
       setMessages((prev) => {
         const next = prev.filter((m) => !m.pending);
         return [...next, reply];

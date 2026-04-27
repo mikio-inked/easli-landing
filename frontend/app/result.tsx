@@ -3,13 +3,14 @@
 // safety + action info is visible without scrolling; details collapse
 // behind tap-to-expand cards so the screen never feels overwhelming.
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
   Animated,
   Easing,
   LayoutAnimation,
+  Modal,
   Platform,
   Pressable,
   ScrollView,
@@ -28,11 +29,13 @@ import {
   BellRing,
   Building2,
   CalendarClock,
+  Check,
   CheckCircle2,
   ChevronDown,
   Copy,
   Eye,
   FileText,
+  Globe,
   HelpCircle,
   Info,
   ListTodo,
@@ -41,6 +44,7 @@ import {
   Share2,
   ShieldAlert,
   Trash2,
+  X,
   XCircle,
 } from 'lucide-react-native';
 import { Badge, Button, SectionTitle } from '../src/ui';
@@ -50,8 +54,8 @@ import {
   setLastResult,
   getLanguage as getStoredLanguage,
 } from '../src/store';
-import { AnalysisRecord, deleteAnalysis, getAnalysis } from '../src/api';
-import { LanguageCode, categoryLabel, t } from '../src/i18n';
+import { AnalysisRecord, deleteAnalysis, getAnalysis, translateAnalysis } from '../src/api';
+import { LANGUAGES, LanguageCode, categoryLabel, t } from '../src/i18n';
 import { shareAnalysisAsPdf, shareAnalysisAsText } from '../src/share';
 import {
   cancelAllForAnalysis,
@@ -260,6 +264,18 @@ export default function ResultScreen() {
   // smartly auto-open Reply Draft only when a reply is required, etc.
   // After the user toggles, their explicit choice wins (stored as bool).
   const [openSections, setOpenSections] = useState<Record<string, boolean>>({});
+  // ---- "Change language" feature state ----
+  // `displayLang` is which language version of the analysis the user is
+  // CURRENTLY looking at. It defaults to the analysis's primary language,
+  // but can diverge after the user taps the language switcher.
+  // NOTE: this is separate from `lang` (the UI chrome language — button
+  // labels, headings) because a user who reads the app in German but wants
+  // the Telekom letter explained in English should get English content
+  // with German chrome.
+  const [displayLang, setDisplayLang] = useState<LanguageCode | null>(null);
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const [translating, setTranslating] = useState(false);
+  const [translateError, setTranslateError] = useState<string | null>(null);
 
   const toggleSection = useCallback((key: string, currentlyOpen: boolean) => {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
@@ -314,6 +330,69 @@ export default function ResultScreen() {
     }, [record?.id, refreshReminders])
   );
 
+  // ---- "Change language" derived state & handler. Must be declared
+  // before any conditional return so React's rules of hooks stay satisfied
+  // across the loading / null-record / render paths. We gate every deref
+  // on `record` being present; when it's null the memoized values are
+  // harmless no-ops.
+  const primaryCode = (record?.target_language ?? 'en') as LanguageCode;
+  const availableLangs = useMemo<Set<LanguageCode>>(() => {
+    const s = new Set<LanguageCode>([primaryCode]);
+    if (record?.translations) {
+      for (const k of Object.keys(record.translations)) {
+        s.add(k as LanguageCode);
+      }
+    }
+    return s;
+  }, [record?.translations, primaryCode]);
+
+  const onPickLanguage = useCallback(async (targetCode: LanguageCode) => {
+    if (!record) return;
+    setTranslateError(null);
+    const effective = displayLang ?? primaryCode;
+
+    // Already the active view — just close.
+    if (targetCode === effective) {
+      setSheetOpen(false);
+      return;
+    }
+
+    // Cached (either primary or already translated) → instant switch.
+    if (availableLangs.has(targetCode)) {
+      setDisplayLang(targetCode);
+      setSheetOpen(false);
+      return;
+    }
+
+    // Miss — call backend, show loading, update record + switch on success.
+    setTranslating(true);
+    setSheetOpen(false);
+    try {
+      const did = await ensureDeviceId();
+      const updated = await translateAnalysis(record.id, did, targetCode);
+      const newRecord: AnalysisRecord = {
+        ...record,
+        translations: {
+          ...(record.translations || {}),
+          ...(updated.translations || {}),
+        },
+      };
+      setRecord(newRecord);
+      setLastResult(newRecord);
+      setDisplayLang(targetCode);
+    } catch (_e) {
+      // Privacy: don't echo raw server error. Show the friendly i18n string.
+      setTranslateError(t(lang, 'translation_error'));
+    } finally {
+      setTranslating(false);
+    }
+  }, [record, displayLang, primaryCode, availableLangs, lang]);
+
+  const onOpenSheet = useCallback(() => {
+    setTranslateError(null);
+    setSheetOpen(true);
+  }, []);
+
   if (loading) {
     return (
       <SafeAreaView style={styles.safe}>
@@ -335,7 +414,14 @@ export default function ResultScreen() {
     );
   }
 
-  const r = record.result;
+  // Resolve which language version to show. Default to the record's
+  // primary language if the user hasn't switched yet.
+  const effectiveDisplayLang: LanguageCode = displayLang ?? primaryCode;
+  const r = (
+    effectiveDisplayLang === primaryCode
+      ? record.result
+      : record.translations?.[effectiveDisplayLang] ?? record.result
+  );
   const risk = riskMeta(r.risk_level, lang);
 
   const copyReply = async () => {
@@ -462,6 +548,128 @@ export default function ResultScreen() {
           </Pressable>
         </View>
       </View>
+
+      {/* Change-language control. Visible right under the header so users who
+          picked the wrong language during scan can fix it without going back
+          to the main menu. Shows the current DISPLAY language (which may
+          differ from the analysis's primary language once the user switches).
+          Tap → bottom sheet with all 7 supported languages.
+          NOTE: Pressable extends full width for an easy tap target; we use
+          a pill inside for visual containment. */}
+      <Pressable
+        onPress={onOpenSheet}
+        style={styles.langSwitchRow}
+        testID="change-language-button"
+        accessibilityRole="button"
+        accessibilityLabel={t(lang, 'change_language')}
+        hitSlop={6}
+      >
+        <View style={styles.langSwitchPill}>
+          <Globe size={16} color={colors.primary} strokeWidth={2.2} />
+          <Text style={styles.langSwitchCurrent} numberOfLines={1}>
+            {LANGUAGES.find(l => l.code === effectiveDisplayLang)?.nativeName || effectiveDisplayLang}
+          </Text>
+          <Text style={styles.langSwitchHint}>· {t(lang, 'change_language')}</Text>
+          <ChevronDown size={14} color={colors.textSecondary} strokeWidth={2.2} />
+        </View>
+      </Pressable>
+
+      {/* Language-picker modal. Full-screen translucent overlay with a
+          centred card so it looks consistent on iOS & Android without
+          a native bottom-sheet lib. Each item shows native label AND a
+          tiny "⚡ cached" marker when the translation is already stored
+          locally — that way power users can tell which switches will
+          be instant vs. which trigger a round-trip. */}
+      <Modal
+        visible={sheetOpen}
+        transparent
+        animationType="fade"
+        statusBarTranslucent
+        onRequestClose={() => setSheetOpen(false)}
+      >
+        <Pressable
+          style={styles.modalBackdrop}
+          onPress={() => setSheetOpen(false)}
+          accessible={false}
+        >
+          {/* Inner Pressable swallows taps so tapping the card doesn't close. */}
+          <Pressable style={styles.modalCard} onPress={() => {}}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>
+                {t(lang, 'translation_sheet_title')}
+              </Text>
+              <Pressable
+                onPress={() => setSheetOpen(false)}
+                hitSlop={10}
+                accessibilityRole="button"
+                accessibilityLabel={t(lang, 'back')}
+              >
+                <X size={22} color={colors.textSecondary} strokeWidth={2.2} />
+              </Pressable>
+            </View>
+            <View style={{ marginTop: spacing.xs }}>
+              {LANGUAGES.map(opt => {
+                const isActive = opt.code === effectiveDisplayLang;
+                const isCached = availableLangs.has(opt.code);
+                return (
+                  <Pressable
+                    key={opt.code}
+                    onPress={() => onPickLanguage(opt.code)}
+                    style={({ pressed }) => [
+                      styles.modalRow,
+                      pressed && { backgroundColor: colors.borderLight },
+                      isActive && { backgroundColor: colors.primarySoft },
+                    ]}
+                    testID={`lang-option-${opt.code}`}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected: isActive }}
+                  >
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.modalRowTitle} numberOfLines={1}>
+                        {opt.flag} {opt.nativeName}
+                      </Text>
+                      {opt.englishName && opt.englishName !== opt.nativeName ? (
+                        <Text style={styles.modalRowSub} numberOfLines={1}>
+                          {opt.englishName}
+                        </Text>
+                      ) : null}
+                    </View>
+                    {isActive ? (
+                      <Check size={20} color={colors.primary} strokeWidth={2.6} />
+                    ) : isCached ? (
+                      <Text style={styles.modalRowCached}>⚡</Text>
+                    ) : null}
+                  </Pressable>
+                );
+              })}
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
+
+      {/* Translating overlay — shown while the backend generates a new
+          localisation. Non-dismissable to prevent the user firing multiple
+          concurrent requests. The backend call typically takes 3-20s. */}
+      {translating ? (
+        <View style={styles.translatingOverlay} pointerEvents="auto">
+          <View style={styles.translatingCard}>
+            <ActivityIndicator color={colors.primary} size="large" />
+            <Text style={styles.translatingText}>
+              {t(lang, 'translating_subtitle')}
+            </Text>
+          </View>
+        </View>
+      ) : null}
+
+      {/* Inline translate-error pill — non-blocking. Lives below the
+          language-switch row so users see it next to the control that
+          triggered it. Auto-dismisses on next successful switch. */}
+      {translateError ? (
+        <View style={styles.translateErrorBanner}>
+          <AlertTriangle size={16} color="#B91C1C" strokeWidth={2.4} />
+          <Text style={styles.translateErrorText}>{translateError}</Text>
+        </View>
+      ) : null}
 
       {/* Auto-pop scam-warning modal — visible once per analysis the first time
           the user lands here. Tone is calm, not panic-inducing. */}
@@ -951,7 +1159,11 @@ export default function ResultScreen() {
           </Pressable>
         ) : null}
         <Pressable
-          onPress={() => router.push(`/chat?id=${encodeURIComponent(record.id)}`)}
+          onPress={() =>
+            router.push(
+              `/chat?id=${encodeURIComponent(record.id)}&lang=${encodeURIComponent(effectiveDisplayLang)}`,
+            )
+          }
           style={styles.stickyAskBtn}
           accessibilityRole="button"
           accessibilityLabel={t(lang, 'ask_question')}
@@ -1531,5 +1743,129 @@ const styles = StyleSheet.create({
     fontSize: fontSize.sm,
     color: colors.textSecondary,
     lineHeight: 20,
+  },
+  // ---- Change-language control ----
+  langSwitchRow: {
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.sm,
+    paddingBottom: spacing.xs,
+    alignItems: 'flex-start',
+  },
+  langSwitchPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 8,
+    borderRadius: 999,
+    backgroundColor: colors.borderLight,
+    borderWidth: 1,
+    borderColor: colors.border,
+    maxWidth: '100%',
+  },
+  langSwitchCurrent: {
+    fontSize: fontSize.sm,
+    color: colors.textPrimary,
+    fontWeight: fontWeight.semibold as any,
+  },
+  langSwitchHint: {
+    fontSize: fontSize.sm,
+    color: colors.textSecondary,
+  },
+  translateErrorBanner: {
+    marginHorizontal: spacing.lg,
+    marginTop: spacing.xs,
+    marginBottom: spacing.sm,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    backgroundColor: '#FEF2F2',
+    borderRadius: radius.md,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    borderWidth: 1,
+    borderColor: '#FECACA',
+  },
+  translateErrorText: {
+    color: '#991B1B',
+    fontSize: fontSize.sm,
+    flex: 1,
+  },
+  // ---- Language-picker modal ----
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: spacing.lg,
+  },
+  modalCard: {
+    width: '100%',
+    maxWidth: 420,
+    backgroundColor: colors.surface,
+    borderRadius: radius.xl,
+    padding: spacing.lg,
+    ...shadows.card,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: spacing.xs,
+  },
+  modalTitle: {
+    fontSize: fontSize.lg,
+    fontWeight: fontWeight.bold as any,
+    color: colors.textPrimary,
+    flex: 1,
+    marginRight: spacing.sm,
+  },
+  modalRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: spacing.md,
+    paddingVertical: 14,
+    borderRadius: radius.md,
+    marginTop: 2,
+    minHeight: 52,
+  },
+  modalRowTitle: {
+    fontSize: fontSize.base,
+    color: colors.textPrimary,
+    fontWeight: fontWeight.semibold as any,
+  },
+  modalRowSub: {
+    fontSize: fontSize.sm,
+    color: colors.textSecondary,
+    marginTop: 2,
+  },
+  modalRowCached: {
+    fontSize: 16,
+    color: colors.textSecondary,
+    opacity: 0.6,
+  },
+  // ---- Translating overlay ----
+  translatingOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(255,255,255,0.78)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 100,
+  },
+  translatingCard: {
+    backgroundColor: colors.surface,
+    borderRadius: radius.lg,
+    paddingVertical: spacing.xl,
+    paddingHorizontal: spacing.xl,
+    alignItems: 'center',
+    ...shadows.card,
+    gap: spacing.md,
+    minWidth: 200,
+  },
+  translatingText: {
+    fontSize: fontSize.base,
+    color: colors.textPrimary,
+    fontWeight: fontWeight.medium as any,
+    textAlign: 'center',
   },
 });

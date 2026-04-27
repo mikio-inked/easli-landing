@@ -60,6 +60,10 @@ export interface AnalysisRecord {
   mime_type: string;
   created_at: string;
   result: AnalysisResult;
+  /** Map of LanguageCode → localized AnalysisResult. Populated on demand by
+   *  POST /api/analyses/{id}/translate. Factual fields (sender, dates, risk,
+   *  category, scam_warning, german_reply_draft) are preserved byte-identical. */
+  translations?: Record<string, AnalysisResult>;
 }
 
 export interface AnalysisListItem {
@@ -247,14 +251,47 @@ export async function listChatMessages(analysisId: string, deviceId: string): Pr
 export async function sendChatMessage(
   analysisId: string,
   deviceId: string,
-  message: string
+  message: string,
+  targetLanguage?: LanguageCode,
 ): Promise<ChatMessage> {
+  const body: Record<string, unknown> = { device_id: deviceId, message };
+  if (targetLanguage) body.target_language = targetLanguage;
   const res = await fetch(`${BASE_URL}/api/analyses/${encodeURIComponent(analysisId)}/chat`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ device_id: deviceId, message }),
+    body: JSON.stringify(body),
   });
   return jsonOrThrow<ChatMessage>(res);
+}
+
+/**
+ * Re-localise an existing analysis into a different language without
+ * rescanning. Server uses the stored structured analysis — no new OCR /
+ * Vision call, no original-image access. Cached per (analysis, language)
+ * so repeat switches are instant.
+ *
+ * Throws a generic Error with a friendly message on any non-2xx. Errors
+ * typically mean the user should try again in a moment — they do NOT
+ * indicate the original analysis is lost (server always keeps the primary
+ * result intact).
+ */
+export async function translateAnalysis(
+  analysisId: string,
+  deviceId: string,
+  targetLanguage: LanguageCode,
+): Promise<AnalysisRecord & { usage?: UsageState }> {
+  const res = await fetch(
+    `${BASE_URL}/api/analyses/${encodeURIComponent(analysisId)}/translate`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        device_id: deviceId,
+        target_language: targetLanguage,
+      }),
+    },
+  );
+  return jsonOrThrow<AnalysisRecord & { usage?: UsageState }>(res);
 }
 
 export async function clearChatMessages(analysisId: string, deviceId: string): Promise<void> {

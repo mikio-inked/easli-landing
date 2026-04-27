@@ -46,6 +46,9 @@ export type UIKey =
   | 'history_title'
   | 'settings_title'
   | 'change_language'
+  | 'translation_sheet_title'
+  | 'translating_subtitle'
+  | 'translation_error'
   | 'delete_all_data'
   | 'delete_account'
   | 'privacy'
@@ -267,6 +270,9 @@ const en: UIStrings = {
   history_title: 'History',
   settings_title: 'Settings',
   change_language: 'Change language',
+  translation_sheet_title: 'Choose a language',
+  translating_subtitle: 'Re-creating the explanation…',
+  translation_error: 'The language could not be changed right now. Please try again.',
   delete_all_data: 'Delete all analyses',
   delete_account: 'Delete my data',
   privacy: 'Privacy',
@@ -491,6 +497,9 @@ const zh: UIStrings = {
   history_title: '历史记录',
   settings_title: '设置',
   change_language: '更换语言',
+  translation_sheet_title: '选择语言',
+  translating_subtitle: '正在重新生成说明…',
+  translation_error: '目前无法更改语言。请重试。',
   delete_all_data: '删除所有分析',
   delete_account: '删除我的数据',
   privacy: '隐私',
@@ -711,6 +720,9 @@ const vi: UIStrings = {
   history_title: 'Lịch sử',
   settings_title: 'Cài đặt',
   change_language: 'Đổi ngôn ngữ',
+  translation_sheet_title: 'Chọn ngôn ngữ',
+  translating_subtitle: 'Đang tạo lại giải thích…',
+  translation_error: 'Hiện không thể đổi ngôn ngữ. Vui lòng thử lại.',
   delete_all_data: 'Xoá tất cả phân tích',
   delete_account: 'Xoá dữ liệu của tôi',
   privacy: 'Quyền riêng tư',
@@ -933,6 +945,9 @@ const tr: UIStrings = {
   history_title: 'Geçmiş',
   settings_title: 'Ayarlar',
   change_language: 'Dili değiştir',
+  translation_sheet_title: 'Bir dil seçin',
+  translating_subtitle: 'Açıklama yeniden oluşturuluyor…',
+  translation_error: 'Dil şu anda değiştirilemedi. Lütfen tekrar deneyin.',
   delete_all_data: 'Tüm analizleri sil',
   delete_account: 'Verilerimi sil',
   privacy: 'Gizlilik',
@@ -1155,6 +1170,9 @@ const ru: UIStrings = {
   history_title: 'История',
   settings_title: 'Настройки',
   change_language: 'Сменить язык',
+  translation_sheet_title: 'Выберите язык',
+  translating_subtitle: 'Пояснение создаётся заново…',
+  translation_error: 'Сейчас не удалось сменить язык. Попробуйте ещё раз.',
   delete_all_data: 'Удалить все анализы',
   delete_account: 'Удалить мои данные',
   privacy: 'Конфиденциальность',
@@ -1377,6 +1395,9 @@ const es: UIStrings = {
   history_title: 'Historial',
   settings_title: 'Ajustes',
   change_language: 'Cambiar idioma',
+  translation_sheet_title: 'Elige un idioma',
+  translating_subtitle: 'Volviendo a generar la explicación…',
+  translation_error: 'No se pudo cambiar el idioma ahora. Vuelve a intentarlo.',
   delete_all_data: 'Eliminar todos los análisis',
   delete_account: 'Eliminar mis datos',
   privacy: 'Privacidad',
@@ -1601,6 +1622,9 @@ const de_simple: UIStrings = {
   history_title: 'Verlauf',
   settings_title: 'Einstellungen',
   change_language: 'Sprache ändern',
+  translation_sheet_title: 'Sprache wählen',
+  translating_subtitle: 'Erklärung wird neu erstellt…',
+  translation_error: 'Die Sprache konnte gerade nicht geändert werden. Bitte versuche es erneut.',
   delete_all_data: 'Alle Briefe löschen',
   delete_account: 'Meine Daten löschen',
   privacy: 'Datenschutz',
