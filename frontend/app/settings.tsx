@@ -32,6 +32,7 @@ import {
   ShieldAlert,
   ShieldCheck,
   Trash2,
+  Type,
 } from 'lucide-react-native';
 import { Card } from '../src/ui';
 import { deleteAllAnalyses, exportMyData } from '../src/api';
@@ -46,6 +47,7 @@ import { cancelAllReminders } from '../src/notifications';
 import { deleteAllOriginals } from '../src/originals';
 import { getSaveOriginals, setSaveOriginals } from '../src/settings';
 import { useUsage, getRemainingAnalyses } from '../src/usage';
+import { useLargeFontMode } from '../src/largeFontMode';
 import {
   isBillingAvailable,
   PaymentsUnavailableError,
@@ -69,6 +71,7 @@ export default function SettingsScreen() {
 
   const { usage, refresh: refreshUsage } = useUsage(deviceId);
   const remaining = getRemainingAnalyses(usage);
+  const [largeFont, setLargeFontEnabled] = useLargeFontMode();
 
   useFocusEffect(
     useCallback(() => {
@@ -259,6 +262,28 @@ export default function SettingsScreen() {
               trackColor={{ false: colors.border, true: colors.primary }}
               thumbColor={colors.white}
               testID="settings-save-originals-toggle"
+            />
+          </View>
+        </Card>
+
+        <Card>
+          <View style={styles.row}>
+            <View style={[styles.rowIcon, { backgroundColor: colors.primarySoft }]}>
+              <Type color={colors.primary} size={20} strokeWidth={2.4} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.rowTitle}>{t(lang, 'onb_large_font')}</Text>
+            </View>
+            <Switch
+              value={largeFont}
+              onValueChange={(v) => {
+                setLargeFontEnabled(v).catch(() => {
+                  // ignore — the toggle still flips locally via the hook
+                });
+              }}
+              trackColor={{ false: colors.border, true: colors.primary }}
+              thumbColor={colors.white}
+              testID="settings-large-font-toggle"
             />
           </View>
         </Card>

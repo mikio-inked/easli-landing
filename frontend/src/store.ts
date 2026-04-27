@@ -12,7 +12,6 @@ const KEY_LANG = 'klarpost.language';
 const KEY_DEVICE = 'klarpost.deviceId';
 const KEY_ONBOARDED = 'klarpost.onboarded';
 const KEY_CONSENT = 'klarpost.consent_v1';
-const KEY_LARGE_FONT = 'klarpost.largeFont';
 
 function uuid(): string {
   // RFC4122-ish, fine for an anonymous device id.
@@ -52,22 +51,15 @@ export async function isOnboarded(): Promise<boolean> {
 }
 
 // ---- Large-font accessibility mode ----
-// Set during onboarding (or later via Settings) — scales up body text by
-// ~15% throughout the app. Targeted at elderly users who struggle with
-// dense German bureaucratic letters. Simple boolean — the theme helpers
-// in /src/theme.ts read this and adjust fontSize tokens accordingly.
-export async function setLargeFontMode(enabled: boolean): Promise<void> {
-  if (enabled) {
-    await AsyncStorage.setItem(KEY_LARGE_FONT, '1');
-  } else {
-    await AsyncStorage.removeItem(KEY_LARGE_FONT);
-  }
-}
-
-export async function getLargeFontMode(): Promise<boolean> {
-  const v = await AsyncStorage.getItem(KEY_LARGE_FONT);
-  return v === '1';
-}
+// Moved to /src/largeFontMode.ts — it owns the render-time scale used by a
+// monkey-patched <Text> component so every screen picks up the bump without
+// refactoring. Re-exported here for backward compatibility with callers that
+// already import from `store`.
+export {
+  setLargeFontMode,
+  isLargeFontModeSync as _isLargeFontSync,
+  loadLargeFontMode as getLargeFontMode,
+} from './largeFontMode';
 
 // ---- DSGVO consent (active opt-in before first analyze) ----
 
