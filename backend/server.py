@@ -40,7 +40,13 @@ MISTRAL_VISION_MODEL = os.environ.get('MISTRAL_VISION_MODEL', 'mistral-large-251
 MISTRAL_ANALYSIS_MODEL = os.environ.get('MISTRAL_ANALYSIS_MODEL', 'mistral-large-2512')
 MISTRAL_CHAT_MODEL = os.environ.get('MISTRAL_CHAT_MODEL', 'mistral-large-2512')
 
-mistral_client: Optional[Mistral] = Mistral(api_key=MISTRAL_API_KEY) if MISTRAL_API_KEY else None
+mistral_client: Optional[Mistral] = (
+    # 30s per individual API call. Combined with our retry helper's 25s
+    # cumulative-wait budget that gives a hard ~55s upper bound on any
+    # single /api/analyze call's Mistral phase — well inside the iOS
+    # client's 120s upload-timeout.
+    Mistral(api_key=MISTRAL_API_KEY, timeout_ms=30_000) if MISTRAL_API_KEY else None
+)
 
 # ==================== PAYWALL / USAGE CONFIG ====================
 # Read once at startup so behaviour is predictable. All values are also
@@ -497,13 +503,24 @@ def _sanitize_literal_fields(parsed: dict) -> None:
 # data, or any metadata derived from the image content. Only sizes (input vs
 # output) and an opaque page index are logged.
 
-# Threshold above which we always re-encode. 1.5 MB is the size at which Mistral
-# rate-limit pressure starts on the free / mid tiers.
-COMPRESS_THRESHOLD_BYTES = int(1.5 * 1024 * 1024)
-# Max pixel dimensions the vision model needs (German A4 letters fit easily).
-MAX_VISION_WIDTH_PX = 1600
-MAX_VISION_HEIGHT_PX = 2200
-JPEG_QUALITY_FOR_VISION = 70
+# Server-side image-compression knobs. Tuned for Mistral free-tier:
+#  • Smaller dimensions reduce per-image vision-token count by ~35-50%, which
+#    lets multi-page (3-5 page) scans fit inside the per-second token rate
+#    on Mistral's free plan.
+#  • The threshold is intentionally low so we re-compress almost everything
+#    coming from iOS — even when the client did its own compression pass,
+#    a second pass at our tighter target costs <100ms and reliably caps the
+#    vision-token usage. Anything truly small (<256 KB binary) is passed
+#    through untouched.
+#  • Quality 60 still produces excellent OCR for German text at 1280px width
+#    (verified empirically with realistic Telekom invoice payloads).
+COMPRESS_THRESHOLD_BYTES = 256 * 1024
+# Max pixel dimensions the vision model needs (German A4 letters fit easily
+# at 1280x1800 — drop from 1600x2200 saves ~35% of vision tokens, critical
+# on Mistral free-tier where 4-page scans were hitting 429s).
+MAX_VISION_WIDTH_PX = 1280
+MAX_VISION_HEIGHT_PX = 1800
+JPEG_QUALITY_FOR_VISION = 60
 
 # Lazy-import Pillow so import errors only surface when we actually compress.
 try:
@@ -630,14 +647,17 @@ def _is_rate_limit_error(exc: Exception) -> bool:
 # one; this fallback is for robustness.
 #
 # Total fallback wait: 2 + 4 + 8 + 16 = 30s across 4 retries (5 total attempts).
-_RATE_LIMIT_DEFAULT_BACKOFF_SECONDS = [2, 4, 8, 16]
+_RATE_LIMIT_DEFAULT_BACKOFF_SECONDS = [2, 4, 8]
 # Hard cap on a single sleep — even if Mistral asks us to wait 5 minutes, we
 # don't keep an iOS upload connection open that long. The client gets a clean
 # 429 with the original Retry-After hint forwarded.
-_RATE_LIMIT_MAX_SINGLE_WAIT_SECONDS = 30
-# Hard cap on total accumulated retry-wait. Past this we surrender and let the
-# user retry from the app (which is friendlier than a 60s+ spinner).
-_RATE_LIMIT_MAX_TOTAL_WAIT_SECONDS = 45
+_RATE_LIMIT_MAX_SINGLE_WAIT_SECONDS = 20
+# Hard cap on total accumulated retry-wait. Tightened from 45s → 25s because
+# combined with our 30s per-call Mistral timeout (timeout_ms on the client),
+# 25s of retry-wait + 4×30s of API-call time keeps us inside the iOS 120s
+# upload-timeout window with margin to spare. Past this we surrender and let
+# the user retry from the app (which is friendlier than a 60s+ spinner).
+_RATE_LIMIT_MAX_TOTAL_WAIT_SECONDS = 25
 # Default we surface to the client if Mistral didn't tell us anything.
 _RATE_LIMIT_FALLBACK_CLIENT_HINT = 8
 
