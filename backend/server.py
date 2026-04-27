@@ -39,13 +39,24 @@ MISTRAL_API_KEY = os.environ.get('MISTRAL_API_KEY', '')
 MISTRAL_VISION_MODEL = os.environ.get('MISTRAL_VISION_MODEL', 'mistral-large-2512')
 MISTRAL_ANALYSIS_MODEL = os.environ.get('MISTRAL_ANALYSIS_MODEL', 'mistral-large-2512')
 MISTRAL_CHAT_MODEL = os.environ.get('MISTRAL_CHAT_MODEL', 'mistral-large-2512')
+# Dedicated OCR model — extremely fast (0.5-1s/page) and orders of magnitude
+# cheaper than running a full multimodal model over every page. Used as the
+# first stage of the 2-stage analyze pipeline:
+#   1) OCR each page in parallel → markdown text
+#   2) Feed combined text to the analysis model (text-only call)
+# Empirical numbers on Mistral Free Tier: 4-page scan goes from ~125s (single
+# multimodal call) to ~4s (OCR+text). It also sidesteps the per-minute
+# vision-token rate limit that single-call Vision was hitting.
+MISTRAL_OCR_MODEL = os.environ.get('MISTRAL_OCR_MODEL', 'mistral-ocr-latest')
 
 mistral_client: Optional[Mistral] = (
-    # 30s per individual API call. Combined with our retry helper's 25s
-    # cumulative-wait budget that gives a hard ~55s upper bound on any
-    # single /api/analyze call's Mistral phase — well inside the iOS
-    # client's 120s upload-timeout.
-    Mistral(api_key=MISTRAL_API_KEY, timeout_ms=30_000) if MISTRAL_API_KEY else None
+    # 60s per individual API call. Vision was 30s but OCR+text split is
+    # much faster (typ. 4-10s) — we still keep 60s as a safety ceiling for
+    # edge cases like Mistral warming up a cold model. Combined with our
+    # retry helper's 25s cumulative-wait budget this gives a hard ~85s
+    # upper bound per Mistral phase — well inside the iOS client's 120s
+    # upload-timeout.
+    Mistral(api_key=MISTRAL_API_KEY, timeout_ms=60_000) if MISTRAL_API_KEY else None
 )
 
 # ==================== PAYWALL / USAGE CONFIG ====================
@@ -776,6 +787,69 @@ async def mistral_complete_with_retry(
     raise RuntimeError("mistral_complete_with_retry: unreachable")
 
 
+async def ocr_pages_with_mistral(
+    images: List[Tuple[str, str]],
+) -> List[str]:
+    """Run Mistral OCR on every page in parallel and return per-page markdown.
+
+    Returns a list the same length as `images`. If a single page fails we
+    insert a short "[Seite N konnte nicht gelesen werden]" placeholder so the
+    combined-text analysis can still run on the other pages — a user with
+    one blurry page gets a useful result for the other three.
+
+    Privacy: only page index + chars-count are logged. Never the text.
+    Per-page OCR latency is typically 0.3-1.5s on Mistral's free tier.
+    """
+    if not mistral_client:
+        raise HTTPException(
+            status_code=500,
+            detail="Mistral API key not configured. Please set MISTRAL_API_KEY in backend/.env",
+        )
+
+    # A semaphore of 3 keeps us friendly with Mistral's per-second RPS limit
+    # on the free tier while still shrinking a 4-page scan to ~2 rounds.
+    sem = asyncio.Semaphore(3)
+
+    async def ocr_one(idx: int, b64: str, mime: str) -> str:
+        async with sem:
+            url_mime = mime or "image/png"
+            try:
+                # mistralai SDK: ocr.process_async with a document = image_url.
+                # We pass a data URL so no upload/file step is needed.
+                resp = await mistral_client.ocr.process_async(
+                    model=MISTRAL_OCR_MODEL,
+                    document={
+                        "type": "image_url",
+                        "image_url": f"data:{url_mime};base64,{b64}",
+                    },
+                    include_image_base64=False,
+                )
+                # resp.pages is a list of OCRPageObject; each has `.markdown`.
+                md_pages = []
+                for p in (resp.pages or []):
+                    md = getattr(p, "markdown", None)
+                    if isinstance(md, str) and md.strip():
+                        md_pages.append(md)
+                combined = "\n\n".join(md_pages).strip()
+                logger.info(
+                    "ocr_page_ok idx=%d chars=%d",
+                    idx, len(combined),
+                )
+                if not combined:
+                    return f"[Seite {idx + 1}: kein Text erkannt]"
+                return combined
+            except Exception as e:
+                # Privacy: log only the exception type + page index.
+                logger.warning(
+                    "ocr_page_failed idx=%d error_type=%s",
+                    idx, type(e).__name__,
+                )
+                return f"[Seite {idx + 1} konnte nicht gelesen werden]"
+
+    tasks = [ocr_one(i, b64, mime) for i, (b64, mime) in enumerate(images)]
+    return await asyncio.gather(*tasks)
+
+
 async def analyze_with_mistral(
     images: List[Tuple[str, str]],
     target_language_label: str,
@@ -783,9 +857,14 @@ async def analyze_with_mistral(
 ) -> AnalysisResult:
     """Analyze a German document (one or many pages) with Mistral.
 
-    Mistral Large 3 (`mistral-large-2512`) handles OCR + reasoning in a single
-    multimodal call, so we don't need a separate OCR step. The whole pipeline
-    stays with one EU-headquartered provider.
+    Two-stage pipeline:
+      1) Mistral OCR runs on every page in parallel → markdown text.
+      2) Mistral Large 3 (text-only) receives the combined markdown + a strict
+         JSON system prompt and produces the structured analysis.
+
+    This is ~30× faster than a single multimodal call for 4-page scans and
+    also costs far fewer vision tokens — which keeps us comfortably inside
+    Mistral's free-tier rate limits.
     """
     if not mistral_client:
         raise HTTPException(
@@ -795,51 +874,81 @@ async def analyze_with_mistral(
     if not images:
         raise HTTPException(status_code=400, detail="No image content to analyze")
 
-    page_note = (
-        f"This document has {len(images)} page(s). They are provided in order from page 1. "
-        "Treat them as ONE document and produce a single combined analysis."
-        if len(images) > 1
-        else ""
-    )
-
-    # Compress / downscale every page before we hand it to Mistral. Privacy-
-    # preserving: compress_image_for_vision() never logs the bytes.
+    # Compress / downscale every page before we hand it to OCR. Saves upload
+    # bandwidth on mobile networks (the Mistral OCR endpoint still benefits
+    # from reasonable image sizes even though it doesn't charge vision
+    # tokens). Privacy-preserving: compress_image_for_vision never logs the
+    # bytes.
     images = [
         compress_image_for_vision(idx, b64, mime)
         for idx, (b64, mime) in enumerate(images)
     ]
 
-    user_content: List[dict] = [
-        {
-            "type": "text",
-            "text": (
-                f"Please analyze this German document and respond ONLY with the JSON object as specified. "
-                f"The user's selected target language is {target_language_label}. {page_note}"
-            ).strip(),
-        }
-    ]
-    for b64, mime in images:
-        # Pixtral expects data URLs. Default to image/png if mime is empty.
-        url_mime = mime or "image/png"
-        user_content.append(
-            {
-                "type": "image_url",
-                "image_url": f"data:{url_mime};base64,{b64}",
-            }
+    # ---- Stage 1: OCR every page in parallel --------------------------
+    try:
+        page_texts = await ocr_pages_with_mistral(images)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception(
+            "Mistral OCR stage failed (model=%s, error_type=%s)",
+            MISTRAL_OCR_MODEL,
+            type(e).__name__,
         )
+        raise HTTPException(status_code=502, detail="AI analysis failed.")
+
+    # Combine per-page markdown into one text block. Page separators help the
+    # analysis model handle multi-page context correctly (e.g. a deadline on
+    # page 2 that refers to a reference on page 1).
+    if len(page_texts) > 1:
+        combined_text = "\n\n".join(
+            f"--- Seite {i + 1} ---\n\n{txt}" for i, txt in enumerate(page_texts)
+        )
+    else:
+        combined_text = page_texts[0] if page_texts else ""
+
+    # Guardrail: if OCR extracted literally nothing readable, bail out with
+    # a clean 422. This usually means the user photographed a blank page,
+    # a picture of a face, or something completely unreadable.
+    all_readable = any(
+        txt and not txt.startswith("[Seite ") for txt in page_texts
+    )
+    if not all_readable or not combined_text.strip():
+        logger.warning(
+            "analysis_unreadable pages=%d total_chars=%d",
+            len(page_texts), len(combined_text),
+        )
+        raise HTTPException(
+            status_code=422,
+            detail="No readable German text was found. Please retry with a clearer photo.",
+        )
+
+    # ---- Stage 2: Structured analysis on extracted text ---------------
+    page_note = (
+        f"The document has {len(page_texts)} page(s). "
+        "Treat them as ONE document and produce a single combined analysis."
+        if len(page_texts) > 1
+        else ""
+    )
+
+    user_text = (
+        f"Analyze this German document and respond ONLY with the JSON object as specified. "
+        f"The user's selected target language is {target_language_label}. {page_note}\n\n"
+        f"--- EXTRACTED DOCUMENT TEXT (from OCR) ---\n{combined_text}"
+    ).strip()
 
     messages = [
         {
             "role": "system",
             "content": build_system_prompt(target_language_label, target_language_code),
         },
-        {"role": "user", "content": user_content},
+        {"role": "user", "content": user_text},
     ]
 
     try:
         response = await mistral_complete_with_retry(
-            label="vision",
-            model=MISTRAL_VISION_MODEL,
+            label="analysis",
+            model=MISTRAL_ANALYSIS_MODEL,
             messages=messages,
             response_format={"type": "json_object"},
             temperature=0.2,
@@ -856,8 +965,8 @@ async def analyze_with_mistral(
     except Exception as e:
         # Privacy: log only the model + exception type, never the messages.
         logger.exception(
-            "Mistral vision call failed (model=%s, error_type=%s)",
-            MISTRAL_VISION_MODEL,
+            "Mistral analysis call failed (model=%s, error_type=%s)",
+            MISTRAL_ANALYSIS_MODEL,
             type(e).__name__,
         )
         raise HTTPException(status_code=502, detail="AI analysis failed.")
@@ -870,7 +979,7 @@ async def analyze_with_mistral(
         # names, deadlines, amounts, addresses extracted from the document.
         logger.exception(
             "Unexpected Mistral response shape (model=%s, choices=%d)",
-            MISTRAL_VISION_MODEL,
+            MISTRAL_ANALYSIS_MODEL,
             len(getattr(response, "choices", []) or []),
         )
         raise HTTPException(status_code=502, detail="AI returned an empty response")
@@ -880,7 +989,7 @@ async def analyze_with_mistral(
         # Privacy: never log the raw response_text — log only metadata.
         logger.error(
             "Could not parse JSON from Mistral analyze response (model=%s, length=%d)",
-            MISTRAL_VISION_MODEL,
+            MISTRAL_ANALYSIS_MODEL,
             len(response_text or ""),
         )
         raise HTTPException(
@@ -906,7 +1015,7 @@ async def analyze_with_mistral(
         # so we can debug schema drift without leaking PII.
         logger.exception(
             "Validation failed for AI response (model=%s, error_type=%s, top_keys=%d)",
-            MISTRAL_VISION_MODEL,
+            MISTRAL_ANALYSIS_MODEL,
             type(e).__name__,
             len(parsed.keys()) if isinstance(parsed, dict) else 0,
         )

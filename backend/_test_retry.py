@@ -122,37 +122,38 @@ async def main():
         expected_min_wait_s=9.5, expected_max_wait_s=11.5,
     ))
 
-    # 4) Persistent 429 with no Retry-After → 4 retries with default backoff
-    #    [2, 4, 8, 16] but max-total cap of 45s allows all 4. Total = 30s.
-    #    But max_attempts = 5, so we try 5 times. Final hint = 16 (last default).
+    # 4) Persistent 429 with no Retry-After → exhaust default backoff
+    #    [2, 4, 8] with 4 total attempts (3 retries). Budget cap 25s means
+    #    we stop waiting once cumulative ≥ 25s; for [2, 4, 8] total waits
+    #    are 2+4+8 = 14s — fits budget → all 3 retries taken.
+    #    Final hint = 8 (last default backoff value used).
     results.append(await run_case(
         "persistent 429 without server hint → exhaust default backoff",
         side_effects=[FakeMistralError() for _ in range(5)],
         expected_outcome="rate_limited",
-        expected_min_wait_s=29.5, expected_max_wait_s=31.5,
-        expected_client_hint=16,
+        expected_min_wait_s=13.5, expected_max_wait_s=15.5,
+        expected_client_hint=8,
     ))
 
-    # 5) Persistent 429 with server hint 7 → cap at total 45s, so we get
-    #    multiple retries each waiting 7s, until budget is exceeded.
-    #    7+7+7+7 = 28s ≤ 45s, but 7+7+7+7+7 = 35s ≤ 45s — still fits 5 attempts? 
-    #    Actually max_attempts is 5, so we try 5 times total.
-    #    Wait sequence: 7+7+7+7 = 28s (4 waits between 5 attempts).
+    # 5) Persistent 429 with server hint 7 → total budget 25s allows 3
+    #    retries (7+7+7 = 21s). 4th attempt fires, 5th would blow budget.
     results.append(await run_case(
         "persistent 429 with server hint=7s, exhausts attempts",
         side_effects=[FakeMistralError(7) for _ in range(6)],
         expected_outcome="rate_limited",
-        expected_min_wait_s=27.5, expected_max_wait_s=29.5,
+        expected_min_wait_s=20.5, expected_max_wait_s=22.5,
         expected_client_hint=7,
     ))
 
-    # 6) Server hint that's too large (e.g., 120s) → capped to 30s for sleep,
-    #    but client_hint forwards the real 120s.
+    # 6) Server hint that's too large (120s) → capped to 20s for sleep,
+    #    but client_hint forwards the real 120s. After 1 retry of 20s we're
+    #    at total_waited=20s; another 20s would exceed the 25s budget →
+    #    surrender after just 1 retry (2 attempts total).
     results.append(await run_case(
         "server hint=120s — capped to max wait, client gets truthful 120s",
-        side_effects=[FakeMistralError(120), FakeMistralError(120)],  # 30+30 > 45 budget
+        side_effects=[FakeMistralError(120), FakeMistralError(120)],
         expected_outcome="rate_limited",
-        expected_min_wait_s=29.5, expected_max_wait_s=31.5,
+        expected_min_wait_s=19.5, expected_max_wait_s=21.5,
         expected_client_hint=120,
     ))
 
