@@ -36,7 +36,7 @@ import {
   Type,
 } from 'lucide-react-native';
 import { Button } from '../src/ui';
-import { setConsent, setLanguage, setOnboarded } from '../src/store';
+import { setConsent, setLanguage, getLanguage, setOnboarded } from '../src/store';
 import { useLargeFontMode } from '../src/largeFontMode';
 import { colors, fontSize, fontWeight, radius, shadows, spacing } from '../src/theme';
 import { LanguageCode, LANGUAGES, t } from '../src/i18n';
@@ -69,13 +69,33 @@ export default function Onboarding() {
   const [lang, setLangState] = useState<LanguageCode>(() => detectInitialLang());
   const [largeFont, setLargeFont] = useLargeFontMode();
 
-  // Persist language as soon as the user taps a flag so the UI re-translates
-  // the moment Screen 2 mounts, without waiting for the final CTA.
+  // On first mount, prefer any previously-persisted language pick over the
+  // auto-detected locale. Without this, toggling large-font mode (which
+  // re-renders the screen) would *visually* feel correct, but the very next
+  // mount cycle of this component (e.g. after a Stack remount earlier on)
+  // would wipe the user's choice back to the system locale. Reading
+  // AsyncStorage once on mount keeps the previous selection sticky.
   useEffect(() => {
-    setLanguage(lang).catch(() => {
+    let cancelled = false;
+    getLanguage()
+      .then((persisted) => {
+        if (!cancelled && persisted) setLangState(persisted);
+      })
+      .catch(() => {
+        // ignore — fall back to the locale-detected initial value
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // Persist whenever the user explicitly picks a language.
+  const onPickLanguage = (code: LanguageCode) => {
+    setLangState(code);
+    setLanguage(code).catch(() => {
       // swallow — AsyncStorage failures shouldn't block the tour
     });
-  }, [lang]);
+  };
 
   const finish = async () => {
     await setLanguage(lang);
@@ -118,7 +138,7 @@ export default function Onboarding() {
       {step === 0 ? (
         <LanguageStep
           lang={lang}
-          onPick={setLangState}
+          onPick={onPickLanguage}
           largeFont={largeFont}
           onToggleLargeFont={setLargeFont}
           onContinue={() => setStep(1)}
