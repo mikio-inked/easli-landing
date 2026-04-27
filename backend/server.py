@@ -1675,14 +1675,15 @@ async def translate_analysis_endpoint(analysis_id: str, req: TranslateRequest):
         }
 
     # ---- Miss: call Mistral (text-only) -------------------------------
-    # Optional soft cap: count primary + existing translations. For a typical
-    # free user this never triggers because MAX_TRANSLATIONS_PER_ANALYSIS is
-    # generous (6 by default, configurable via env).
-    distinct_langs = set(translations.keys()) | {primary_code}
-    if len(distinct_langs) >= MAX_TRANSLATIONS_PER_ANALYSIS:
+    # Optional soft cap on how many ADDITIONAL translations (not counting
+    # the primary language) a single analysis can have. Default 6 means
+    # every user can reach all 6 non-primary supported languages. Set to 7
+    # if you want paranoid headroom. Never fires for TestFlight traffic.
+    distinct_translations = set(translations.keys())
+    if len(distinct_translations) >= MAX_TRANSLATIONS_PER_ANALYSIS:
         logger.info(
             "translation_blocked_per_doc_limit device=%s analysis=%s target=%s distinct=%d",
-            req.device_id, analysis_id, target_code, len(distinct_langs),
+            req.device_id, analysis_id, target_code, len(distinct_translations),
         )
         usage_rec = await _load_or_create_usage(req.device_id)
         return JSONResponse(
