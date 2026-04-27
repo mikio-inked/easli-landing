@@ -1,10 +1,13 @@
 // Helpers to export the current analysis as a shareable PDF or plain text
-// using the native share sheet. Uses ONLY React Native's built-in Share API
-// (no expo-sharing dependency) so we avoid native build issues with newer
-// expo-modules-core. expo-print is still used for HTML→PDF conversion.
+// using the native share sheet. iOS uses RN's built-in Share API (which
+// accepts file:// URLs out of the box). Android uses `expo-sharing`, which
+// wraps Android's `Intent.ACTION_SEND` flow with a content:// URI provider —
+// without it, RN's Share.share() can only attach plain text on Android.
+// expo-print is used for HTML→PDF conversion on both platforms.
 
 import { Alert, Platform, Share } from 'react-native';
 import * as Print from 'expo-print';
+import * as Sharing from 'expo-sharing';
 
 import { AnalysisRecord } from './api';
 import { LanguageCode, categoryLabel, t } from './i18n';
@@ -257,9 +260,20 @@ export async function shareAnalysisAsPdf(
       await Share.share({ url: uri, title: 'KlarPost' });
       return;
     }
-    // Android: Share.share doesn't natively support file URIs in a useful
-    // way, so fall back to text + a note. Users can also tap Share-as-text
-    // for the full readable version.
+    // Android: RN's Share.share() can't attach a file:// URI as a payload —
+    // it would silently degrade to text. expo-sharing wraps Android's
+    // Storage Access Framework and FileProvider so the user gets a real
+    // PDF in WhatsApp / Gmail / Drive / etc., matching the iOS experience.
+    if (await Sharing.isAvailableAsync()) {
+      await Sharing.shareAsync(uri, {
+        mimeType: 'application/pdf',
+        dialogTitle: 'KlarPost',
+        UTI: 'com.adobe.pdf',
+      });
+      return;
+    }
+    // Last-ditch fallback (should be rare — Sharing is available on every
+    // shipping Android device): degrade to plain-text share.
     await Share.share({
       message: buildAnalysisText(record, lang),
       title: 'KlarPost',

@@ -46,6 +46,14 @@
     "plugins": [
       "expo-router",
       [
+        "expo-build-properties",
+        {
+          "android": {
+            "largeHeap": true
+          }
+        }
+      ],
+      [
         "expo-camera",
         {
           "cameraPermission": "Scan German documents to translate and explain them."
@@ -83,7 +91,8 @@
         }
       ],
       "expo-web-browser",
-      "expo-localization"
+      "expo-localization",
+      "expo-build-properties"
     ],
     "experiments": {
       "typedRoutes": true
