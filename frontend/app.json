@@ -81,7 +81,8 @@
         {
           "cameraPermission": "Scan German documents to translate and explain them."
         }
-      ]
+      ],
+      "expo-web-browser"
     ],
     "experiments": {
       "typedRoutes": true
