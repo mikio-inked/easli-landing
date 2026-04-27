@@ -441,8 +441,14 @@ function LiveDemoStep({ lang, onGetStarted }: { lang: LanguageCode; onGetStarted
           </Animated.View>
         </View>
 
-        <Pressable onPress={runAnimation} style={styles.replay} testID="onb-replay">
-          <Text style={styles.replayText}>↻ {t(lang, 'retry')}</Text>
+        <Pressable
+          onPress={runAnimation}
+          style={styles.replay}
+          testID="onb-replay"
+          accessibilityRole="button"
+          accessibilityLabel="Replay demo"
+        >
+          <Text style={styles.replayText}>↻</Text>
         </Pressable>
 
         <Text style={styles.privacyFootnote}>{t(lang, 'privacy_short')}</Text>
@@ -715,13 +721,20 @@ const styles = StyleSheet.create({
   replay: {
     alignSelf: 'center',
     paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.md,
+    paddingHorizontal: spacing.lg,
     marginBottom: spacing.md,
+    borderRadius: radius.full,
+    backgroundColor: colors.primarySoft,
+    borderWidth: 1,
+    borderColor: colors.border,
+    minWidth: 56,
+    alignItems: 'center',
   },
   replayText: {
-    fontSize: fontSize.sm,
+    fontSize: fontSize.lg,
     color: colors.primary,
-    fontWeight: fontWeight.semibold,
+    fontWeight: fontWeight.bold,
+    lineHeight: 22,
   },
   privacyFootnote: {
     textAlign: 'center',

@@ -22,9 +22,11 @@ installLargeFontPatch();
 export default function RootLayout() {
   const [fontReady, setFontReady] = useState(false);
   // Subscribing to the hook triggers a re-render of the whole Stack when the
-  // user flips the toggle — that propagates the new scale to every mounted
-  // screen in one frame.
-  useLargeFontMode();
+  // user flips the toggle. We then bump the Stack's `key` so React fully
+  // remounts the navigator — this guarantees every screen's <Text> is freshly
+  // rendered through the patched render fn with the new scale, even on
+  // platforms where some Text instances aggressively memoise their styles.
+  const [largeFont] = useLargeFontMode();
 
   // Boot the RevenueCat SDK as early as possible. The wrapper is built to
   // never throw — it logs a single info line if the keys are missing or the
@@ -58,9 +60,11 @@ export default function RootLayout() {
       <SafeAreaProvider>
         <StatusBar style="dark" />
         <Stack
-          // Keying on fontReady ensures the first render uses the correct
-          // scale — avoids a flash of un-zoomed text on cold starts.
-          key={fontReady ? 'ready' : 'boot'}
+          // Re-key on (a) initial font-flag load and (b) every toggle so the
+          // entire navigator remounts and every <Text> goes through the
+          // patched render with the new scale. The slight mount/unmount cost
+          // is negligible compared to the accessibility win.
+          key={`${fontReady ? 'r' : 'b'}-${largeFont ? 'lg' : 'sm'}`}
           screenOptions={{
             headerShown: false,
             contentStyle: { backgroundColor: colors.background },

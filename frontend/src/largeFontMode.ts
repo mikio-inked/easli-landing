@@ -1,17 +1,16 @@
 // App-wide font scaling for accessibility / elderly-friendly mode.
 //
-// Strategy: monkey-patch React Native's built-in Text component so every
-// `<Text>` in the tree receives a scaled `fontSize` (and `lineHeight`) without
-// requiring every individual screen to be refactored. The patch is installed
-// ONCE at module load time — before the first <Text> is rendered — and reads
-// a module-level `_scale` variable that is kept in sync with AsyncStorage.
+// Two-pronged strategy so this works on Expo Go, in production builds, and
+// across Hermes / JSC / RN 0.81+:
 //
-// Why monkey-patching and not a theme context?
-// KlarPost already has 20+ screens with hard-coded fontSize values from the
-// theme token set. Threading a hook through every screen would be noisy and
-// slow to roll out, and we want one toggle to instantly upscale everything
-// (headings, buttons, list items, modals). The override respects any fontSize
-// authors have set locally — it simply multiplies by the current scale.
+//   1. Monkey-patch the `render` slot of the forwardRef'd <Text>/<TextInput>
+//      from `react-native`. This catches every text node anywhere in the
+//      tree and multiplies any explicit fontSize / lineHeight by the current
+//      scale. The patch is idempotent and installed at module-import time
+//      (before the first render in `_layout.tsx`).
+//   2. Re-key the root Stack whenever the scale changes — see `_layout.tsx`.
+//      That way even text components whose parents wouldn't naturally
+//      re-render still pick up the new scale on the next paint.
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useEffect, useState } from 'react';
@@ -20,8 +19,6 @@ import { StyleSheet, Text as RNText, TextInput as RNTextInput } from 'react-nati
 const KEY_LARGE_FONT = 'klarpost.largeFont';
 const LARGE_SCALE = 1.18; // +18% — comfortable bump without breaking layouts
 
-// Module-level state kept in sync with AsyncStorage. Read synchronously inside
-// the patched render function so toggling takes effect on next re-render.
 let _scale = 1;
 let _installed = false;
 const listeners = new Set<() => void>();
@@ -31,9 +28,52 @@ function scaleStyle(style: unknown): unknown {
   const flat = StyleSheet.flatten(style as never) as Record<string, unknown> | null;
   if (!flat) return style;
   const next: Record<string, unknown> = { ...flat };
-  if (typeof flat.fontSize === 'number') next.fontSize = (flat.fontSize as number) * _scale;
-  if (typeof flat.lineHeight === 'number') next.lineHeight = (flat.lineHeight as number) * _scale;
+  if (typeof flat.fontSize === 'number') {
+    // Round to a whole pixel — some RN releases ignore fractional fontSize.
+    next.fontSize = Math.round((flat.fontSize as number) * _scale);
+  }
+  if (typeof flat.lineHeight === 'number') {
+    next.lineHeight = Math.round((flat.lineHeight as number) * _scale);
+  }
   return next;
+}
+
+function tryReplaceRender(comp: unknown, label: string): boolean {
+  if (!comp || typeof comp !== 'object') return false;
+  const target = comp as { render?: (...args: unknown[]) => unknown };
+  const orig = target.render;
+  if (typeof orig !== 'function') return false;
+  const wrapper = function patchedRender(this: unknown, props: { style?: unknown }, ref: unknown) {
+    if (_scale === 1) {
+      return (orig as (p: unknown, r: unknown) => unknown).call(this, props, ref);
+    }
+    const nextProps = { ...props, style: scaleStyle(props?.style) };
+    return (orig as (p: unknown, r: unknown) => unknown).call(this, nextProps, ref);
+  };
+  // Try direct assignment first (works on most RN builds).
+  try {
+    target.render = wrapper as never;
+    if (target.render === wrapper) return true;
+  } catch {
+    // fallthrough to defineProperty
+  }
+  // Some RN builds make the property non-writable but configurable. defineProperty
+  // sidesteps the silent-fail of strict-mode assignment.
+  try {
+    Object.defineProperty(target, 'render', {
+      configurable: true,
+      enumerable: true,
+      writable: true,
+      value: wrapper,
+    });
+    return target.render === wrapper;
+  } catch (e) {
+    if (__DEV__) {
+      // eslint-disable-next-line no-console
+      console.warn(`[largeFontMode] could not patch ${label}.render`, e);
+    }
+    return false;
+  }
 }
 
 /**
@@ -44,30 +84,14 @@ export function installLargeFontPatch(): void {
   if (_installed) return;
   _installed = true;
   try {
-    const anyText = RNText as unknown as { render?: (...args: unknown[]) => unknown };
-    const origTextRender = anyText.render;
-    if (typeof origTextRender === 'function') {
-      anyText.render = function patchedTextRender(this: unknown, props: { style?: unknown }, ref: unknown) {
-        if (_scale === 1) {
-          return (origTextRender as (p: unknown, r: unknown) => unknown).call(this, props, ref);
-        }
-        const nextProps = { ...props, style: scaleStyle(props?.style) };
-        return (origTextRender as (p: unknown, r: unknown) => unknown).call(this, nextProps, ref);
-      } as never;
-    }
-    const anyInput = RNTextInput as unknown as { render?: (...args: unknown[]) => unknown };
-    const origInputRender = anyInput.render;
-    if (typeof origInputRender === 'function') {
-      anyInput.render = function patchedInputRender(this: unknown, props: { style?: unknown }, ref: unknown) {
-        if (_scale === 1) {
-          return (origInputRender as (p: unknown, r: unknown) => unknown).call(this, props, ref);
-        }
-        const nextProps = { ...props, style: scaleStyle(props?.style) };
-        return (origInputRender as (p: unknown, r: unknown) => unknown).call(this, nextProps, ref);
-      } as never;
+    const t = tryReplaceRender(RNText, 'Text');
+    const ti = tryReplaceRender(RNTextInput, 'TextInput');
+    if (__DEV__) {
+      // eslint-disable-next-line no-console
+      console.log(`[largeFontMode] patch installed text=${t} textInput=${ti}`);
     }
   } catch {
-    // If RN internals ever change, fail soft — the app just won't scale.
+    // Always fail soft — accessibility is best-effort.
   }
 }
 
@@ -104,6 +128,12 @@ export async function setLargeFontMode(enabled: boolean): Promise<void> {
 /** Reads the current flag without touching storage (for quick checks). */
 export function isLargeFontModeSync(): boolean {
   return _scale > 1;
+}
+
+/** Raw scale (1 or LARGE_SCALE). Useful for screens that prefer a hook
+ *  over the implicit Text patch (e.g. for explicit lineHeight tuning). */
+export function getFontScaleSync(): number {
+  return _scale;
 }
 
 /**
