@@ -12,11 +12,9 @@
       "policy": "appVersion"
     },
     "updates": {
-  "enabled": true,
-  "checkAutomatically": "ON_LOAD",
-  "fallbackToCacheTimeout": 0,
-  "url": "https://u.expo.dev/2e32d367-22a7-403f-8381-bd3a20c7fa80"
-},
+      "enabled": false,
+      "fallbackToCacheTimeout": 0
+    },
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.klarpost.app",
@@ -87,11 +85,6 @@
     ],
     "experiments": {
       "typedRoutes": true
-    },
-"extra": {
-  "eas": {
-    "projectId": "2e32d367-22a7-403f-8381-bd3a20c7fa80"
-  }
-}
+    }
   }
 }
