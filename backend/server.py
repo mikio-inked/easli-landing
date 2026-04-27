@@ -1828,6 +1828,49 @@ async def dev_simulate(device_id: str, scenario: str):
 # Include the router in the main app
 app.include_router(api_router)
 
+
+# Diagnostic request-logger middleware — added because we observed a class
+# of failures where iOS clients reported 429 errors that have no
+# corresponding entries in the access log. Logs ONE line per request with
+# enough metadata to triage where in the stack a request is being dropped:
+#   - method, path, query
+#   - source IP (X-Forwarded-For / direct)
+#   - User-Agent (truncated)
+#   - Content-Length (if present)
+#   - response status, response time, exception class (if any)
+#
+# Privacy: NEVER reads or logs the request body. Only headers + URL.
+# The User-Agent is truncated to 80 chars to avoid log spam.
+@app.middleware("http")
+async def diag_request_logger(request: Request, call_next):
+    import time as _t
+    started = _t.monotonic()
+    fwd = request.headers.get("x-forwarded-for") or request.client.host if request.client else "?"
+    ua = (request.headers.get("user-agent") or "")[:80]
+    cl = request.headers.get("content-length") or "?"
+    method = request.method
+    path = request.url.path
+    qs = request.url.query or ""
+    try:
+        response = await call_next(request)
+        dur_ms = int((_t.monotonic() - started) * 1000)
+        logger.info(
+            "diag_req method=%s path=%s qs=%s status=%s dur_ms=%s "
+            "fwd=%s cl=%s ua=%s",
+            method, path, qs[:100], response.status_code, dur_ms,
+            fwd, cl, ua,
+        )
+        return response
+    except Exception as e:
+        dur_ms = int((_t.monotonic() - started) * 1000)
+        logger.exception(
+            "diag_req method=%s path=%s qs=%s status=EXC dur_ms=%s "
+            "fwd=%s cl=%s ua=%s exc_type=%s",
+            method, path, qs[:100], dur_ms, fwd, cl, ua, type(e).__name__,
+        )
+        raise
+
+
 app.add_middleware(
     CORSMiddleware,
     allow_credentials=True,
