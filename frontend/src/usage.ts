@@ -84,6 +84,33 @@ export class RateLimitError extends Error {
   }
 }
 
+/**
+ * Thrown by analyzeDocument() when the backend's language gate decides
+ * the document is clearly NOT primarily German and rejects before running
+ * any full analysis. NO quota is consumed when this is thrown — the caller
+ * can show a calm explanation screen and send the user back to scan/upload
+ * without any usage bookkeeping.
+ *
+ * `detectedLanguageCode` is a best-effort ISO-639-1 code (e.g. 'en', 'fr',
+ * 'tr') or null if the model couldn't name the language. `confidence` is
+ * always 'high' when this error fires — the backend uses 'low' / 'unknown'
+ * to fall through to normal analysis with an uncertainty note instead.
+ */
+export class UnsupportedDocumentLanguageError extends Error {
+  detectedLanguageCode: string | null;
+  confidence: 'low' | 'medium' | 'high';
+  constructor(
+    message: string,
+    detectedLanguageCode: string | null,
+    confidence: 'low' | 'medium' | 'high' = 'high',
+  ) {
+    super(message);
+    this.name = 'UnsupportedDocumentLanguageError';
+    this.detectedLanguageCode = detectedLanguageCode;
+    this.confidence = confidence;
+  }
+}
+
 async function jsonOrThrow<T>(res: Response): Promise<T> {
   if (!res.ok) {
     let body: any = null;

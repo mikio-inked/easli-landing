@@ -49,6 +49,11 @@ export type UIKey =
   | 'translation_sheet_title'
   | 'translating_subtitle'
   | 'translation_error'
+  | 'lang_gate_reject_title'
+  | 'lang_gate_reject_body'
+  | 'lang_gate_reject_cta'
+  | 'lang_gate_reject_hint'
+  | 'lang_gate_uncertain'
   | 'delete_all_data'
   | 'delete_account'
   | 'privacy'
@@ -273,6 +278,11 @@ const en: UIStrings = {
   translation_sheet_title: 'Choose a language',
   translating_subtitle: 'Re-creating the explanation…',
   translation_error: 'The language could not be changed right now. Please try again.',
+  lang_gate_reject_title: 'Document not supported',
+  lang_gate_reject_body: 'This document does not appear to be in German. KlarPost is currently optimised for German letters. Please scan a German-language letter.',
+  lang_gate_reject_cta: 'Scan another document',
+  lang_gate_reject_hint: 'If you think this is a mistake, please try again with better lighting or a sharper picture.',
+  lang_gate_uncertain: 'The language could not be detected with certainty. The analysis may be inaccurate.',
   delete_all_data: 'Delete all analyses',
   delete_account: 'Delete my data',
   privacy: 'Privacy',
@@ -500,6 +510,11 @@ const zh: UIStrings = {
   translation_sheet_title: '选择语言',
   translating_subtitle: '正在重新生成说明…',
   translation_error: '目前无法更改语言。请重试。',
+  lang_gate_reject_title: '不支持该文档',
+  lang_gate_reject_body: '此文档似乎不是德语。KlarPost 目前仅针对德语信件进行优化。请扫描一封德语信件。',
+  lang_gate_reject_cta: '扫描其他文档',
+  lang_gate_reject_hint: '如果您认为这是误判,请在更好的光线下或使用更清晰的照片重试。',
+  lang_gate_uncertain: '无法确定文档语言。分析结果可能不准确。',
   delete_all_data: '删除所有分析',
   delete_account: '删除我的数据',
   privacy: '隐私',
@@ -723,6 +738,11 @@ const vi: UIStrings = {
   translation_sheet_title: 'Chọn ngôn ngữ',
   translating_subtitle: 'Đang tạo lại giải thích…',
   translation_error: 'Hiện không thể đổi ngôn ngữ. Vui lòng thử lại.',
+  lang_gate_reject_title: 'Tài liệu không được hỗ trợ',
+  lang_gate_reject_body: 'Tài liệu này có vẻ không phải tiếng Đức. KlarPost hiện được tối ưu cho các văn bản tiếng Đức. Vui lòng quét một lá thư tiếng Đức.',
+  lang_gate_reject_cta: 'Quét tài liệu khác',
+  lang_gate_reject_hint: 'Nếu bạn cho rằng đây là nhầm lẫn, vui lòng thử lại với ánh sáng tốt hơn hoặc ảnh rõ nét hơn.',
+  lang_gate_uncertain: 'Không thể xác định chắc chắn ngôn ngữ của tài liệu. Kết quả phân tích có thể không chính xác.',
   delete_all_data: 'Xoá tất cả phân tích',
   delete_account: 'Xoá dữ liệu của tôi',
   privacy: 'Quyền riêng tư',
@@ -948,6 +968,11 @@ const tr: UIStrings = {
   translation_sheet_title: 'Bir dil seçin',
   translating_subtitle: 'Açıklama yeniden oluşturuluyor…',
   translation_error: 'Dil şu anda değiştirilemedi. Lütfen tekrar deneyin.',
+  lang_gate_reject_title: 'Belge desteklenmiyor',
+  lang_gate_reject_body: 'Bu belge Almanca değil gibi görünüyor. KlarPost şu an Almanca mektuplar için optimize edilmiştir. Lütfen Almanca bir mektup tarayın.',
+  lang_gate_reject_cta: 'Başka bir belge tara',
+  lang_gate_reject_hint: 'Bunun bir hata olduğunu düşünüyorsanız daha iyi ışıkla veya daha net bir fotoğrafla tekrar deneyin.',
+  lang_gate_uncertain: 'Belgenin dili kesin olarak tespit edilemedi. Analiz hatalı olabilir.',
   delete_all_data: 'Tüm analizleri sil',
   delete_account: 'Verilerimi sil',
   privacy: 'Gizlilik',
@@ -1173,6 +1198,11 @@ const ru: UIStrings = {
   translation_sheet_title: 'Выберите язык',
   translating_subtitle: 'Пояснение создаётся заново…',
   translation_error: 'Сейчас не удалось сменить язык. Попробуйте ещё раз.',
+  lang_gate_reject_title: 'Документ не поддерживается',
+  lang_gate_reject_body: 'Похоже, этот документ не на немецком языке. KlarPost сейчас работает только с немецкими письмами. Пожалуйста, отсканируйте письмо на немецком.',
+  lang_gate_reject_cta: 'Сканировать другой документ',
+  lang_gate_reject_hint: 'Если вы считаете, что это ошибка, попробуйте ещё раз при лучшем освещении или с более чётким фото.',
+  lang_gate_uncertain: 'Язык документа не удалось точно определить. Анализ может быть неточным.',
   delete_all_data: 'Удалить все анализы',
   delete_account: 'Удалить мои данные',
   privacy: 'Конфиденциальность',
@@ -1398,6 +1428,11 @@ const es: UIStrings = {
   translation_sheet_title: 'Elige un idioma',
   translating_subtitle: 'Volviendo a generar la explicación…',
   translation_error: 'No se pudo cambiar el idioma ahora. Vuelve a intentarlo.',
+  lang_gate_reject_title: 'Documento no compatible',
+  lang_gate_reject_body: 'Este documento no parece estar en alemán. KlarPost está actualmente optimizado para cartas en alemán. Escanea una carta en alemán.',
+  lang_gate_reject_cta: 'Escanear otro documento',
+  lang_gate_reject_hint: 'Si crees que es un error, inténtalo de nuevo con mejor iluminación o una foto más nítida.',
+  lang_gate_uncertain: 'No se pudo detectar el idioma con seguridad. El análisis puede ser inexacto.',
   delete_all_data: 'Eliminar todos los análisis',
   delete_account: 'Eliminar mis datos',
   privacy: 'Privacidad',
@@ -1625,6 +1660,11 @@ const de_simple: UIStrings = {
   translation_sheet_title: 'Sprache wählen',
   translating_subtitle: 'Erklärung wird neu erstellt…',
   translation_error: 'Die Sprache konnte gerade nicht geändert werden. Bitte versuche es erneut.',
+  lang_gate_reject_title: 'Dokument nicht unterstützt',
+  lang_gate_reject_body: 'Dieses Dokument scheint nicht auf Deutsch zu sein. KlarPost ist aktuell für deutsche Schreiben optimiert. Bitte scanne ein deutschsprachiges Schreiben.',
+  lang_gate_reject_cta: 'Anderes Dokument scannen',
+  lang_gate_reject_hint: 'Falls du glaubst, dass das ein Fehler ist, versuche es bitte erneut mit besserem Licht oder einem schärferen Bild.',
+  lang_gate_uncertain: 'Die Sprache konnte nicht sicher erkannt werden. Die Analyse kann ungenau sein.',
   delete_all_data: 'Alle Briefe löschen',
   delete_account: 'Meine Daten löschen',
   privacy: 'Datenschutz',

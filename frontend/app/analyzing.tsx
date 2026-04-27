@@ -19,14 +19,14 @@ import {
   setLastResult,
   getLanguage as getStoredLanguage,
 } from '../src/store';
-import { analyzeDocument, PaymentRequiredError, RateLimitError, TestLimitReachedError } from '../src/api';
+import { analyzeDocument, PaymentRequiredError, RateLimitError, TestLimitReachedError, UnsupportedDocumentLanguageError } from '../src/api';
 import { LanguageCode, t } from '../src/i18n';
 import { saveOriginal } from '../src/originals';
 import { getSaveOriginals } from '../src/settings';
 import { compressPagesForUpload } from '../src/imageCompression';
 import { colors, fontSize, fontWeight, radius, spacing } from '../src/theme';
 
-type Status = 'running' | 'error';
+type Status = 'running' | 'error' | 'lang_rejected';
 
 /**
  * Everything we need to *re-fire* an /api/analyze call without going back to
@@ -110,6 +110,18 @@ export default function Analyzing() {
       }
       if (e instanceof PaymentRequiredError) {
         router.replace('/paywall?reason=payment_required');
+        return;
+      }
+      // Language gate — document is clearly non-German. Zero quota was
+      // consumed server-side. Show a calm dedicated screen instead of the
+      // generic error toast. No retry button — the document itself is the
+      // wrong input, so the only sensible action is "scan another document".
+      if (e instanceof UnsupportedDocumentLanguageError) {
+        setStatus('lang_rejected');
+        // Body is the localized string from the backend, or the i18n fallback
+        // if the server didn't provide one.
+        setErrorMsg(e.message || t(ctx.lang, 'lang_gate_reject_body'));
+        setRetryable(false);
         return;
       }
       // Mistral rate-limited us. Show the truthful Retry-After window the
@@ -206,6 +218,42 @@ export default function Analyzing() {
     }
     router.back();
   }, [runAnalysis, router]);
+
+  if (status === 'lang_rejected') {
+    // Dedicated screen for the language gate. Calm, no red alert icon,
+    // no retry button — the document itself is the wrong input. Only
+    // action is "scan another document" which takes the user back to the
+    // capture flow.
+    return (
+      <SafeAreaView style={styles.safe} testID="analyzing-lang-rejected">
+        <View style={styles.centerWrap}>
+          <View style={[styles.errorIcon, { backgroundColor: colors.primarySoft }]}>
+            <FileSearch color={colors.primary} size={36} strokeWidth={2.4} />
+          </View>
+          <Text style={styles.errorTitle}>{t(lang, 'lang_gate_reject_title')}</Text>
+          <Text style={styles.errorBody}>
+            {errorMsg || t(lang, 'lang_gate_reject_body')}
+          </Text>
+          <Text style={[styles.errorBody, { marginTop: spacing.md, fontSize: fontSize.sm, color: colors.textSecondary }]}>
+            {t(lang, 'lang_gate_reject_hint')}
+          </Text>
+        </View>
+        <View style={styles.footer}>
+          <Button
+            label={t(lang, 'lang_gate_reject_cta')}
+            onPress={() => router.replace('/scan')}
+            testID="analyzing-lang-rejected-cta"
+          />
+          <Button
+            label={t(lang, 'back')}
+            onPress={() => router.replace('/home')}
+            variant="ghost"
+            testID="analyzing-lang-rejected-home"
+          />
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   if (status === 'error') {
     // Countdown is purely informational — the button is always tappable so

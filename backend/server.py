@@ -882,51 +882,44 @@ async def analyze_with_mistral(
     target_language_label: str,
     target_language_code: str = "",
 ) -> AnalysisResult:
-    """Analyze a German document (one or many pages) with Mistral.
+    """Backwards-compatible convenience: OCR + language-blind analysis.
 
-    Two-stage pipeline:
-      1) Mistral OCR runs on every page in parallel → markdown text.
-      2) Mistral Large 3 (text-only) receives the combined markdown + a strict
-         JSON system prompt and produces the structured analysis.
+    The /api/analyze route does OCR → language-gate → analysis explicitly, but
+    some older callers (scripts, tests) may still use this. Kept as a thin
+    wrapper so we don't break them.
+    """
+    if not images:
+        raise HTTPException(status_code=400, detail="No image content to analyze")
+    images = [
+        compress_image_for_vision(idx, b64, mime)
+        for idx, (b64, mime) in enumerate(images)
+    ]
+    page_texts = await ocr_pages_with_mistral(images)
+    return await analyze_from_ocr_text(
+        page_texts, target_language_label, target_language_code,
+    )
 
-    This is ~30× faster than a single multimodal call for 4-page scans and
-    also costs far fewer vision tokens — which keeps us comfortably inside
-    Mistral's free-tier rate limits.
+
+async def analyze_from_ocr_text(
+    page_texts: List[str],
+    target_language_label: str,
+    target_language_code: str = "",
+) -> AnalysisResult:
+    """Second half of the 2-stage pipeline: given already-OCR'd per-page text,
+    produce a structured analysis in the user's language.
+
+    Extracted out so the /api/analyze route can interpose a cheap
+    language-gate step between OCR and full analysis — and bail out before
+    burning full-analysis tokens on non-German documents.
     """
     if not mistral_client:
         raise HTTPException(
             status_code=500,
             detail="Mistral API key not configured. Please set MISTRAL_API_KEY in backend/.env",
         )
-    if not images:
-        raise HTTPException(status_code=400, detail="No image content to analyze")
-
-    # Compress / downscale every page before we hand it to OCR. Saves upload
-    # bandwidth on mobile networks (the Mistral OCR endpoint still benefits
-    # from reasonable image sizes even though it doesn't charge vision
-    # tokens). Privacy-preserving: compress_image_for_vision never logs the
-    # bytes.
-    images = [
-        compress_image_for_vision(idx, b64, mime)
-        for idx, (b64, mime) in enumerate(images)
-    ]
-
-    # ---- Stage 1: OCR every page in parallel --------------------------
-    try:
-        page_texts = await ocr_pages_with_mistral(images)
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.exception(
-            "Mistral OCR stage failed (model=%s, error_type=%s)",
-            MISTRAL_OCR_MODEL,
-            type(e).__name__,
-        )
-        raise HTTPException(status_code=502, detail="AI analysis failed.")
 
     # Combine per-page markdown into one text block. Page separators help the
-    # analysis model handle multi-page context correctly (e.g. a deadline on
-    # page 2 that refers to a reference on page 1).
+    # analysis model handle multi-page context correctly.
     if len(page_texts) > 1:
         combined_text = "\n\n".join(
             f"--- Seite {i + 1} ---\n\n{txt}" for i, txt in enumerate(page_texts)
@@ -950,7 +943,6 @@ async def analyze_with_mistral(
             detail="No readable German text was found. Please retry with a clearer photo.",
         )
 
-    # ---- Stage 2: Structured analysis on extracted text ---------------
     page_note = (
         f"The document has {len(page_texts)} page(s). "
         "Treat them as ONE document and produce a single combined analysis."
@@ -981,16 +973,12 @@ async def analyze_with_mistral(
             temperature=0.2,
         )
     except MistralRateLimited as rl:
-        # Surface a clean 429 with a Retry-After header — the iOS client can
-        # show "server is busy, try again in N seconds" instead of the generic
-        # "AI analysis failed" toast.
         raise HTTPException(
             status_code=429,
             detail="AI is rate-limited. Please try again in a moment.",
             headers={"Retry-After": str(rl.retry_after)},
         )
     except Exception as e:
-        # Privacy: log only the model + exception type, never the messages.
         logger.exception(
             "Mistral analysis call failed (model=%s, error_type=%s)",
             MISTRAL_ANALYSIS_MODEL,
@@ -1002,8 +990,6 @@ async def analyze_with_mistral(
     try:
         response_text = (response.choices[0].message.content or "").strip()
     except Exception:
-        # Privacy: never log the raw Mistral response — it contains sender
-        # names, deadlines, amounts, addresses extracted from the document.
         logger.exception(
             "Unexpected Mistral response shape (model=%s, choices=%d)",
             MISTRAL_ANALYSIS_MODEL,
@@ -1013,7 +999,6 @@ async def analyze_with_mistral(
 
     parsed = extract_json_from_text(response_text)
     if not parsed:
-        # Privacy: never log the raw response_text — log only metadata.
         logger.error(
             "Could not parse JSON from Mistral analyze response (model=%s, length=%d)",
             MISTRAL_ANALYSIS_MODEL,
@@ -1024,22 +1009,14 @@ async def analyze_with_mistral(
             detail="AI returned an invalid response. Please try again.",
         )
 
-    # Ensure target_language is set
     parsed["target_language"] = target_language_label
     parsed["source_language"] = "German"
 
-    # Defensive coercion: Mistral Large 3 occasionally adds editorial
-    # commentary inside Literal[...] fields (e.g. confidence='high (but…)').
-    # Normalize them BEFORE Pydantic validation so a chatty model doesn't
-    # turn a valid analysis into a 502.
     _sanitize_literal_fields(parsed)
 
     try:
         result = AnalysisResult(**parsed)
     except Exception as e:
-        # Privacy: never log `parsed` — it contains the analyzed document.
-        # Log only the validation error type and the missing/extra keys count
-        # so we can debug schema drift without leaking PII.
         logger.exception(
             "Validation failed for AI response (model=%s, error_type=%s, top_keys=%d)",
             MISTRAL_ANALYSIS_MODEL,
@@ -1051,13 +1028,99 @@ async def analyze_with_mistral(
             detail="AI response did not match expected format.",
         )
 
-    # Always enforce a default disclaimer if empty
     if not result.disclaimer:
         result.disclaimer = (
             "KlarPost provides general information only and does not give legal, tax, financial, or medical advice. "
             "Please verify with the sender or a qualified professional."
         )
     return result
+
+
+# ==================== LANGUAGE GATE ====================
+# Cheap, lightweight pre-analysis check: is this document actually primarily
+# German? Reject clearly-non-German docs BEFORE burning a full analysis call
+# and BEFORE consuming the user's quota. Aim: <1s and <~200 output tokens.
+
+_LANG_GATE_SAMPLE_CHARS = 1500  # First ~1.5KB of extracted text is plenty
+
+_LANG_GATE_SYSTEM_PROMPT = (
+    "You are a language classifier for a German-documents assistant. "
+    "You will receive the OCR-extracted text of the FIRST page of a document. "
+    "Decide whether the document is primarily German.\n\n"
+    "IMPORTANT nuances:\n"
+    " - A German letter that contains some English product names, technical "
+    "terms, legal phrases, company names, URLs, or short English "
+    "attachments is STILL German. Classify it as 'de'.\n"
+    " - A document written primarily in a non-German language (English, "
+    "French, Spanish, Italian, Turkish, Polish, Russian, Chinese, etc.) "
+    "is 'non_de'.\n"
+    " - If the text is too short, blurry, or ambiguous to decide confidently, "
+    "use 'unknown'.\n\n"
+    "Respond ONLY with a compact JSON object with exactly these keys:\n"
+    "  document_language: 'de' | 'non_de' | 'unknown'\n"
+    "  detected_language_code: ISO-639-1 code ('de','en','fr','es','it',"
+    "'tr','pl','ru','zh',...) or null\n"
+    "  confidence: 'low' | 'medium' | 'high'\n"
+    "NO prose, NO code fences."
+)
+
+
+async def detect_document_language(
+    page0_text: str,
+) -> Tuple[str, Optional[str], str]:
+    """Run the lightweight language gate on page-1 OCR text.
+
+    Returns (document_language, detected_language_code, confidence).
+    Never raises — on Mistral errors or timeouts returns ('unknown', None,
+    'low') so the caller can safely fall through to full analysis. That's
+    the 'fail-open' path the spec asks for.
+    """
+    if not mistral_client or not page0_text:
+        return ('unknown', None, 'low')
+
+    sample = page0_text[:_LANG_GATE_SAMPLE_CHARS]
+
+    messages = [
+        {"role": "system", "content": _LANG_GATE_SYSTEM_PROMPT},
+        {"role": "user", "content": sample},
+    ]
+
+    try:
+        # We deliberately DO NOT use mistral_complete_with_retry here — the
+        # gate must be cheap and fast, and if it's rate-limited or slow we'd
+        # rather fall through to full analysis than stall the user. A single
+        # attempt is enough.
+        response = await mistral_client.chat.complete_async(
+            model=MISTRAL_ANALYSIS_MODEL,
+            messages=messages,
+            response_format={"type": "json_object"},
+            temperature=0.0,
+            max_tokens=80,  # tiny — we only need 3 short fields
+        )
+        response_text = (response.choices[0].message.content or "").strip()
+    except Exception as e:
+        logger.info(
+            "language_gate_failed error_type=%s model=%s",
+            type(e).__name__, MISTRAL_ANALYSIS_MODEL,
+        )
+        return ('unknown', None, 'low')
+
+    parsed = extract_json_from_text(response_text) or {}
+    dl = parsed.get("document_language") or "unknown"
+    if dl not in ("de", "non_de", "unknown"):
+        dl = "unknown"
+    code = parsed.get("detected_language_code")
+    if isinstance(code, str):
+        code = code.strip().lower() or None
+    else:
+        code = None
+    conf = parsed.get("confidence") or "low"
+    if conf not in ("low", "medium", "high"):
+        conf = "low"
+    return (dl, code, conf)
+
+
+
 
 
 # ==================== USAGE / ENTITLEMENT HELPERS ====================
@@ -2000,8 +2063,89 @@ async def analyze_document(req: AnalyzeRequest):
     if not images:
         raise HTTPException(status_code=400, detail="No readable pages found")
 
-    # Run the analysis. If this raises, no usage is consumed.
-    result = await analyze_with_mistral(images, target_language_label, req.target_language)
+    # ----- Language gate ---------------------------------------------------
+    # Compress first (needed for OCR anyway — costs a few ms but saves upload
+    # bandwidth to Mistral), then OCR just enough to classify.
+    images = [
+        compress_image_for_vision(idx, b64, mime)
+        for idx, (b64, mime) in enumerate(images)
+    ]
+
+    # OCR all pages now so we can reuse the extracted text in the analysis
+    # step if the gate passes. The gate itself only looks at page 1.
+    try:
+        page_texts = await ocr_pages_with_mistral(images)
+    except Exception as e:
+        logger.exception(
+            "Mistral OCR stage failed (model=%s, error_type=%s)",
+            MISTRAL_OCR_MODEL,
+            type(e).__name__,
+        )
+        raise HTTPException(status_code=502, detail="AI analysis failed.")
+
+    page0_text = page_texts[0] if page_texts else ""
+    logger.info(
+        "language_gate_checked device=%s pages=%d p0_chars=%d",
+        req.device_id, len(page_texts), len(page0_text or ""),
+    )
+    doc_lang, det_code, conf = await detect_document_language(page0_text)
+
+    uncertainty_notice: Optional[str] = None
+    if doc_lang == "non_de" and conf == "high":
+        # Reject: high-confidence non-German. No quota consumption, no
+        # history entry, no full analysis. Privacy-safe log — no content.
+        logger.info(
+            "language_gate_rejected device=%s detected=%s confidence=%s mode=%s",
+            req.device_id, det_code or "?", conf, PAYWALL_MODE,
+        )
+        return JSONResponse(
+            status_code=422,
+            content={
+                "error": "unsupported_document_language",
+                "message": (
+                    "Dieses Dokument scheint nicht auf Deutsch zu sein. "
+                    "KlarPost ist aktuell für deutsche Schreiben optimiert. "
+                    "Bitte scanne ein deutschsprachiges Schreiben."
+                ),
+                "document_language": doc_lang,
+                "detected_language_code": det_code,
+                "confidence": conf,
+                # Include current usage so the client UI can stay in sync —
+                # we did NOT consume anything, so numbers stay put.
+                "usage": _to_usage_response(usage_rec).dict(),
+            },
+        )
+    elif doc_lang == "unknown" or conf == "low":
+        # Low-confidence or unknown — don't block, but attach an uncertainty
+        # note to the final AnalysisResult so the user knows the AI wasn't
+        # 100% sure about the input.
+        logger.info(
+            "language_gate_unknown device=%s detected=%s confidence=%s",
+            req.device_id, det_code or "?", conf,
+        )
+        uncertainty_notice = (
+            "Die Sprache konnte nicht sicher erkannt werden. "
+            "Die Analyse kann ungenau sein."
+        )
+    else:
+        logger.info(
+            "language_gate_passed device=%s detected=%s confidence=%s",
+            req.device_id, det_code or "?", conf,
+        )
+
+    # ----- Full analysis ---------------------------------------------------
+    # Run analysis on the already-OCR'd text. If this raises, no usage is
+    # consumed (the `_consume_after_success` call below is skipped).
+    result = await analyze_from_ocr_text(
+        page_texts, target_language_label, req.target_language,
+    )
+
+    # Prepend the language-uncertainty note to `uncertainties` if we set one.
+    if uncertainty_notice:
+        existing = list(result.uncertainties or [])
+        if uncertainty_notice not in existing:
+            existing.insert(0, uncertainty_notice)
+            result.uncertainties = existing
 
     record = AnalysisRecord(
         device_id=req.device_id,

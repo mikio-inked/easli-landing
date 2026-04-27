@@ -112,6 +112,7 @@ export {
   PaymentRequiredError,
   RateLimitError,
   TestLimitReachedError,
+  UnsupportedDocumentLanguageError,
   type UsageState,
 } from './usage';
 
@@ -119,6 +120,7 @@ import {
   PaymentRequiredError,
   RateLimitError,
   TestLimitReachedError,
+  UnsupportedDocumentLanguageError,
   type UsageState,
 } from './usage';
 
@@ -193,6 +195,28 @@ export async function analyzeDocument(params: {
       throw new RateLimitError(
         (body && body.detail) || 'AI is busy. Please try again in a moment.',
         Number.isFinite(retryAfter) ? retryAfter : 8,
+      );
+    }
+  }
+
+  // Language gate — the backend returns 422 with a typed error envelope
+  // when the document is clearly non-German. We surface a dedicated typed
+  // error so the analyzing screen can show a calm explanation screen
+  // instead of the generic "AI analysis failed" toast, and so the caller
+  // can be 100% sure NO usage was consumed. Keeping this BEFORE jsonOrThrow
+  // is critical — otherwise the generic handler strips the structured body.
+  if (res.status === 422) {
+    let body: any = null;
+    try {
+      body = await res.json();
+    } catch {
+      // fall through to generic error below
+    }
+    if (body && body.error === 'unsupported_document_language') {
+      throw new UnsupportedDocumentLanguageError(
+        body.message || 'Dieses Dokument scheint nicht auf Deutsch zu sein.',
+        body.detected_language_code ?? null,
+        body.confidence || 'high',
       );
     }
   }
