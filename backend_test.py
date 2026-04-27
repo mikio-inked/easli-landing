@@ -17,7 +17,7 @@ from typing import List, Optional, Tuple
 import requests
 from PIL import Image, ImageDraw, ImageFont
 
-BASE_URL = "https://klarpost-mvp.preview.emergentagent.com/api"
+BASE_URL = "https://doc-assistant-app.preview.emergentagent.com/api"
 TIMEOUT_FAST = 30
 TIMEOUT_LLM = 180
 
