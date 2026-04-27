@@ -102,6 +102,9 @@ export type UIKey =
   | 'onb3_title'
   | 'onb3_body'
   | 'onb_get_started'
+  | 'onb_pick_lang_title'
+  | 'onb_demo_subtitle'
+  | 'onb_large_font'
   | 'privacy_short'
   | 'disclaimer_long'
   | 'copy'
@@ -331,6 +334,9 @@ const en: UIStrings = {
   onb3_title: 'Your privacy comes first',
   onb3_body: 'AI analysis is by Mistral AI, a European AI provider headquartered in Paris, France. Mistral hosts data in the EU by default. We do not save your originals. No ads, no tracking — and you can delete everything any time.',
   onb_get_started: 'Get started',
+  onb_pick_lang_title: 'Choose your language',
+  onb_demo_subtitle: 'Scan a German letter and get a clear explanation in your language.',
+  onb_large_font: 'Larger text (for better readability)',
   privacy_short: 'Original documents are not stored. You stay in control.',
   disclaimer_long: 'KlarPost provides general information only. It does not give legal, tax, financial or medical advice. For important matters, please contact the sender or a qualified professional.',
   copy: 'Copy',
@@ -563,6 +569,9 @@ const zh: UIStrings = {
   onb3_title: '您的隐私最重要',
   onb3_body: 'KlarPost 文件分析由 Mistral AI 提供——一家总部位于法国巴黎的欧洲 AI 公司。Mistral 默认在欧盟内托管数据。我们不保存您的原件,不投放广告,不跟踪您——您随时可以删除一切。',
   onb_get_started: '开始使用',
+  onb_pick_lang_title: '选择你的语言',
+  onb_demo_subtitle: '扫描一封德语信件,获得用你语言写的清晰解释。',
+  onb_large_font: '更大的字体(更易阅读)',
   privacy_short: '原始文件不会被保存。您始终掌握控制权。',
   disclaimer_long: 'KlarPost 仅提供一般信息，不提供法律、税务、财务或医疗建议。对于重要事项，请联系发件人或合格的专业人士。',
   copy: '复制',
@@ -791,6 +800,9 @@ const vi: UIStrings = {
   onb3_title: 'Quyền riêng tư của bạn là trên hết',
   onb3_body: 'Phân tích AI bởi Mistral AI, một nhà cung cấp AI châu Âu có trụ sở tại Paris, Pháp. Mistral lưu trữ dữ liệu trong EU theo mặc định. Chúng tôi không lưu bản gốc, không quảng cáo, không theo dõi — và bạn có thể xoá mọi thứ bất cứ lúc nào.',
   onb_get_started: 'Bắt đầu',
+  onb_pick_lang_title: 'Chọn ngôn ngữ của bạn',
+  onb_demo_subtitle: 'Quét một lá thư tiếng Đức và nhận giải thích rõ ràng bằng ngôn ngữ của bạn.',
+  onb_large_font: 'Chữ to hơn (để dễ đọc hơn)',
   privacy_short: 'Tài liệu gốc không được lưu. Bạn luôn kiểm soát.',
   disclaimer_long: 'KlarPost chỉ cung cấp thông tin chung. Đây không phải là tư vấn pháp lý, thuế, tài chính hoặc y tế. Với những vấn đề quan trọng, hãy liên hệ với người gửi hoặc một chuyên gia có chuyên môn.',
   copy: 'Sao chép',
@@ -1021,6 +1033,9 @@ const tr: UIStrings = {
   onb3_title: 'Gizliliğiniz önce gelir',
   onb3_body: 'AI analizi, Paris/Fransa merkezli bir Avrupa AI sağlayıcısı olan Mistral AI tarafından yapılır. Mistral verileri varsayılan olarak AB içinde barındırır. Orijinalleri saklamayız, reklam göstermeyiz, sizi takip etmeyiz — ve istediğiniz zaman her şeyi silebilirsiniz.',
   onb_get_started: 'Başla',
+  onb_pick_lang_title: 'Dilini seç',
+  onb_demo_subtitle: 'Almanca bir mektup tara ve kendi dilinde net bir açıklama al.',
+  onb_large_font: 'Daha büyük yazı (daha iyi okunabilirlik için)',
   privacy_short: 'Orijinal belgeler saklanmaz. Kontrol sizde.',
   disclaimer_long: 'KlarPost yalnızca genel bilgi sağlar. Hukuki, vergi, finansal veya tıbbi tavsiye vermez. Önemli konularda lütfen göndericiye veya yetkili bir uzmana danışın.',
   copy: 'Kopyala',
@@ -1251,6 +1266,9 @@ const ru: UIStrings = {
   onb3_title: 'Ваша приватность важна',
   onb3_body: 'ИИ-анализ выполняется Mistral AI — европейским поставщиком ИИ со штаб-квартирой в Париже (Франция). Mistral по умолчанию хранит данные в ЕС. Мы не сохраняем оригиналы, не показываем рекламу и не отслеживаем вас — и вы можете удалить всё в любой момент.',
   onb_get_started: 'Начать',
+  onb_pick_lang_title: 'Выбери свой язык',
+  onb_demo_subtitle: 'Отсканируй немецкое письмо и получи понятное объяснение на своём языке.',
+  onb_large_font: 'Крупный шрифт (для лучшей читаемости)',
   privacy_short: 'Оригиналы не сохраняются. Контроль остаётся за вами.',
   disclaimer_long: 'KlarPost предоставляет только общую информацию. Это не юридическая, налоговая, финансовая или медицинская консультация. По важным вопросам обратитесь к отправителю или квалифицированному специалисту.',
   copy: 'Копировать',
@@ -1481,6 +1499,9 @@ const es: UIStrings = {
   onb3_title: 'Tu privacidad es lo primero',
   onb3_body: 'El análisis IA lo realiza Mistral AI, un proveedor de IA europeo con sede en París, Francia. Mistral aloja los datos en la UE de forma predeterminada. No guardamos tus originales, no mostramos anuncios, no te rastreamos — y puedes borrar todo cuando quieras.',
   onb_get_started: 'Empezar',
+  onb_pick_lang_title: 'Elige tu idioma',
+  onb_demo_subtitle: 'Escanea una carta en alemán y obtén una explicación clara en tu idioma.',
+  onb_large_font: 'Texto más grande (para mejor legibilidad)',
   privacy_short: 'Los documentos originales no se guardan. Tú tienes el control.',
   disclaimer_long: 'KlarPost solo proporciona información general. No es asesoría legal, fiscal, financiera ni médica. Para asuntos importantes, contacta al remitente o a un profesional cualificado.',
   copy: 'Copiar',
