@@ -187,21 +187,31 @@ export default function Analyzing() {
   }, [retryCountdown]);
 
   /**
-   * Retry button handler. If we have a cached analysis context and the
-   * countdown is at 0, re-fire the same /api/analyze call (server is
-   * idempotent on idempotency_key). Otherwise fall back to going back to
-   * /scan so the user can reshoot.
+   * Retry button handler. If we have a cached analysis context, re-fire the
+   * same /api/analyze call (server is idempotent on idempotency_key).
+   * Otherwise fall back to going back to /scan so the user can reshoot.
+   *
+   * Note: the button is no longer disabled during the countdown — tapping
+   * during a wait window is now permitted (we cancel the countdown and try
+   * immediately). The countdown is purely advisory: the next attempt may
+   * still 429 if the user jumps the gun, but we've found that users
+   * confused by a non-responsive button is a worse outcome than letting
+   * them retry early. The auto-fire-when-countdown-hits-0 path below also
+   * frees the user from having to tap at all.
    */
   const onRetry = useCallback(() => {
-    if (retryCountdown > 0) return;
     if (ctxRef.current) {
       runAnalysis(ctxRef.current);
       return;
     }
     router.back();
-  }, [retryCountdown, runAnalysis, router]);
+  }, [runAnalysis, router]);
 
   if (status === 'error') {
+    // Countdown is purely informational — the button is always tappable so
+    // the user can re-fire immediately if they want. The "(Ns)" suffix tells
+    // them how long Mistral asked us to wait, so an early tap may 429 again,
+    // but that's their call.
     const retryLabel = retryCountdown > 0
       ? `${t(lang, 'retry')} (${retryCountdown}s)`
       : t(lang, 'retry');
@@ -218,7 +228,7 @@ export default function Analyzing() {
           <Button
             label={retryLabel}
             onPress={onRetry}
-            disabled={retryCountdown > 0 || !retryable}
+            disabled={!retryable}
             testID="analyzing-retry"
           />
           <Button
