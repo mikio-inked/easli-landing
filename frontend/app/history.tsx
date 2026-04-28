@@ -15,7 +15,7 @@ import {
 } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { ArrowLeft, ClipboardList, ShieldAlert, Trash2 } from 'lucide-react-native';
+import { ArrowLeft, ClipboardList, HardDrive, ShieldAlert, Trash2 } from 'lucide-react-native';
 import { Badge } from '../src/ui';
 import { ensureDeviceId, getLanguage as getStoredLanguage, setLastResult } from '../src/store';
 import { AnalysisListItem, deleteAnalysis, listAnalyses } from '../src/api';
@@ -28,7 +28,7 @@ import {
   t,
 } from '../src/i18n';
 import { cancelAllForAnalysis } from '../src/notifications';
-import { deleteOriginal } from '../src/originals';
+import { deleteOriginal, getStoredOriginalIds } from '../src/originals';
 import { colors, fontSize, fontWeight, radius, spacing } from '../src/theme';
 
 function formatDate(iso: string, lang: LanguageCode): string {
@@ -52,6 +52,7 @@ function safeCategory(code: string | undefined | null): CategoryCode {
 export default function HistoryScreen() {
   const router = useRouter();
   const [items, setItems] = useState<AnalysisListItem[]>([]);
+  const [savedIds, setSavedIds] = useState<Set<string>>(new Set());
   const [lang, setLang] = useState<LanguageCode>('en');
   const [refreshing, setRefreshing] = useState(false);
   const [filter, setFilter] = useState<CategoryCode | null>(null);
@@ -65,6 +66,14 @@ export default function HistoryScreen() {
       setItems(data);
     } catch {
       setItems([]);
+    }
+    // Refresh "saved on this device" badge set in parallel — single
+    // directory listing keeps the cost flat regardless of history size.
+    try {
+      const s = await getStoredOriginalIds();
+      setSavedIds(s);
+    } catch {
+      setSavedIds(new Set());
     }
   }, []);
 
@@ -195,6 +204,15 @@ export default function HistoryScreen() {
                   <Text style={styles.itemTitle} numberOfLines={1}>
                     {item.document_type || item.sender || t(lang, 'document_type')}
                   </Text>
+                  {savedIds.has(item.id) ? (
+                    <View
+                      style={styles.savedDot}
+                      testID={`history-saved-${item.id}`}
+                      accessibilityLabel={t(lang, 'saved_to_device')}
+                    >
+                      <HardDrive color={colors.primary} size={11} strokeWidth={2.6} />
+                    </View>
+                  ) : null}
                   <Text style={styles.itemDate}>{formatDate(item.created_at, lang)}</Text>
                 </View>
                 <Text style={styles.itemSummary} numberOfLines={2}>
@@ -355,6 +373,17 @@ const styles = StyleSheet.create({
     fontSize: fontSize.xs,
     color: colors.textMuted,
     fontWeight: fontWeight.semibold,
+  },
+  // Tiny chip indicating this analysis has its original document saved on
+  // device (toggle in Settings). Reassures the user that local storage
+  // really did persist their letter.
+  savedDot: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: colors.primarySoft,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   itemSummary: {
     fontSize: fontSize.sm,

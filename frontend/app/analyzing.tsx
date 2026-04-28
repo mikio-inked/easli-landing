@@ -9,6 +9,7 @@ import {
   Text,
   View,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { AlertCircle, Check, Clock, FileSearch, Languages, ScanText } from 'lucide-react-native';
@@ -91,13 +92,22 @@ export default function Analyzing() {
       setLastResult(record);
       // Optional on-device storage of the original document — opt-in only.
       // For multi-page captures we store only the first page (preview only).
+      // We capture success/failure here so the result screen can show a
+      // visible banner ("Saved on this device" / "Could not save") instead
+      // of silently swallowing errors. The banner state lives in
+      // AsyncStorage under a single key that result.tsx consumes once on
+      // mount and immediately clears.
       try {
-        if (await getSaveOriginals() && ctx.pages.length > 0) {
+        if ((await getSaveOriginals()) && ctx.pages.length > 0) {
           const first = ctx.pages[0];
-          await saveOriginal(record.id, first.base64, first.mimeType);
+          const ok = await saveOriginal(record.id, first.base64, first.mimeType);
+          await AsyncStorage.setItem(
+            'klarpost.lastSaveBanner',
+            JSON.stringify({ id: record.id, ok, at: Date.now() }),
+          );
         }
       } catch {
-        // Non-fatal: result is already saved on the server.
+        // saveOriginal already logs; AsyncStorage write itself shouldn't crash.
       }
       // Small pause so the user sees the final tick before navigating.
       setTimeout(() => router.replace(`/result?id=${encodeURIComponent(record.id)}`), 350);

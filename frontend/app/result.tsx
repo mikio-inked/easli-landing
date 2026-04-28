@@ -22,6 +22,7 @@ import {
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Clipboard from 'expo-clipboard';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   AlertTriangle,
   ArrowLeft,
@@ -259,6 +260,12 @@ export default function ResultScreen() {
   const [copied, setCopied] = useState(false);
   const [reminders, setReminders] = useState<ReminderRecord[]>([]);
   const [originalSaved, setOriginalSaved] = useState(false);
+  // Save-banner state — populated from `klarpost.lastSaveBanner` AsyncStorage
+  // key written by analyzing.tsx after the optional original save attempt.
+  // We read+clear once on mount so the banner appears immediately after
+  // navigation but NOT when the user later returns to the same record from
+  // history. Auto-dismissed after 4s.
+  const [saveBanner, setSaveBanner] = useState<'ok' | 'fail' | null>(null);
   // Per-section open state. Default values are computed lazily from the
   // analysis result via `defaultOpenSections(record)` below — that lets us
   // smartly auto-open Reply Draft only when a reply is required, etc.
@@ -294,6 +301,29 @@ export default function ResultScreen() {
     (async () => {
       const l = (await getStoredLanguage()) ?? 'en';
       setLang(l);
+
+      // Pop the "Saved on this device" banner — written by analyzing.tsx —
+      // exactly once per analysis. Banner survives a screen re-mount only if
+      // we haven't read it yet, so consuming it here gives feedback right
+      // after the new analysis arrives, but never on later visits to history.
+      try {
+        const raw = await AsyncStorage.getItem('klarpost.lastSaveBanner');
+        if (raw) {
+          const data = JSON.parse(raw) as { id?: string; ok?: boolean; at?: number };
+          await AsyncStorage.removeItem('klarpost.lastSaveBanner');
+          // Only show if banner is recent (<60s) AND matches the analysis we
+          // are about to display — guards against stale entries surviving
+          // app crashes or background-kills.
+          const fresh = typeof data.at === 'number' && Date.now() - data.at < 60_000;
+          if (fresh && (id ? data.id === id : true)) {
+            setSaveBanner(data.ok ? 'ok' : 'fail');
+            setTimeout(() => setSaveBanner(null), 4000);
+          }
+        }
+      } catch {
+        // banner is best-effort; never block result rendering on it
+      }
+
       const cached = getLastResult();
       if (cached && (!id || cached.id === id)) {
         setRecord(cached);
@@ -683,6 +713,34 @@ export default function ResultScreen() {
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
       >
+        {/* Save-status banner — shown for ~4 seconds after a fresh analysis
+            when the user has the "Save originals" toggle on. Gives instant
+            visible confirmation that local storage actually worked (or
+            failed). Auto-clears via setTimeout in the load effect. */}
+        {saveBanner ? (
+          <View
+            style={[
+              styles.saveBanner,
+              saveBanner === 'ok' ? styles.saveBannerOk : styles.saveBannerFail,
+            ]}
+            testID={`save-banner-${saveBanner}`}
+          >
+            {saveBanner === 'ok' ? (
+              <CheckCircle2 color={colors.green.text} size={18} strokeWidth={2.4} />
+            ) : (
+              <AlertTriangle color={colors.red.text} size={18} strokeWidth={2.4} />
+            )}
+            <Text
+              style={[
+                styles.saveBannerText,
+                saveBanner === 'ok' ? styles.saveBannerTextOk : styles.saveBannerTextFail,
+              ]}
+            >
+              {t(lang, saveBanner === 'ok' ? 'saved_to_device' : 'saved_to_device_failed')}
+            </Text>
+          </View>
+        ) : null}
+
         {/* ============================================================
             1. RISK HERO
             ============================================================ */}
@@ -1278,6 +1336,32 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
   },
   errorText: { fontSize: fontSize.base, color: colors.textSecondary, textAlign: 'center' },
+
+  // ---- Save banner (shown briefly after analysis when "save originals" is on) ----
+  saveBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+  },
+  saveBannerOk: {
+    backgroundColor: colors.green.bg,
+    borderColor: colors.green.border,
+  },
+  saveBannerFail: {
+    backgroundColor: colors.red.bg,
+    borderColor: colors.red.border,
+  },
+  saveBannerText: {
+    flex: 1,
+    fontSize: fontSize.sm,
+    fontWeight: fontWeight.semibold,
+  },
+  saveBannerTextOk: { color: colors.green.text },
+  saveBannerTextFail: { color: colors.red.text },
 
   // ---- Risk Hero ----
   heroCard: {

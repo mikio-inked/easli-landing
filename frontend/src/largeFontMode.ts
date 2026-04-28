@@ -1,19 +1,26 @@
 // App-wide font scaling for accessibility / elderly-friendly mode.
 //
-// Two-pronged strategy so this works on Expo Go, in production builds, and
-// across Hermes / JSC / RN 0.81+:
+// Three-layer patch strategy so this works in **every** RN environment:
 //
-//   1. Monkey-patch the `render` slot of the forwardRef'd <Text>/<TextInput>
-//      from `react-native`. This catches every text node anywhere in the
-//      tree and multiplies any explicit fontSize / lineHeight by the current
-//      scale. The patch is idempotent and installed at module-import time
-//      (before the first render in `_layout.tsx`).
-//   2. Re-key the root Stack whenever the scale changes — see `_layout.tsx`.
-//      That way even text components whose parents wouldn't naturally
-//      re-render still pick up the new scale on the next paint.
+//   1. `react/jsx-runtime` `.jsx` and `.jsxs`  — caught by the new JSX
+//      transform (the default in RN 0.71+ / Expo SDK 50+ release builds with
+//      Hermes). Every `<Text>` becomes a `_jsx(Text, props)` call at compile
+//      time, so this is the most reliable interception point in production.
+//   2. `React.createElement`                    — caught by code that still
+//      uses the legacy JSX transform (rare today, but Expo Go dev bundles
+//      and some third-party libs sometimes do).
+//   3. `Text.render` / `TextInput.render` slot  — last-resort fallback for
+//      odd RN builds where the forwardRef render slot is the only writable
+//      surface. This was our original approach and it works in Expo Go,
+//      but Hermes-optimised TestFlight builds can render via a memoised
+//      path that ignores it — hence the higher-level patches above.
+//
+// All three are idempotent and installed at module-import time
+// (`installLargeFontPatch()` is called from `app/_layout.tsx` top-level
+// before the first <Text> is rendered).
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { StyleSheet, Text as RNText, TextInput as RNTextInput } from 'react-native';
 
 const KEY_LARGE_FONT = 'klarpost.largeFont';
@@ -29,7 +36,6 @@ function scaleStyle(style: unknown): unknown {
   if (!flat) return style;
   const next: Record<string, unknown> = { ...flat };
   if (typeof flat.fontSize === 'number') {
-    // Round to a whole pixel — some RN releases ignore fractional fontSize.
     next.fontSize = Math.round((flat.fontSize as number) * _scale);
   }
   if (typeof flat.lineHeight === 'number') {
@@ -38,27 +44,121 @@ function scaleStyle(style: unknown): unknown {
   return next;
 }
 
-function tryReplaceRender(comp: unknown, label: string): boolean {
+// Cheap identity check that survives module-instance differences. RN ships
+// Text as a forwardRef. Comparing by `displayName === 'Text'` would match
+// authored components called Text too — instead we match the canonical
+// imports we captured at module load.
+const TEXT_TYPES = new Set<unknown>([RNText, RNTextInput]);
+
+function maybeScalePropsFor(type: unknown, props: unknown): unknown {
+  if (_scale === 1) return props;
+  if (!TEXT_TYPES.has(type)) return props;
+  if (props == null || typeof props !== 'object') return props;
+  const p = props as { style?: unknown };
+  if (p.style == null) return props;
+  return { ...p, style: scaleStyle(p.style) };
+}
+
+// ---- Layer 1: react/jsx-runtime --------------------------------------------
+function patchJsxRuntime(): boolean {
+  // Both runtimes (prod + dev) need patching; either may be present at runtime
+  // depending on whether Babel emitted the dev or prod transform.
+  const targets: { name: string; mod: Record<string, unknown> | null }[] = [];
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const prod = require('react/jsx-runtime') as Record<string, unknown>;
+    targets.push({ name: 'jsx-runtime', mod: prod });
+  } catch {
+    // ignore — runtime not present
+  }
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const dev = require('react/jsx-dev-runtime') as Record<string, unknown>;
+    targets.push({ name: 'jsx-dev-runtime', mod: dev });
+  } catch {
+    // ignore
+  }
+
+  let patchedAny = false;
+  for (const { mod } of targets) {
+    if (!mod) continue;
+    for (const fnName of ['jsx', 'jsxs', 'jsxDEV']) {
+      const orig = mod[fnName];
+      if (typeof orig !== 'function') continue;
+      const wrapped = function patchedJsx(this: unknown, type: unknown, props: unknown, ...rest: unknown[]) {
+        const nextProps = maybeScalePropsFor(type, props);
+        return (orig as (...a: unknown[]) => unknown).call(this, type, nextProps, ...rest);
+      };
+      try {
+        mod[fnName] = wrapped;
+        if (mod[fnName] === wrapped) {
+          patchedAny = true;
+          continue;
+        }
+      } catch {
+        // try defineProperty
+      }
+      try {
+        Object.defineProperty(mod, fnName, {
+          configurable: true,
+          enumerable: true,
+          writable: true,
+          value: wrapped,
+        });
+        if (mod[fnName] === wrapped) patchedAny = true;
+      } catch {
+        // give up on this fn
+      }
+    }
+  }
+  return patchedAny;
+}
+
+// ---- Layer 2: React.createElement ------------------------------------------
+function patchCreateElement(): boolean {
+  const anyReact = React as unknown as { createElement: (...args: unknown[]) => unknown };
+  const orig = anyReact.createElement;
+  if (typeof orig !== 'function') return false;
+  const wrapped = function patchedCreateElement(this: unknown, type: unknown, props: unknown, ...children: unknown[]) {
+    const nextProps = maybeScalePropsFor(type, props);
+    return (orig as (...a: unknown[]) => unknown).call(this, type, nextProps, ...children);
+  };
+  try {
+    anyReact.createElement = wrapped as never;
+    if (anyReact.createElement === wrapped) return true;
+  } catch {
+    // fall through
+  }
+  try {
+    Object.defineProperty(React, 'createElement', {
+      configurable: true,
+      enumerable: true,
+      writable: true,
+      value: wrapped,
+    });
+    return (React as unknown as { createElement: unknown }).createElement === wrapped;
+  } catch {
+    return false;
+  }
+}
+
+// ---- Layer 3: forwardRef render slot (legacy fallback) ---------------------
+function tryReplaceRender(comp: unknown): boolean {
   if (!comp || typeof comp !== 'object') return false;
   const target = comp as { render?: (...args: unknown[]) => unknown };
   const orig = target.render;
   if (typeof orig !== 'function') return false;
   const wrapper = function patchedRender(this: unknown, props: { style?: unknown }, ref: unknown) {
-    if (_scale === 1) {
-      return (orig as (p: unknown, r: unknown) => unknown).call(this, props, ref);
-    }
+    if (_scale === 1) return (orig as (p: unknown, r: unknown) => unknown).call(this, props, ref);
     const nextProps = { ...props, style: scaleStyle(props?.style) };
     return (orig as (p: unknown, r: unknown) => unknown).call(this, nextProps, ref);
   };
-  // Try direct assignment first (works on most RN builds).
   try {
     target.render = wrapper as never;
     if (target.render === wrapper) return true;
   } catch {
-    // fallthrough to defineProperty
+    // fall through
   }
-  // Some RN builds make the property non-writable but configurable. defineProperty
-  // sidesteps the silent-fail of strict-mode assignment.
   try {
     Object.defineProperty(target, 'render', {
       configurable: true,
@@ -67,31 +167,43 @@ function tryReplaceRender(comp: unknown, label: string): boolean {
       value: wrapper,
     });
     return target.render === wrapper;
-  } catch (e) {
-    if (__DEV__) {
-      // eslint-disable-next-line no-console
-      console.warn(`[largeFontMode] could not patch ${label}.render`, e);
-    }
+  } catch {
     return false;
   }
 }
 
 /**
- * Install the Text / TextInput render override exactly once. Safe to call
- * from the module top-level of `_layout.tsx`.
+ * Install the JSX-runtime + createElement + render-slot overrides exactly
+ * once. Safe to call from the module top-level of `_layout.tsx`.
  */
 export function installLargeFontPatch(): void {
   if (_installed) return;
   _installed = true;
+  let jsxOk = false;
+  let createOk = false;
+  let textOk = false;
+  let inputOk = false;
   try {
-    const t = tryReplaceRender(RNText, 'Text');
-    const ti = tryReplaceRender(RNTextInput, 'TextInput');
-    if (__DEV__) {
-      // eslint-disable-next-line no-console
-      console.log(`[largeFontMode] patch installed text=${t} textInput=${ti}`);
-    }
+    jsxOk = patchJsxRuntime();
   } catch {
-    // Always fail soft — accessibility is best-effort.
+    // ignore
+  }
+  try {
+    createOk = patchCreateElement();
+  } catch {
+    // ignore
+  }
+  try {
+    textOk = tryReplaceRender(RNText);
+    inputOk = tryReplaceRender(RNTextInput);
+  } catch {
+    // ignore
+  }
+  if (__DEV__) {
+    // eslint-disable-next-line no-console
+    console.log(
+      `[largeFontMode] patch installed jsx=${jsxOk} createElement=${createOk} text=${textOk} textInput=${inputOk}`,
+    );
   }
 }
 

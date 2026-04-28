@@ -44,7 +44,7 @@ import {
 } from '../src/store';
 import { LanguageCode, getLanguage as getLanguageMeta, t } from '../src/i18n';
 import { cancelAllReminders } from '../src/notifications';
-import { deleteAllOriginals } from '../src/originals';
+import { deleteAllOriginals, getStorageStats, formatBytes } from '../src/originals';
 import { getSaveOriginals, setSaveOriginals } from '../src/settings';
 import { useUsage, getRemainingAnalyses } from '../src/usage';
 import { useLargeFontMode } from '../src/largeFontMode';
@@ -66,6 +66,7 @@ export default function SettingsScreen() {
   const [lang, setLang] = useState<LanguageCode>('en');
   const [deviceId, setDeviceId] = useState<string | null>(null);
   const [saveOriginals, setSaveOriginalsState] = useState(false);
+  const [storageStatsLabel, setStorageStatsLabel] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
   const [restoring, setRestoring] = useState(false);
 
@@ -80,6 +81,21 @@ export default function SettingsScreen() {
         setDeviceId(await ensureDeviceId());
       })();
       getSaveOriginals().then(setSaveOriginalsState);
+      // Refresh storage stats label every time we re-focus Settings — gives
+      // the user a sticky, glanceable confirmation that storage is alive.
+      getStorageStats()
+        .then((s) => {
+          if (!s.available) {
+            setStorageStatsLabel('Not available on this platform');
+          } else if (s.count === 0) {
+            setStorageStatsLabel('No originals saved yet');
+          } else {
+            setStorageStatsLabel(`${s.count} · ${formatBytes(s.totalBytes)}`);
+          }
+        })
+        .catch(() => {
+          setStorageStatsLabel(null);
+        });
     }, [])
   );
 
@@ -265,6 +281,27 @@ export default function SettingsScreen() {
             />
           </View>
         </Card>
+
+        <Pressable
+          onPress={() => router.push('/storage')}
+          style={({ pressed }) => [
+            styles.row,
+            styles.cardLike,
+            pressed && { opacity: 0.7 },
+          ]}
+          testID="settings-open-storage"
+        >
+          <View style={[styles.rowIcon, { backgroundColor: colors.primarySoft }]}>
+            <HardDrive color={colors.primary} size={20} strokeWidth={2.4} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.rowTitle}>{t(lang, 'view_storage')}</Text>
+            <Text style={styles.rowSub}>
+              {storageStatsLabel ?? `${t(lang, 'local_storage_title')} · …`}
+            </Text>
+          </View>
+          <ChevronRight color={colors.textMuted} size={20} strokeWidth={2.4} />
+        </Pressable>
 
         <Card>
           <View style={styles.row}>
@@ -622,6 +659,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.md,
+  },
+  cardLike: {
+    backgroundColor: colors.surface,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: spacing.md,
   },
   rowIcon: {
     width: 40,

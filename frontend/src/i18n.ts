@@ -118,6 +118,11 @@ export type UIKey =
   | 'save_originals'
   | 'save_originals_sub'
   | 'view_original'
+  | 'saved_to_device'
+  | 'saved_to_device_failed'
+  | 'local_storage_title'
+  | 'view_storage'
+  | 'storage_run_test'
   | 'remind_me'
   | 'reminder_set'
   | 'cancel_reminder'
@@ -350,6 +355,11 @@ const en: UIStrings = {
   save_originals: 'Save originals on this device',
   save_originals_sub: 'Originals stay on your iPhone, never uploaded to a server.',
   view_original: 'View original',
+  saved_to_device: 'Original saved on this device',
+  saved_to_device_failed: 'Could not save original on this device',
+  local_storage_title: 'Local storage',
+  view_storage: 'View saved originals',
+  storage_run_test: 'Test storage',
   remind_me: 'Remind me',
   reminder_set: 'Reminder set',
   cancel_reminder: 'Cancel reminder',
@@ -585,6 +595,11 @@ const zh: UIStrings = {
   save_originals: '在本机保存原始文件',
   save_originals_sub: '原件只保留在您的 iPhone 上，绝不会上传到服务器。',
   view_original: '查看原件',
+  saved_to_device: '已保存到此设备',
+  saved_to_device_failed: '无法保存到此设备',
+  local_storage_title: '本地存储',
+  view_storage: '查看已保存的原件',
+  storage_run_test: '测试存储',
   remind_me: '提醒我',
   reminder_set: '已设提醒',
   cancel_reminder: '取消提醒',
@@ -816,6 +831,11 @@ const vi: UIStrings = {
   save_originals: 'Lưu tài liệu gốc trên thiết bị này',
   save_originals_sub: 'Tài liệu gốc chỉ ở trên iPhone của bạn và không được tải lên máy chủ.',
   view_original: 'Xem tài liệu gốc',
+  saved_to_device: 'Đã lưu trên thiết bị này',
+  saved_to_device_failed: 'Không thể lưu trên thiết bị này',
+  local_storage_title: 'Bộ nhớ cục bộ',
+  view_storage: 'Xem các bản gốc đã lưu',
+  storage_run_test: 'Kiểm tra bộ nhớ',
   remind_me: 'Nhắc tôi',
   reminder_set: 'Đã đặt nhắc',
   cancel_reminder: 'Huỷ nhắc',
@@ -1049,6 +1069,11 @@ const tr: UIStrings = {
   save_originals: 'Orijinalleri bu cihaza kaydet',
   save_originals_sub: 'Orijinaller yalnızca iPhone’unuzda kalır, sunucuya yüklenmez.',
   view_original: 'Orijinali görüntüle',
+  saved_to_device: 'Bu cihaza kaydedildi',
+  saved_to_device_failed: 'Bu cihaza kaydedilemedi',
+  local_storage_title: 'Yerel depolama',
+  view_storage: 'Kaydedilen orijinalleri görüntüle',
+  storage_run_test: 'Depolamayı test et',
   remind_me: 'Bana hatırlat',
   reminder_set: 'Hatırlatma kuruldu',
   cancel_reminder: 'Hatırlatmayı iptal et',
@@ -1282,6 +1307,11 @@ const ru: UIStrings = {
   save_originals: 'Сохранять оригиналы на этом устройстве',
   save_originals_sub: 'Оригиналы остаются только на вашем iPhone и никогда не отправляются на сервер.',
   view_original: 'Открыть оригинал',
+  saved_to_device: 'Сохранено на этом устройстве',
+  saved_to_device_failed: 'Не удалось сохранить на этом устройстве',
+  local_storage_title: 'Локальное хранилище',
+  view_storage: 'Сохранённые оригиналы',
+  storage_run_test: 'Проверить хранилище',
   remind_me: 'Напомнить',
   reminder_set: 'Напоминание установлено',
   cancel_reminder: 'Отменить напоминание',
@@ -1515,6 +1545,11 @@ const es: UIStrings = {
   save_originals: 'Guardar originales en este dispositivo',
   save_originals_sub: 'Los originales se quedan en tu iPhone y nunca se suben al servidor.',
   view_original: 'Ver original',
+  saved_to_device: 'Guardado en este dispositivo',
+  saved_to_device_failed: 'No se pudo guardar en este dispositivo',
+  local_storage_title: 'Almacenamiento local',
+  view_storage: 'Ver originales guardados',
+  storage_run_test: 'Probar almacenamiento',
   remind_me: 'Recordármelo',
   reminder_set: 'Recordatorio creado',
   cancel_reminder: 'Cancelar recordatorio',
@@ -1750,6 +1785,11 @@ const de_simple: UIStrings = {
   save_originals: 'Brief auf diesem Handy speichern',
   save_originals_sub: 'Der Brief bleibt nur auf Ihrem Handy. Er geht nicht ins Internet.',
   view_original: 'Brief ansehen',
+  saved_to_device: 'Auf diesem Gerät gespeichert',
+  saved_to_device_failed: 'Konnte nicht auf diesem Gerät gespeichert werden',
+  local_storage_title: 'Lokaler Speicher',
+  view_storage: 'Gespeicherte Briefe ansehen',
+  storage_run_test: 'Speicher prüfen',
   remind_me: 'Erinnern',
   reminder_set: 'Erinnerung gesetzt',
   cancel_reminder: 'Erinnerung löschen',
