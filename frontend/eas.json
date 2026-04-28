@@ -9,7 +9,7 @@
       "distribution": "internal",
       "ios": {
         "simulator": false,
-        "resourceClass": "m-medium"
+        "resourceClass": "medium"
       },
       "android": {
         "buildType": "apk",
@@ -29,7 +29,7 @@
       "distribution": "internal",
       "channel": "preview",
       "ios": {
-        "resourceClass": "m-medium"
+        "resourceClass": "medium"
       },
       "android": {
         "buildType": "apk"
@@ -39,7 +39,7 @@
       "channel": "production",
       "autoIncrement": true,
       "ios": {
-        "resourceClass": "m-large",
+        "resourceClass": "large",
         "image": "latest"
       },
       "android": {

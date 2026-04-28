@@ -110,7 +110,7 @@ Write-Host ""
 Write-Color "[BUILD] Starting EAS build..." Cyan
 Write-Host ""
 
-eas build --platform ios --profile $Profile --non-interactive
+eas build --platform ios --profile $Profile
 
 if ($LASTEXITCODE -ne 0) {
     Write-Host ""
@@ -131,7 +131,7 @@ if ($Profile -eq "production") {
     if ($submit -eq "y" -or $submit -eq "Y") {
         Write-Host ""
         Write-Color "[SUBMIT] Submitting to TestFlight..." Cyan
-        eas submit --platform ios --latest --non-interactive
+        eas submit --platform ios --latest
 
         if ($LASTEXITCODE -eq 0) {
             Write-Host ""

@@ -89,7 +89,7 @@ echo ""
 echo -e "${BLUE}🚀 Starting EAS build...${NC}"
 echo ""
 
-eas build --platform ios --profile "$PROFILE" --non-interactive
+eas build --platform ios --profile "$PROFILE"
 
 BUILD_EXIT=$?
 
@@ -113,7 +113,7 @@ if [ "$PROFILE" = "production" ]; then
   if [[ $REPLY =~ ^[Yy]$ ]]; then
     echo ""
     echo -e "${BLUE}📤 Submitting to TestFlight...${NC}"
-    eas submit --platform ios --latest --non-interactive
+    eas submit --platform ios --latest
 
     if [ $? -eq 0 ]; then
       echo ""

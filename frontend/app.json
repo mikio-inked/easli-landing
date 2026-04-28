@@ -22,7 +22,8 @@
         "NSCameraUsageDescription": "Scan German documents to translate and explain them.",
         "NSPhotoLibraryUsageDescription": "Pick a photo of a German document to analyze.",
         "NSPhotoLibraryAddUsageDescription": "Save analyzed documents to your library.",
-        "NSMicrophoneUsageDescription": "Not used. Microphone access is not required."
+        "NSMicrophoneUsageDescription": "Not used. Microphone access is not required.",
+        "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
