@@ -1722,18 +1722,24 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
   deadlineItem: {
-    flexDirection: 'row',
+    // Stack vertically: long date ranges like "2026-04-21 bis 2026-04-23"
+    // would otherwise hog the row and squeeze the description into a 30 px
+    // column where each glyph wrapped to its own line. Putting the date
+    // chip above the description gives the body text the full card width.
+    flexDirection: 'column',
     alignItems: 'flex-start',
-    gap: 12,
+    gap: spacing.xs,
     backgroundColor: colors.background,
     borderRadius: radius.md,
     padding: spacing.md,
   },
   deadlineDateChip: {
+    alignSelf: 'flex-start',
     backgroundColor: colors.primarySoft,
     borderRadius: radius.sm,
     paddingHorizontal: 10,
     paddingVertical: 6,
+    maxWidth: '100%',
   },
   deadlineDate: {
     fontSize: fontSize.sm,
