@@ -13,11 +13,19 @@ ohne den Emergent-Cloud-Build-Wrapper (der ein 12-Min-Timeout hatte).
 
 ---
 
+## 💡 Wichtig: Funktioniert auch von Windows!
+
+Der eigentliche iOS-Build läuft in der **EAS Cloud** auf Apple-Servern.
+Du brauchst **keinen Mac** — Windows + Node.js reichen vollständig aus.
+Apple-spezifische Schritte (Provisioning, Signing) übernimmt EAS automatisch.
+
+---
+
 ## ✅ Voraussetzungen (einmalig einrichten)
 
 ### 1. Tools installieren
 
-Auf deinem Mac:
+#### 🍏 macOS / Linux
 
 ```bash
 # Node.js (≥ 18)
@@ -29,6 +37,26 @@ npm install -g eas-cli
 # Expo CLI (optional, aber praktisch)
 npm install -g expo
 ```
+
+#### 🪟 Windows (PowerShell)
+
+```powershell
+# 1. Node.js installieren von https://nodejs.org/ (LTS-Version)
+node --version
+
+# 2. EAS CLI installieren
+npm install -g eas-cli
+
+# 3. Expo CLI (optional)
+npm install -g expo
+
+# 4. PowerShell erlauben, lokale Scripts auszuführen (NUR EINMAL):
+Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy RemoteSigned
+```
+
+> 💡 **Tipp für Windows-User:** Statt der normalen `cmd`-Konsole nimm **PowerShell** oder
+> **Windows Terminal** (gibt's gratis im Microsoft Store). Damit funktionieren die Befehle wie
+> auf Mac/Linux, und das `build-ios.ps1` Script läuft sauber.
 
 ### 2. Repo lokal auschecken
 
@@ -83,9 +111,18 @@ Beim ersten Build wirst du gefragt:
 
 ### Option A: Per Script (empfohlen)
 
+#### 🍏 macOS / Linux
+
 ```bash
 cd frontend
 ./scripts/build-ios.sh production
+```
+
+#### 🪟 Windows (PowerShell)
+
+```powershell
+cd frontend
+.\scripts\build-ios.ps1 production
 ```
 
 Das Script:
