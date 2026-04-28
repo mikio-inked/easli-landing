@@ -33,6 +33,9 @@
       },
       "android": {
         "buildType": "apk"
+      },
+      "env": {
+        "EXPO_PUBLIC_BACKEND_URL": "https://doc-assistant-app.preview.emergentagent.com"
       }
     },
     "production": {
@@ -48,6 +51,9 @@
       },
       "cache": {
         "disabled": false
+      },
+      "env": {
+        "EXPO_PUBLIC_BACKEND_URL": "https://doc-assistant-app.preview.emergentagent.com"
       }
     }
   },
