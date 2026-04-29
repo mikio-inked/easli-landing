@@ -47,9 +47,10 @@ export default function PrivacyPublicScreen() {
           <Section title="1. Verantwortlicher">
             <Text style={styles.body}>
               Verantwortlicher im Sinne der DSGVO ist:{'\n'}
-              [TODO: Name / Firma]{'\n'}
-              [TODO: Anschrift]{'\n'}
-              E-Mail: [TODO: kontakt@deine-domain.de]
+              Martin Tran (Freiberufler){'\n'}
+              Alfred-Delp-Str. 33{'\n'}
+              68623 Lampertheim, Deutschland{'\n'}
+              E-Mail: kontakt@klarpost.app
             </Text>
           </Section>
 
@@ -120,8 +121,16 @@ export default function PrivacyPublicScreen() {
             </Bullet>
             <Bullet>
               <Text style={styles.body}>
-                <Text style={styles.bold}>MongoDB Cloud</Text> bzw. dedizierter Datenbank-
-                Server in der EU — Speicherung der strukturierten Analyseergebnisse.
+                <Text style={styles.bold}>MongoDB Atlas</Text> (MongoDB Limited, EU-Region
+                Frankfurt) — Speicherung der strukturierten Analyseergebnisse.
+                Auftragsverarbeitungsvertrag (AVV) gemäß Art. 28 DSGVO geschlossen.
+              </Text>
+            </Bullet>
+            <Bullet>
+              <Text style={styles.body}>
+                <Text style={styles.bold}>Railway Corp.</Text> (USA, mit Server-Standort
+                EU) — Hosting des Backend-Servers (api.klarpost.app). Standardvertragsklauseln
+                der EU-Kommission, Daten werden in einer EU-Region gehostet.
               </Text>
             </Bullet>
             <Bullet>
@@ -170,7 +179,7 @@ export default function PrivacyPublicScreen() {
               </Text>
             </Bullet>
             <Text style={styles.body}>
-              Alternativ erreichen Sie uns per E-Mail unter [TODO: kontakt@deine-domain.de].
+              Alternativ erreichen Sie uns per E-Mail unter kontakt@klarpost.app.
             </Text>
           </Section>
 
@@ -209,8 +218,8 @@ export default function PrivacyPublicScreen() {
 
           <Section title="Controller">
             <Text style={styles.body}>
-              [TODO: Name / Company]{'\n'}[TODO: Address]{'\n'}
-              Email: [TODO: contact@your-domain.com]
+              Martin Tran (Freelancer){'\n'}Alfred-Delp-Str. 33{'\n'}68623 Lampertheim, Germany{'\n'}
+              Email: kontakt@klarpost.app
             </Text>
           </Section>
 
@@ -285,7 +294,7 @@ export default function PrivacyPublicScreen() {
             <Text style={styles.body}>
               Access, rectification, erasure, restriction, portability, objection — all
               available directly in the app (Settings → Export / Delete) or by email at
-              [TODO: contact@your-domain.com]. You may also lodge a complaint with the
+              kontakt@klarpost.app. You may also lodge a complaint with the
               competent data protection authority.
             </Text>
           </Section>

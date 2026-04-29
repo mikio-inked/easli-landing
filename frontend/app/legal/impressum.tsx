@@ -43,24 +43,24 @@ export default function ImpressumScreen() {
           <Text style={styles.docKicker}>Angaben gemäß § 5 TMG</Text>
 
           <Section title="Anbieter">
-            <Text style={styles.body}>[TODO: Name / Firma]</Text>
-            <Text style={styles.body}>[TODO: Straße und Hausnummer]</Text>
-            <Text style={styles.body}>[TODO: PLZ und Ort]</Text>
+            <Text style={styles.body}>Martin Tran</Text>
+            <Text style={styles.body}>Freiberuflich tätig</Text>
+            <Text style={styles.body}>Alfred-Delp-Str. 33</Text>
+            <Text style={styles.body}>68623 Lampertheim</Text>
             <Text style={styles.body}>Deutschland</Text>
           </Section>
 
           <Section title="Vertreten durch">
-            <Text style={styles.body}>[TODO: Name der vertretungsberechtigten Person]</Text>
+            <Text style={styles.body}>Martin Tran</Text>
           </Section>
 
           <Section title="Kontakt">
-            <Text style={styles.body}>E-Mail: [TODO: kontakt@deine-domain.de]</Text>
-            <Text style={styles.body}>Telefon: [TODO: optional]</Text>
+            <Text style={styles.body}>E-Mail: kontakt@klarpost.app</Text>
           </Section>
 
           <Section title="Verantwortlich für den Inhalt nach § 18 Abs. 2 MStV">
-            <Text style={styles.body}>[TODO: Name]</Text>
-            <Text style={styles.body}>[TODO: Anschrift wie oben]</Text>
+            <Text style={styles.body}>Martin Tran</Text>
+            <Text style={styles.body}>Anschrift wie oben</Text>
           </Section>
 
           <Section title="Haftung für Inhalte">
@@ -120,23 +120,23 @@ export default function ImpressumScreen() {
           <Text style={styles.docKicker}>Statutory information according to § 5 TMG</Text>
 
           <Section title="Provider">
-            <Text style={styles.body}>[TODO: Name / Company]</Text>
-            <Text style={styles.body}>[TODO: Street, house number]</Text>
-            <Text style={styles.body}>[TODO: Postcode, city]</Text>
+            <Text style={styles.body}>Martin Tran</Text>
+            <Text style={styles.body}>Freelancer (independent professional)</Text>
+            <Text style={styles.body}>Alfred-Delp-Str. 33</Text>
+            <Text style={styles.body}>68623 Lampertheim</Text>
             <Text style={styles.body}>Germany</Text>
           </Section>
 
           <Section title="Represented by">
-            <Text style={styles.body}>[TODO: Name of authorised representative]</Text>
+            <Text style={styles.body}>Martin Tran</Text>
           </Section>
 
           <Section title="Contact">
-            <Text style={styles.body}>Email: [TODO: contact@your-domain.com]</Text>
-            <Text style={styles.body}>Phone: [TODO: optional]</Text>
+            <Text style={styles.body}>Email: kontakt@klarpost.app</Text>
           </Section>
 
           <Section title="Editorially responsible (§ 18 (2) MStV)">
-            <Text style={styles.body}>[TODO: Name, address as above]</Text>
+            <Text style={styles.body}>Martin Tran, address as above</Text>
           </Section>
 
           <Section title="Liability for content & links">
