@@ -53,7 +53,7 @@
         "disabled": false
       },
       "env": {
-        "EXPO_PUBLIC_BACKEND_URL": "https://doc-assistant-app.preview.emergentagent.com"
+        "EXPO_PUBLIC_BACKEND_URL": "https://api.klarpost.app"
       }
     }
   },
