@@ -20,7 +20,7 @@ from datetime import datetime
 from PIL import Image, ImageDraw, ImageFont
 
 # Use the public URL from frontend/.env (per system rules)
-BASE = "https://doc-assistant-app.preview.emergentagent.com/api"
+BASE = "https://doc-scanner-de.preview.emergentagent.com/api"
 
 # ---------- helpers ----------
 

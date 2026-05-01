@@ -34,7 +34,7 @@ from pymongo import MongoClient
 BACKEND_URL = (
     os.environ.get("EXPO_PUBLIC_BACKEND_URL")
     or os.environ.get("REACT_APP_BACKEND_URL")
-    or "https://doc-assistant-app.preview.emergentagent.com"
+    or "https://doc-scanner-de.preview.emergentagent.com"
 )
 API = f"{BACKEND_URL.rstrip('/')}/api"
 

@@ -35,7 +35,7 @@ from typing import Any
 import requests
 from PIL import Image, ImageDraw, ImageFont
 
-BASE = "https://doc-assistant-app.preview.emergentagent.com/api"
+BASE = "https://doc-scanner-de.preview.emergentagent.com/api"
 TIMEOUT = 90
 
 # Tokens to grep in backend logs at end-of-run.
