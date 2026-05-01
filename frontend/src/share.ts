@@ -92,9 +92,10 @@ export function buildAnalysisText(record: AnalysisRecord, lang: LanguageCode): s
     });
     lines.push('');
   }
-  if (r.german_reply_draft) {
-    lines.push(`■ ${t(lang, 'reply_draft')} (Deutsch)`);
-    lines.push(r.german_reply_draft);
+  const replyDraftText = (r as any).reply_draft || r.german_reply_draft;
+  if (replyDraftText) {
+    lines.push(`■ ${t(lang, 'reply_draft')}`);
+    lines.push(replyDraftText);
     lines.push('');
   }
   if (r.reply_draft_explanation_translated) {
@@ -193,8 +194,8 @@ function buildAnalysisHtml(record: AnalysisRecord, lang: LanguageCode): string {
   ${deadlineRows ? `<h2>${escapeHtml(t(lang, 'deadlines'))}</h2><ul>${deadlineRows}</ul>` : ''}
   ${actionsRows ? `<h2>${escapeHtml(t(lang, 'what_to_do_next'))}</h2><ul>${actionsRows}</ul>` : ''}
   ${
-    r.german_reply_draft
-      ? `<h2>${escapeHtml(t(lang, 'reply_draft'))} (Deutsch)</h2><div class="reply">${escapeHtml(r.german_reply_draft)}</div>`
+    (((r as any).reply_draft || r.german_reply_draft))
+      ? `<h2>${escapeHtml(t(lang, 'reply_draft'))}</h2><div class="reply">${escapeHtml((r as any).reply_draft || r.german_reply_draft)}</div>`
       : ''
   }
   ${

@@ -132,7 +132,12 @@ class RequiredAction(BaseModel):
 
 
 class AnalysisResult(BaseModel):
-    source_language: str = "German"
+    source_language: str = ""
+    # ISO-639-1 code of the detected source language ('de', 'en', 'fr', ...).
+    # Empty string when unknown. Populated since Phase-3 (multi-source-language
+    # expansion). For legacy records with only `source_language` (free-form
+    # string like "German") this will be "".
+    source_language_code: str = ""
     target_language: str = ""
     document_type: str = ""
     sender: str = ""
@@ -143,6 +148,13 @@ class AnalysisResult(BaseModel):
     required_actions: List[RequiredAction] = []
     risk_level: Literal["green", "yellow", "red"] = "green"
     risk_reason: str = ""
+    # Polite neutral reply draft — written in the SAME language as the source
+    # document (so the user can actually send it back to the sender). Replaces
+    # the old `german_reply_draft` (kept below as alias for backward compat).
+    reply_draft: str = ""
+    # Legacy alias — older clients / DB records read `german_reply_draft`.
+    # We mirror the same value here so old data + old app versions keep
+    # working without a migration.
     german_reply_draft: str = ""
     reply_draft_explanation_translated: str = ""
     questions_to_ask: List[str] = []
@@ -346,14 +358,15 @@ def build_system_prompt(target_language_label: str, target_language_code: str = 
             "- Use short bullet points where it helps clarity.\n"
             "- Output the German text in the standard alphabet (no Fraktur, no abbreviations like z.B./bzw.).\n"
         )
-    return f"""You are KlarPost, a careful, trustworthy assistant that helps people in Germany understand German documents.
+    return f"""You are KlarPost, a careful, trustworthy assistant that helps people understand official, administrative, and everyday letters written in ANY European language.
 
 Your job:
-1. Carefully read the German document in the provided image.
-2. Explain it clearly in {target_language_label}.
-3. Identify deadlines, required actions, and risk level.
-4. Provide a neutral German reply draft if useful.
-5. Translate the explanation of the reply draft into {target_language_label}.
+1. Carefully read the document text provided (OCR output). It may be written in German, English, French, Spanish, Italian, Dutch, Polish, Portuguese, or another language.
+2. Detect the PRIMARY language of the document yourself from the text. Use English names for `source_language` (e.g. "German", "English", "French", "Spanish", "Italian", "Dutch", "Polish", "Portuguese", "Turkish"). Provide the ISO-639-1 code separately in `source_language_code` (e.g. "de", "en", "fr", "es", "it", "nl", "pl", "pt", "tr").
+3. Explain it clearly in {target_language_label}.
+4. Identify deadlines, required actions, and risk level.
+5. Provide a neutral reply draft in the SAME language as the source document (so the user can send it back to the sender) — see `reply_draft` below.
+6. Translate the explanation of the reply draft into {target_language_label}.
 
 CRITICAL RULES:
 - You MUST NOT provide legal, tax, financial, or medical advice.
@@ -386,19 +399,19 @@ Category — pick the SINGLE best match for `category`:
 If multiple categories apply, pick the strongest one. NEVER invent a new category.
 
 Scam / phishing detection — set `scam_warning` to true ONLY when at least ONE strong red flag is present:
-- Asks the user to send money to a foreign IBAN (non-DE/AT/CH) that does NOT match the supposed sender, or to a personal account when the sender claims to be a public authority.
+- Asks the user to send money to a foreign IBAN that does NOT match the supposed sender, or to a personal account when the sender claims to be a public authority, bank, or large company.
 - Threatens arrest, deportation, account closure, public shaming, or other extreme consequences within hours/days unless payment is made.
-- Impersonates a German authority (Finanzamt, Bundespolizei, Zoll, GEZ/Rundfunkbeitrag, Krankenkasse, Bank) but uses sloppy German, wrong logos, gmail/web.de/yahoo addresses, or non-official URLs.
-- Demands payment via gift cards, vouchers, cryptocurrency, Western Union, MoneyGram, prepaid cards, or asks for the user's full bank login/TAN/PIN.
-- Sends a "Paketzustellung / Zoll / DHL / Hermes" SMS-style request for a tiny fee with a suspicious link, especially shortened/foreign domain.
-- Sends a fake "Bußgeldbescheid" or "Mahnung" without a recognisable Aktenzeichen or sender address, or with an obviously cloned look.
+- Impersonates an authority, bank, or well-known company (tax office, police, customs, public broadcaster, health insurer, utility, courier, bank, streaming service, tech company) but uses sloppy language, wrong logos, free-mail addresses (gmail/web.de/yahoo/outlook), or non-official URLs.
+- Demands payment via gift cards, vouchers, cryptocurrency, Western Union, MoneyGram, prepaid cards, or asks for the user's full bank login/TAN/PIN/2FA code.
+- Parcel-delivery SMS-style request for a tiny fee with a suspicious short/foreign link (e.g. fake DHL, UPS, Royal Mail, La Poste, Correos).
+- Fake fine / late-payment notice without a recognisable reference number or sender address, or with an obviously cloned look.
 - Asks the user to install software, share screen, or hand over remote access.
-- Phishing links that mimic banking/Behörde domains (typosquatting).
-Do NOT mark as scam just because it is uncomfortable, demanding, or in legalese. Real Mahnungen, Inkassos, and tax letters are usually NOT scams.
-When `scam_warning` is true, set `scam_reason` to a short calm sentence in {target_language_label} explaining WHY (e.g. "Die Zahlungsaufforderung verlangt eine Krypto-Überweisung — das ist sehr ungewöhnlich für Behörden."). When false, leave `scam_reason` empty.
+- Phishing links that mimic banking/authority domains (typosquatting).
+Do NOT mark as scam just because a letter is uncomfortable, demanding, or full of legalese. Real dunning letters (Mahnung / demand letter), debt-collection, and tax letters are usually NOT scams.
+When `scam_warning` is true, set `scam_reason` to a short calm sentence in {target_language_label} explaining WHY. When false, leave `scam_reason` empty.
 
-If the image does NOT appear to be a German document or text is unreadable:
-- Set document_type to "Unbekannt / Unknown" (or equivalent)
+If the text is unreadable, empty, or clearly NOT a real letter/document (e.g. a photo of a face, a blank page, a product photo):
+- Set document_type to "Unknown"
 - Set risk_level to "yellow"
 - Add a clear note in uncertainties explaining the issue.
 - Use empty strings/lists for fields you cannot fill.
@@ -407,9 +420,10 @@ You MUST respond ONLY with a single valid JSON object that matches the schema be
 
 JSON Schema:
 {{
-  "source_language": "German",
+  "source_language": "string - the primary language of the document, in English (e.g. 'German', 'English', 'French', 'Spanish', 'Italian', 'Dutch', 'Polish', 'Portuguese', 'Turkish')",
+  "source_language_code": "string - ISO-639-1 code of the source language (e.g. 'de','en','fr','es','it','nl','pl','pt','tr')",
   "target_language": "{target_language_label}",
-  "document_type": "string - the type of document (e.g. 'Krankenkasse Brief', 'Mietvertrag Kündigung', 'Rundfunkbeitrag', 'Mahnung', etc.) — write it briefly in {target_language_label}",
+  "document_type": "string - the type of document (e.g. 'Health insurance letter', 'Rental termination', 'Tax notice', 'Dunning letter', etc.) — write it briefly in {target_language_label}",
   "sender": "string - sender or organization, as written on the document (keep proper names in original)",
   "summary_translated": "string - one short paragraph in {target_language_label} summarising the document",
   "simple_explanation_translated": "string - simple, non-technical explanation in {target_language_label} of what this document means for the recipient",
@@ -430,7 +444,8 @@ JSON Schema:
   ],
   "risk_level": "green|yellow|red",
   "risk_reason": "short reason in {target_language_label} explaining the risk level",
-  "german_reply_draft": "polite neutral reply draft in German (only if relevant; otherwise empty string)",
+  "reply_draft": "polite neutral reply draft written in the SAME language as the source document (e.g. if the document is in English, the reply is in English; if Spanish, in Spanish). Empty string if a reply is not useful.",
+  "german_reply_draft": "DEPRECATED — set to the SAME value as reply_draft for backward compatibility with older app versions",
   "reply_draft_explanation_translated": "short explanation in {target_language_label} of what the reply draft says",
   "questions_to_ask": ["helpful, neutral questions the user could ask the sender or a qualified advisor — in {target_language_label}"],
   "uncertainties": ["clearly note anything uncertain, unreadable, or low-confidence — in {target_language_label}"],
@@ -440,7 +455,7 @@ JSON Schema:
   "scam_reason": "string in {target_language_label} — only when scam_warning is true, otherwise empty"
 }}
 
-Use ONLY the {target_language_label} for translated fields. Keep document_type concise. Be conservative with deadlines and risk levels. If unsure, say so in uncertainties.
+Use ONLY {target_language_label} for translated natural-language fields. Keep `reply_draft` and `german_reply_draft` in the SOURCE document's language. Keep document_type concise. Be conservative with deadlines and risk levels. If unsure, say so in uncertainties.
 """
 
 
@@ -940,7 +955,7 @@ async def analyze_from_ocr_text(
         )
         raise HTTPException(
             status_code=422,
-            detail="No readable German text was found. Please retry with a clearer photo.",
+            detail="No readable text was found. Please retry with a clearer photo.",
         )
 
     page_note = (
@@ -951,8 +966,11 @@ async def analyze_from_ocr_text(
     )
 
     user_text = (
-        f"Analyze this German document and respond ONLY with the JSON object as specified. "
-        f"The user's selected target language is {target_language_label}. {page_note}\n\n"
+        f"Analyze this document and respond ONLY with the JSON object as specified. "
+        f"Detect the source language of the document yourself from the text. "
+        f"The user's selected target language for the explanation is {target_language_label}. "
+        f"Write `reply_draft` and `german_reply_draft` in the SAME language as the source document. "
+        f"{page_note}\n\n"
         f"--- EXTRACTED DOCUMENT TEXT (from OCR) ---\n{combined_text}"
     ).strip()
 
@@ -1010,7 +1028,25 @@ async def analyze_from_ocr_text(
         )
 
     parsed["target_language"] = target_language_label
-    parsed["source_language"] = "German"
+    # Source language is detected by the model — don't hardcode "German" any
+    # more. If the model forgot the field (rare), fall back to empty string.
+    if not isinstance(parsed.get("source_language"), str):
+        parsed["source_language"] = ""
+    if not isinstance(parsed.get("source_language_code"), str):
+        parsed["source_language_code"] = ""
+    # Normalise the ISO code.
+    parsed["source_language_code"] = (parsed.get("source_language_code") or "").strip().lower()
+
+    # Back-compat alias: mirror `reply_draft` ↔ `german_reply_draft` so both
+    # old clients (which read `german_reply_draft`) and new clients (which
+    # read `reply_draft`) see the same value regardless of which key the
+    # model happens to emit.
+    rd = parsed.get("reply_draft")
+    grd = parsed.get("german_reply_draft")
+    if isinstance(rd, str) and rd.strip() and not (isinstance(grd, str) and grd.strip()):
+        parsed["german_reply_draft"] = rd
+    elif isinstance(grd, str) and grd.strip() and not (isinstance(rd, str) and rd.strip()):
+        parsed["reply_draft"] = grd
 
     _sanitize_literal_fields(parsed)
 
@@ -1309,8 +1345,12 @@ async def _consume_chat_question(device_id: str, analysis_id: str) -> None:
 
 def build_chat_system_prompt(record: dict, target_language_label: str, target_language_code: str = "") -> str:
     result = record.get("result", {}) or {}
+    # Resolve reply_draft with legacy fallback to german_reply_draft.
+    reply_draft_value = result.get("reply_draft") or result.get("german_reply_draft", "")
     # Trim arrays to what's useful in the system context.
     doc_context = {
+        "source_language": result.get("source_language", ""),
+        "source_language_code": result.get("source_language_code", ""),
         "document_type": result.get("document_type", ""),
         "sender": result.get("sender", ""),
         "summary_translated": result.get("summary_translated", ""),
@@ -1320,7 +1360,7 @@ def build_chat_system_prompt(record: dict, target_language_label: str, target_la
         "required_actions": result.get("required_actions", [])[:8],
         "risk_level": result.get("risk_level", "green"),
         "risk_reason": result.get("risk_reason", ""),
-        "german_reply_draft": result.get("german_reply_draft", ""),
+        "reply_draft": reply_draft_value,
         "questions_to_ask": result.get("questions_to_ask", [])[:8],
         "uncertainties": result.get("uncertainties", [])[:8],
     }
@@ -1334,7 +1374,7 @@ def build_chat_system_prompt(record: dict, target_language_label: str, target_la
             "- Active voice, concrete nouns, address the user with 'Sie'.\n"
             "- Briefly explain rare formal terms in parentheses."
         )
-    return f"""You are KlarPost's document assistant. You help ONE user understand ONE specific German document. The full structured analysis of that document is provided below.
+    return f"""You are KlarPost's document assistant. You help ONE user understand ONE specific letter or document. The full structured analysis of that document is provided below.
 
 CRITICAL SCOPE — refuse anything outside it:
 1. You may ONLY discuss THIS document and the immediate context around it (e.g. what a specific term in this letter means, what the deadline implies, how to phrase a polite reply to THIS sender, what document types like this typically look like in Germany, what to ask the sender, how to find a counseling center for THIS kind of issue).
@@ -1476,7 +1516,7 @@ def build_translation_system_prompt(
             "'Versicherte'), give a one-clause explanation in parentheses.\n"
             "- Use short bullet points where it helps clarity.\n"
         )
-    return f"""You are KlarPost's translator. You receive a structured JSON analysis of a German document in {current_target_label}. Your job is to produce the SAME analysis object with the natural-language fields rewritten in {new_target_label}.
+    return f"""You are KlarPost's translator. You receive a structured JSON analysis of a document in {current_target_label}. Your job is to produce the SAME analysis object with the natural-language fields rewritten in {new_target_label}.
 
 PRESERVE EXACTLY (do NOT translate, do NOT modify):
 - "sender" — proper name / organisation as given
@@ -1486,9 +1526,11 @@ PRESERVE EXACTLY (do NOT translate, do NOT modify):
 - "risk_level" — green|yellow|red (enum)
 - "category" — one of the 12 fixed codes (tax|insurance|rent|bank|health|government|court|utilities|telecom|work|education|other)
 - "scam_warning" — boolean
-- "german_reply_draft" — MUST stay in German (it's a reply TO a German sender)
-- "source_language" — always "German"
-- Any numeric amounts, IBAN/Aktenzeichen/reference numbers appearing inside natural-language fields must stay byte-identical (e.g. "123,45 EUR", "DE89 3704 0044 0532 0130 00", "Az. DE-2026-0001").
+- "reply_draft" — MUST stay byte-identical in the SOURCE document's language (the user will send this back to the sender)
+- "german_reply_draft" — MUST mirror `reply_draft` exactly (legacy alias, same value)
+- "source_language" — the source-language name in English (e.g. "German", "English", "French")
+- "source_language_code" — the ISO-639-1 code (e.g. "de", "en", "fr")
+- Any numeric amounts, IBAN / reference / case numbers appearing inside natural-language fields must stay byte-identical (e.g. "123,45 EUR", "DE89 3704 0044 0532 0130 00", "Az. DE-2026-0001").
 
 TRANSLATE / LOCALISE into {new_target_label}:
 - "document_type"
@@ -1499,7 +1541,7 @@ TRANSLATE / LOCALISE into {new_target_label}:
 - "required_actions[].action"
 - "required_actions[].reason"
 - "risk_reason"
-- "reply_draft_explanation_translated" — explanation of what german_reply_draft says
+- "reply_draft_explanation_translated" — explanation of what reply_draft says
 - "questions_to_ask"
 - "uncertainties"
 - "disclaimer" — one short generic disclaimer stating KlarPost does not provide legal, tax, financial or medical advice
@@ -1507,7 +1549,7 @@ TRANSLATE / LOCALISE into {new_target_label}:
 
 TARGET META:
 - "target_language" must be set to "{new_target_label}"
-- "source_language" must remain "German"
+- "source_language" and "source_language_code" stay unchanged
 
 STYLE RULES (all target languages):
 - Friendly, calm, plain. No emojis unless they were in the source.
@@ -1541,14 +1583,19 @@ async def translate_analysis_with_mistral(
     # fields and keep only what AnalysisResult needs. Ensures the model
     # doesn't get confused by extras.
     ALLOWED_KEYS = {
-        "source_language", "target_language", "document_type", "sender",
+        "source_language", "source_language_code", "target_language",
+        "document_type", "sender",
         "summary_translated", "simple_explanation_translated", "key_points",
         "deadlines", "required_actions", "risk_level", "risk_reason",
-        "german_reply_draft", "reply_draft_explanation_translated",
+        "reply_draft", "german_reply_draft", "reply_draft_explanation_translated",
         "questions_to_ask", "uncertainties", "disclaimer", "category",
         "scam_warning", "scam_reason",
     }
     slim = {k: v for k, v in (source_result or {}).items() if k in ALLOWED_KEYS}
+    # If the source only has the legacy `german_reply_draft` (old DB record),
+    # also expose it as `reply_draft` so the prompt preserves it correctly.
+    if slim.get("german_reply_draft") and not slim.get("reply_draft"):
+        slim["reply_draft"] = slim["german_reply_draft"]
 
     messages = [
         {
@@ -1619,10 +1666,18 @@ async def translate_analysis_with_mistral(
         "risk_level",
         "category",
         "scam_warning",
+        "reply_draft",
         "german_reply_draft",
+        "source_language",
+        "source_language_code",
     ):
         if k in slim:
             parsed[k] = slim[k]
+    # Keep reply_draft ↔ german_reply_draft in sync after invariants applied.
+    if parsed.get("reply_draft") and not parsed.get("german_reply_draft"):
+        parsed["german_reply_draft"] = parsed["reply_draft"]
+    elif parsed.get("german_reply_draft") and not parsed.get("reply_draft"):
+        parsed["reply_draft"] = parsed["german_reply_draft"]
     # Deep-preserve factual sub-fields of deadlines/required_actions.
     if isinstance(slim.get("deadlines"), list) and isinstance(parsed.get("deadlines"), list):
         src_deadlines = slim["deadlines"]
@@ -1638,7 +1693,8 @@ async def translate_analysis_with_mistral(
                 src = src_actions[i] or {}
                 a["urgency"] = src.get("urgency", a.get("urgency", "low"))
 
-    parsed["source_language"] = "German"
+    # Source language stays whatever the source record had (already copied
+    # above via the invariant loop). target_language is always the new one.
     parsed["target_language"] = new_target_label
 
     _sanitize_literal_fields(parsed)
@@ -2091,34 +2147,12 @@ async def analyze_document(req: AnalyzeRequest):
     doc_lang, det_code, conf = await detect_document_language(page0_text)
 
     uncertainty_notice: Optional[str] = None
-    if doc_lang == "non_de" and conf == "high":
-        # Reject: high-confidence non-German. No quota consumption, no
-        # history entry, no full analysis. Privacy-safe log — no content.
-        logger.info(
-            "language_gate_rejected device=%s detected=%s confidence=%s mode=%s",
-            req.device_id, det_code or "?", conf, PAYWALL_MODE,
-        )
-        return JSONResponse(
-            status_code=422,
-            content={
-                "error": "unsupported_document_language",
-                "message": (
-                    "Dieses Dokument scheint nicht auf Deutsch zu sein. "
-                    "KlarPost ist aktuell für deutsche Schreiben optimiert. "
-                    "Bitte scanne ein deutschsprachiges Schreiben."
-                ),
-                "document_language": doc_lang,
-                "detected_language_code": det_code,
-                "confidence": conf,
-                # Include current usage so the client UI can stay in sync —
-                # we did NOT consume anything, so numbers stay put.
-                "usage": _to_usage_response(usage_rec).dict(),
-            },
-        )
-    elif doc_lang == "unknown" or conf == "low":
-        # Low-confidence or unknown — don't block, but attach an uncertainty
-        # note to the final AnalysisResult so the user knows the AI wasn't
-        # 100% sure about the input.
+    # Phase-3 (multi-source-language): We no longer hard-reject non-German
+    # documents. The analysis model handles any European language directly
+    # and `reply_draft` is produced in the sender's language. The old gate
+    # still runs in detection-only mode so the user can be told when the
+    # language could not be determined confidently — helpful UX, no block.
+    if doc_lang == "unknown" or conf == "low":
         logger.info(
             "language_gate_unknown device=%s detected=%s confidence=%s",
             req.device_id, det_code or "?", conf,
@@ -2129,8 +2163,8 @@ async def analyze_document(req: AnalyzeRequest):
         )
     else:
         logger.info(
-            "language_gate_passed device=%s detected=%s confidence=%s",
-            req.device_id, det_code or "?", conf,
+            "language_gate_passed device=%s detected=%s confidence=%s doc_lang=%s",
+            req.device_id, det_code or "?", conf, doc_lang,
         )
 
     # ----- Full analysis ---------------------------------------------------

@@ -32,6 +32,9 @@ export type Category =
 
 export interface AnalysisResult {
   source_language: string;
+  /** ISO-639-1 code of the detected source language ('de', 'en', 'fr', ...).
+   * Empty string on legacy records. Populated since Phase-3. */
+  source_language_code?: string;
   target_language: string;
   document_type: string;
   sender: string;
@@ -42,6 +45,12 @@ export interface AnalysisResult {
   required_actions: RequiredAction[];
   risk_level: 'green' | 'yellow' | 'red';
   risk_reason: string;
+  /** Polite reply draft — in the SAME language as the source document.
+   * Preferred field since Phase-3 (multi-source-language). */
+  reply_draft?: string;
+  /** Legacy alias — kept for backward compat with older records. Mirrors
+   * `reply_draft` when both are populated. Readers should prefer
+   * `reply_draft ?? german_reply_draft`. */
   german_reply_draft: string;
   reply_draft_explanation_translated: string;
   questions_to_ask: string[];

@@ -185,6 +185,7 @@ function replyRequired(r: any): boolean {
   ];
   if (tokenSearch(fields.join(' '), REPLY_TOKENS)) return true;
   // If there's a reply draft and a deadline, we treat that as "reply needed".
+  if ((r as any).reply_draft && (r.deadlines || []).length > 0) return true;
   if (r.german_reply_draft && (r.deadlines || []).length > 0) return true;
   return false;
 }
@@ -453,11 +454,14 @@ export default function ResultScreen() {
       : record.translations?.[effectiveDisplayLang] ?? record.result
   );
   const risk = riskMeta(r.risk_level, lang);
+  // Phase-3 (multi-source-language): prefer `reply_draft` (any source
+  // language), fall back to legacy `german_reply_draft` for older records.
+  const replyDraftText = (r as any).reply_draft || r.german_reply_draft || '';
 
   const copyReply = async () => {
-    if (!r.german_reply_draft) return;
+    if (!replyDraftText) return;
     try {
-      await Clipboard.setStringAsync(r.german_reply_draft);
+      await Clipboard.setStringAsync(replyDraftText);
       setCopied(true);
       setTimeout(() => setCopied(false), 1500);
     } catch {
@@ -506,11 +510,40 @@ export default function ResultScreen() {
   const hasActions = (r.required_actions?.length ?? 0) > 0;
   const hasDeadlines = (r.deadlines?.length ?? 0) > 0;
   const hasScam = !!r.scam_warning;
-  const hasReplyDraft = !!r.german_reply_draft;
+  const hasReplyDraft = !!replyDraftText;
   const hasQuestions = (r.questions_to_ask?.length ?? 0) > 0;
   const hasUncertainties = (r.uncertainties?.length ?? 0) > 0;
   const hasKeyPoints = (r.key_points?.length ?? 0) > 0;
   const hasSenderText = !!(r.sender && r.sender.trim());
+  // Human-readable label for the detected source language (e.g. "English",
+  // "Français"). Falls back to the LLM-provided `source_language` (English
+  // name) when the ISO code is empty. Returns '' when nothing is known.
+  const sourceLangLabel = (() => {
+    const code = ((r as any).source_language_code || '').toLowerCase();
+    const nameMap: Record<string, string> = {
+      de: 'Deutsch',
+      en: 'English',
+      fr: 'Français',
+      es: 'Español',
+      it: 'Italiano',
+      nl: 'Nederlands',
+      pl: 'Polski',
+      pt: 'Português',
+      tr: 'Türkçe',
+      ru: 'Русский',
+      zh: '中文',
+      vi: 'Tiếng Việt',
+      ar: 'العربية',
+      uk: 'Українська',
+      ro: 'Română',
+      el: 'Ελληνικά',
+      cs: 'Čeština',
+    };
+    if (code && nameMap[code]) return nameMap[code];
+    if (r.source_language && r.source_language.trim()) return r.source_language;
+    return '';
+  })();
+  const hasSourceLang = !!sourceLangLabel;
   const mainAct = pickMainAction(r);
   const replyNeeded = replyRequired(r);
   const importantUncertainty = hasImportantUncertainty(r);
@@ -1060,7 +1093,7 @@ export default function ResultScreen() {
             testID="reply-card"
           >
             <View style={styles.replyBox}>
-              <Text style={styles.replyText}>{r.german_reply_draft}</Text>
+              <Text style={styles.replyText}>{replyDraftText}</Text>
             </View>
             <Pressable
               onPress={copyReply}
@@ -1142,6 +1175,14 @@ export default function ResultScreen() {
                 {r.document_type || t(lang, 'other_document')}
               </Text>
             </View>
+            {hasSourceLang ? (
+              <View style={styles.kvRow}>
+                <Text style={styles.kvKey}>{t(lang, 'source_language_detected')}</Text>
+                <Text style={styles.kvValue} numberOfLines={1}>
+                  {sourceLangLabel}
+                </Text>
+              </View>
+            ) : null}
             {hasKeyPoints ? (
               <View style={{ gap: 8, marginTop: spacing.sm }}>
                 {r.key_points!.map((kp, i) => (
