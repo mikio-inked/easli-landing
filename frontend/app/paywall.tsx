@@ -131,16 +131,16 @@ export default function Paywall() {
             Platform.OS === 'android'
               ? t(lang, 'paywall_payments_unavailable_apk')
               : t(lang, 'paywall_payments_unavailable');
-          Alert.alert('KlarPost', message);
+          Alert.alert('easli', message);
           return;
         }
         const pkg = findPackageForProductId(offering, productId);
         if (!pkg) {
-          Alert.alert('KlarPost', t(lang, 'paywall_payments_unavailable'));
+          Alert.alert('easli', t(lang, 'paywall_payments_unavailable'));
           return;
         }
         await purchasePackage(pkg);
-        Alert.alert('KlarPost', t(lang, 'paywall_purchase_success'));
+        Alert.alert('easli', t(lang, 'paywall_purchase_success'));
         // Webhook will update server-side usage; we still refresh in case
         // the device is online and the webhook lands quickly.
         await refreshUsage();
@@ -151,14 +151,14 @@ export default function Paywall() {
         router.back();
       } catch (e: any) {
         if (e instanceof PurchaseCancelledError) {
-          Alert.alert('KlarPost', t(lang, 'paywall_purchase_cancelled'));
+          Alert.alert('easli', t(lang, 'paywall_purchase_cancelled'));
           return;
         }
         if (e instanceof PaymentsUnavailableError) {
-          Alert.alert('KlarPost', t(lang, 'paywall_payments_unavailable'));
+          Alert.alert('easli', t(lang, 'paywall_payments_unavailable'));
           return;
         }
-        Alert.alert('KlarPost', t(lang, 'paywall_purchase_failed'));
+        Alert.alert('easli', t(lang, 'paywall_purchase_failed'));
       } finally {
         setBusy(null);
       }
@@ -172,7 +172,7 @@ export default function Paywall() {
     try {
       if (!isBillingAvailable()) {
         Alert.alert(
-          'KlarPost',
+          'easli',
           Platform.OS === 'android'
             ? t(lang, 'paywall_payments_unavailable_apk')
             : t(lang, 'paywall_payments_unavailable')
@@ -181,13 +181,13 @@ export default function Paywall() {
       }
       await restorePurchases();
       await refreshUsage();
-      Alert.alert('KlarPost', t(lang, 'paywall_restored'));
+      Alert.alert('easli', t(lang, 'paywall_restored'));
     } catch (e: any) {
       if (e instanceof PaymentsUnavailableError) {
-        Alert.alert('KlarPost', t(lang, 'paywall_payments_unavailable'));
+        Alert.alert('easli', t(lang, 'paywall_payments_unavailable'));
         return;
       }
-      Alert.alert('KlarPost', t(lang, 'paywall_purchase_failed'));
+      Alert.alert('easli', t(lang, 'paywall_purchase_failed'));
     } finally {
       setRestoring(false);
     }
@@ -214,7 +214,7 @@ export default function Paywall() {
         <Pressable onPress={() => router.back()} hitSlop={12} testID="paywall-close">
           <X color={colors.textPrimary} size={26} strokeWidth={2.4} />
         </Pressable>
-        <Text style={styles.headerTitle}>KlarPost</Text>
+        <Text style={styles.headerTitle}>easli</Text>
         <View style={{ width: 26 }} />
       </View>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>

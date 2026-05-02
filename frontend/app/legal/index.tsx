@@ -67,7 +67,7 @@ export default function LegalIndexScreen() {
         />
 
         <Text style={styles.footnote}>
-          KlarPost • Made with care in the EU
+          easli • Made with care in the EU
         </Text>
       </ScrollView>
     </SafeAreaView>

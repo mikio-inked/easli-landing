@@ -1,4 +1,4 @@
-// KlarPost — redesigned onboarding flow.
+// easli — redesigned onboarding flow.
 //
 // Two screens, guided by a top progress bar, designed to convince the user of
 // the value within ~20 seconds:
@@ -39,9 +39,10 @@ import { Button } from '../src/ui';
 import { setConsent, setLanguage, getLanguage, setOnboarded } from '../src/store';
 import { useLargeFontMode } from '../src/largeFontMode';
 import { colors, fontSize, fontWeight, radius, shadows, spacing } from '../src/theme';
+import { EasliMark, EasliWordmark } from '../src/brand';
 import { LanguageCode, LANGUAGES, t } from '../src/i18n';
 
-// Map iOS/Android BCP-47 locales to the languages KlarPost ships. Fallback is
+// Map iOS/Android BCP-47 locales to the languages easli ships. Fallback is
 // English — never German simple (that's an opt-in accessibility flavour).
 function detectInitialLang(): LanguageCode {
   try {
@@ -120,13 +121,8 @@ export default function Onboarding() {
           </Pressable>
         ) : (
           <View style={styles.brandRow}>
-            <Image
-              source={require('../assets/images/icon.png')}
-              style={styles.brandLogo}
-              resizeMode="cover"
-              accessibilityLabel="KlarPost"
-            />
-            <Text style={styles.brand}>KlarPost</Text>
+            <EasliMark size={28} tone="primary" />
+            <EasliWordmark size={20} tone="primary" />
           </View>
         )}
         <View style={styles.progressRow}>

@@ -1,11 +1,11 @@
 {
   "expo": {
-    "name": "KlarPost",
+    "name": "easli",
     "slug": "klarpost",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "klarpost",
+    "scheme": "easli",
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
     "runtimeVersion": {
@@ -19,8 +19,8 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.klarpost.app",
       "infoPlist": {
-        "NSCameraUsageDescription": "Scan German documents to translate and explain them.",
-        "NSPhotoLibraryUsageDescription": "Pick a photo of a German document to analyze.",
+        "NSCameraUsageDescription": "Scan letters to translate and explain them.",
+        "NSPhotoLibraryUsageDescription": "Pick a photo of a letter to analyze.",
         "NSPhotoLibraryAddUsageDescription": "Save analyzed documents to your library.",
         "NSMicrophoneUsageDescription": "Not used. Microphone access is not required.",
         "ITSAppUsesNonExemptEncryption": false
@@ -30,7 +30,7 @@
       "package": "com.klarpost.app",
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
-        "backgroundColor": "#F8FAFC"
+        "backgroundColor": "#FAFAF7"
       },
       "edgeToEdgeEnabled": true,
       "permissions": [
@@ -57,21 +57,21 @@
       [
         "expo-camera",
         {
-          "cameraPermission": "Scan German documents to translate and explain them."
+          "cameraPermission": "Scan letters to translate and explain them."
         }
       ],
       [
         "expo-image-picker",
         {
-          "photosPermission": "Pick a photo of a German document to analyze.",
-          "cameraPermission": "Scan German documents to translate and explain them."
+          "photosPermission": "Pick a photo of a letter to analyze.",
+          "cameraPermission": "Scan letters to translate and explain them."
         }
       ],
       [
         "expo-notifications",
         {
           "icon": "./assets/images/icon.png",
-          "color": "#1D4ED8"
+          "color": "#1E3A8A"
         }
       ],
       [
@@ -80,7 +80,7 @@
           "image": "./assets/images/splash-icon.png",
           "imageWidth": 200,
           "resizeMode": "contain",
-          "backgroundColor": "#F8FAFC"
+          "backgroundColor": "#FAFAF7"
         }
       ],
       "expo-secure-store",
@@ -88,7 +88,7 @@
       [
         "react-native-document-scanner-plugin",
         {
-          "cameraPermission": "Scan German documents to translate and explain them."
+          "cameraPermission": "Scan letters to translate and explain them."
         }
       ],
       "expo-web-browser",

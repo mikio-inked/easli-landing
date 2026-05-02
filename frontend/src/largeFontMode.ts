@@ -30,16 +30,51 @@ let _scale = 1;
 let _installed = false;
 const listeners = new Set<() => void>();
 
+// ---- Inter font auto-application -----------------------------------------
+// Map fontWeight string/number → Inter family name. We piggy-back on the
+// largeFontMode patch (which already intercepts every <Text>'s style) so
+// callers don't need to set fontFamily everywhere — they just keep using
+// fontWeight: '700' / '600' / etc. and the right Inter is picked.
+//
+// When `fontFamily` is already set on the style, we DON'T override it —
+// that lets brand components (logo) opt into a specific weight directly.
+function interFamilyFor(weight: unknown): string {
+  if (typeof weight === 'number') {
+    if (weight >= 800) return 'Inter_800ExtraBold';
+    if (weight >= 700) return 'Inter_700Bold';
+    if (weight >= 600) return 'Inter_600SemiBold';
+    if (weight >= 500) return 'Inter_500Medium';
+    return 'Inter_400Regular';
+  }
+  if (typeof weight === 'string') {
+    if (weight === 'bold' || weight === '700') return 'Inter_700Bold';
+    if (weight === '800' || weight === '900') return 'Inter_800ExtraBold';
+    if (weight === '600') return 'Inter_600SemiBold';
+    if (weight === '500') return 'Inter_500Medium';
+    return 'Inter_400Regular';
+  }
+  return 'Inter_400Regular';
+}
+
 function scaleStyle(style: unknown): unknown {
-  if (_scale === 1 || style == null) return style;
+  if (style == null) return style;
   const flat = StyleSheet.flatten(style as never) as Record<string, unknown> | null;
   if (!flat) return style;
   const next: Record<string, unknown> = { ...flat };
-  if (typeof flat.fontSize === 'number') {
-    next.fontSize = Math.round((flat.fontSize as number) * _scale);
+  // Apply font scaling for accessibility / large-font-mode.
+  if (_scale !== 1) {
+    if (typeof flat.fontSize === 'number') {
+      next.fontSize = Math.round((flat.fontSize as number) * _scale);
+    }
+    if (typeof flat.lineHeight === 'number') {
+      next.lineHeight = Math.round((flat.lineHeight as number) * _scale);
+    }
   }
-  if (typeof flat.lineHeight === 'number') {
-    next.lineHeight = Math.round((flat.lineHeight as number) * _scale);
+  // Auto-apply Inter family unless the caller explicitly set fontFamily.
+  // This is what makes the easli rebrand "just work" across all 23 screens
+  // without touching each <Text> individually.
+  if (typeof flat.fontFamily !== 'string' || !flat.fontFamily) {
+    next.fontFamily = interFamilyFor(flat.fontWeight);
   }
   return next;
 }
@@ -51,11 +86,16 @@ function scaleStyle(style: unknown): unknown {
 const TEXT_TYPES = new Set<unknown>([RNText, RNTextInput]);
 
 function maybeScalePropsFor(type: unknown, props: unknown): unknown {
-  if (_scale === 1) return props;
+  // We always want to apply Inter font (even at scale === 1), so we don't
+  // early-return on the scale check any more. The early-out is now only
+  // for non-Text types and missing style.
   if (!TEXT_TYPES.has(type)) return props;
   if (props == null || typeof props !== 'object') return props;
   const p = props as { style?: unknown };
-  if (p.style == null) return props;
+  if (p.style == null) {
+    // No style set yet — inject a minimal one so Inter still applies.
+    return { ...p, style: { fontFamily: 'Inter_400Regular' } };
+  }
   return { ...p, style: scaleStyle(p.style) };
 }
 

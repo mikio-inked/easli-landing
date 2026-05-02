@@ -11,6 +11,7 @@ import {
   loadLargeFontMode,
   useLargeFontMode,
 } from '../src/largeFontMode';
+import { useEasliFonts } from '../src/fontLoader';
 
 // Install the Text/TextInput render override at module import time, BEFORE
 // any <Text> can render. Loading the persisted flag is async; until it
@@ -20,7 +21,11 @@ import {
 installLargeFontPatch();
 
 export default function RootLayout() {
-  const [fontReady, setFontReady] = useState(false);
+  const [largeFontReady, setLargeFontReady] = useState(false);
+  // Brand typography (Inter family). Doesn't block rendering — the hook
+  // returns true on either success OR error so a network glitch can't
+  // freeze the splash screen.
+  const fontsLoaded = useEasliFonts();
   // Subscribe to the toggle so the component (and its Stack child) re-renders
   // on flip — this propagates to the currently-mounted screen, whose <Text>
   // children pass through the patched render with the new scale.
@@ -37,7 +42,7 @@ export default function RootLayout() {
       } catch {
         // ignore — _scale stays at default
       } finally {
-        if (!cancelled) setFontReady(true);
+        if (!cancelled) setLargeFontReady(true);
       }
       try {
         const deviceId = await ensureDeviceId();
@@ -53,18 +58,18 @@ export default function RootLayout() {
     };
   }, []);
 
+  // Boot key only flips ONCE the persisted large-font flag has loaded AND
+  // the Inter fonts are ready (or have failed). After that initial flip
+  // we never remount the navigator — toggling large-font mode re-renders
+  // the visible screen via the hook subscription instead.
+  const bootKey = largeFontReady && fontsLoaded ? 'r' : 'b';
+
   return (
     <GestureHandlerRootView style={{ flex: 1, backgroundColor: colors.background }}>
       <SafeAreaProvider>
         <StatusBar style="dark" />
         <Stack
-          // Only re-key on the initial font-flag load — NOT on every toggle,
-          // because remounting the navigator would reset transient screen
-          // state (e.g. the user's language pick on the onboarding screen).
-          // Toggling large-font mode re-renders the currently-visible screen
-          // through the hook subscription, and the patched <Text> render
-          // function picks up the new scale on the very next paint.
-          key={fontReady ? 'r' : 'b'}
+          key={bootKey}
           screenOptions={{
             headerShown: false,
             contentStyle: { backgroundColor: colors.background },

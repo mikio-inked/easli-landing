@@ -105,7 +105,7 @@ export default function SettingsScreen() {
     try {
       if (!isBillingAvailable()) {
         Alert.alert(
-          'KlarPost',
+          'easli',
           Platform.OS === 'android'
             ? t(lang, 'paywall_payments_unavailable_apk')
             : t(lang, 'paywall_payments_unavailable')
@@ -114,13 +114,13 @@ export default function SettingsScreen() {
       }
       await restorePurchases();
       await refreshUsage();
-      Alert.alert('KlarPost', t(lang, 'paywall_restored'));
+      Alert.alert('easli', t(lang, 'paywall_restored'));
     } catch (e: any) {
       if (e instanceof PaymentsUnavailableError) {
-        Alert.alert('KlarPost', t(lang, 'paywall_payments_unavailable'));
+        Alert.alert('easli', t(lang, 'paywall_payments_unavailable'));
         return;
       }
-      Alert.alert('KlarPost', t(lang, 'paywall_purchase_failed'));
+      Alert.alert('easli', t(lang, 'paywall_purchase_failed'));
     } finally {
       setRestoring(false);
     }
@@ -135,7 +135,7 @@ export default function SettingsScreen() {
     } else if (Platform.OS === 'android') {
       Linking.openURL('https://play.google.com/store/account/subscriptions').catch(() => {});
     } else {
-      Alert.alert('KlarPost', t(lang, 'paywall_payments_unavailable'));
+      Alert.alert('easli', t(lang, 'paywall_payments_unavailable'));
     }
   };
 
@@ -176,9 +176,9 @@ export default function SettingsScreen() {
       await Share.share(
         {
           message: json,
-          title: 'KlarPost data export',
+          title: 'easli data export',
         },
-        { dialogTitle: 'KlarPost data export' }
+        { dialogTitle: 'easli data export' }
       );
     } catch (e: any) {
       Alert.alert(t(lang, 'export_failed'), e?.message || '');
@@ -599,7 +599,7 @@ export default function SettingsScreen() {
           </Card>
         )}
 
-        <Text style={styles.version}>KlarPost · v1.0.0 (MVP)</Text>
+        <Text style={styles.version}>easli · v1.0.0 (MVP)</Text>
       </ScrollView>
     </SafeAreaView>
   );

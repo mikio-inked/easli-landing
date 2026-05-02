@@ -44,7 +44,7 @@ export default function ContactScreen() {
   }, []);
 
   const onMail = async () => {
-    const url = `mailto:${CONTACT_EMAIL}?subject=KlarPost`;
+    const url = `mailto:${CONTACT_EMAIL}?subject=easli`;
     try {
       const can = await Linking.canOpenURL(url);
       if (can) {
@@ -84,7 +84,7 @@ export default function ContactScreen() {
           </View>
           <Text style={styles.heroTitle}>{t(lang, 'contact')}</Text>
           <Text style={styles.heroSubtitle}>
-            We answer in German or English. Please mention your KlarPost language
+            We answer in German or English. Please mention your easli language
             and the type of letter so we can help quickly.
           </Text>
 
@@ -139,14 +139,14 @@ export default function ContactScreen() {
           </View>
           <Text style={styles.body}>
             We will never ask for your full bank credentials, full credit-card
-            numbers, or your KlarPost analysis IDs by email. If you receive an
-            email pretending to be KlarPost asking for these, please forward it to
+            numbers, or your easli analysis IDs by email. If you receive an
+            email pretending to be easli asking for these, please forward it to
             us so we can warn other users.
           </Text>
         </View>
 
         <Text style={styles.footnote}>
-          KlarPost • Made with care in the EU
+          easli • Made with care in the EU
         </Text>
       </ScrollView>
     </SafeAreaView>

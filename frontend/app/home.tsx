@@ -28,6 +28,7 @@ import {
   setConsent,
 } from '../src/store';
 import { colors, fontSize, fontWeight, radius, shadows, spacing } from '../src/theme';
+import { EasliMark, EasliWordmark } from '../src/brand';
 
 function riskBadgeProps(level: 'green' | 'yellow' | 'red', lang: LanguageCode) {
   return {
@@ -201,13 +202,8 @@ export default function Home() {
     <SafeAreaView style={styles.safe} testID="home-screen">
       <View style={styles.topBar}>
         <View style={styles.brandRow}>
-          <Image
-            source={require('../assets/images/icon.png')}
-            style={styles.brandLogo}
-            resizeMode="cover"
-            accessibilityLabel="KlarPost"
-          />
-          <Text style={styles.brandText}>KlarPost</Text>
+          <EasliMark size={32} tone="primary" />
+          <EasliWordmark size={22} tone="primary" />
         </View>
         <View style={styles.topActions}>
           <Pressable

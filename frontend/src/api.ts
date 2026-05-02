@@ -1,4 +1,4 @@
-// API client for the KlarPost backend.
+// API client for the easli backend.
 
 import { LanguageCode } from './i18n';
 
@@ -189,7 +189,7 @@ export async function analyzeDocument(params: {
         throw new PaymentRequiredError(message, body.usage as UsageState);
       }
       throw new TestLimitReachedError(
-        message || 'Dein Testkontingent ist erreicht. Danke fürs Testen von KlarPost.',
+        message || 'Dein Testkontingent ist erreicht. Danke fürs Testen von easli.',
         body.usage as UsageState,
       );
     }
