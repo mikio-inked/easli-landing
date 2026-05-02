@@ -1960,7 +1960,7 @@ const de_simple: UIStrings = {
   disclaimer_long: 'easli gibt nur allgemeine Informationen. easli ist keine Rechts-, Steuer-, Geld- oder Arzt-Beratung. Bei wichtigen Fragen frag bitte den Absender oder eine Fachperson (zum Beispiel einen Arzt, eine Anwältin oder eine Beratungsstelle).',
   copy: 'Kopieren',
   copied: 'Kopiert',
-  home_quick_help: 'Was möchtest du verstehen? ✨',
+  home_quick_help: 'Was möchtest du verstehen?',
   see_all: 'Alle zeigen',
   analyze_again: 'Anderen Brief prüfen',
   no_explanation: 'Keine Erklärung da.',

@@ -74,6 +74,13 @@ export default function SettingsScreen() {
   const remaining = getRemainingAnalyses(usage);
   const [largeFont, setLargeFontEnabled] = useLargeFontMode();
 
+  // OTA Debug Block — hidden Easter egg: tap version text 5x to reveal
+  const [versionTapCount, setVersionTapCount] = useState(0);
+  const showOtaDebug = versionTapCount >= 5;
+  const onTapVersion = useCallback(() => {
+    setVersionTapCount((n) => n + 1);
+  }, []);
+
   useFocusEffect(
     useCallback(() => {
       (async () => {
@@ -518,10 +525,12 @@ export default function SettingsScreen() {
           </>
         )}
 
-        <Text style={styles.version}>easli · v1.0.0 (MVP)</Text>
+        <Pressable onPress={onTapVersion} hitSlop={10}>
+          <Text style={styles.version}>easli · v1.0.0 (MVP)</Text>
+        </Pressable>
 
-        {/* ---------- OTA Update Debug Block (visible in production) ---------- */}
-        <OtaDebugBlock />
+        {/* OTA Update Debug Block — hidden, reveal by tapping version 5 times */}
+        {showOtaDebug && <OtaDebugBlock />}
       </ScrollView>
     </SafeAreaView>
   );
