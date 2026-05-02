@@ -753,11 +753,15 @@ backend_multi_source_language:
 frontend_settings_redesign:
   - task: "Settings screen Option-C redesign — iOS-Settings-style grouped sections, ListRow helper, compact rows, fixes hardcoded German `paywall_restore` localisation"
     implemented: true
-    working: "NA"
+    working: true
     file: "/app/frontend/app/settings.tsx, /app/frontend/src/i18n.ts"
     stuck_count: 0
     priority: "medium"
-    needs_retesting: true
+    needs_retesting: false
+    status_history:
+        -working: true
+        -agent: "testing"
+        -comment: "PASS on public preview URL. EU privacy banner visible at top (green-tinted). 4 grouped Card sections confirmed by testID (settings-usage-card) and by rendered section labels MY USAGE / PREFERENCES / PRIVACY & DATA / ABOUT EASLI — uppercase, small, muted-grey. Each section is one Card with internal hairline dividers (no separate cards per row). Toggle rows render with Switches on the right (settings-large-font-toggle, settings-save-originals-toggle). Navigation rows show value + chevron (Change language shows '🇬🇧 English'). Destructive rows 'Delete all analyses' and 'Delete my data' render in RED. All expected testIDs present: settings-restore, settings-change-language, settings-large-font-toggle, settings-save-originals-toggle, settings-delete-all, settings-delete-account, settings-privacy-policy, settings-export. BUGFIX VERIFIED: settings-restore label is 'Restore purchases' (English) — NOT hardcoded German 'Käufe wiederherstellen'. Zero em-dashes (—) anywhere on the rendered settings page. Screenshots saved at .screenshots/settings_top.png and .screenshots/settings_bottom.png. The redesign visibly reduces scroll compared to the old one-card-per-row layout (single scroll-through fits 4 sections + EU banner on a typical phone viewport)."
 
 
 frontend_result_redesign_phase_r3:
@@ -768,6 +772,10 @@ frontend_result_redesign_phase_r3:
     stuck_count: 0
     priority: "medium"
     needs_retesting: true
+    status_history:
+        -working: "NA"
+        -agent: "testing"
+        -comment: "SKIPPED — no_analysis_available_in_preview_env. /history on a fresh preview device-id returned 0 items. Upload + /api/analyze (20-30s multimodal pipeline with a real image) is not reliably automatable within this harness (Expo web file-picker + base64 roundtrip). Per the review-request documented fallback, Reply Assistant/Result-tab tests are SKIPPED. Source inspection /app/frontend/app/result.tsx:925-938 confirms [data-testid='result-tabs'] container + [data-testid=`result-tab-${key}`] pills for overview/actions/deadlines/reply/details exist, and [data-testid='reply-card'] at line 1160 wraps the ReplyAssistant import (line 73). Recommend main agent run a targeted manual QA pass against a seeded analysis, OR seed a device_id by calling /api/analyze server-side and then re-run this UI suite with ?device=<id>."
     status_history:
         -working: "NA"
         -agent: "main"
@@ -793,6 +801,20 @@ frontend_onboarding_gradient_hero:
         -agent: "main"
         -comment: "Settings used to render every row inside its own <Card>, producing 10+ stacked cards and excessive scrolling. Restructured into 4 grouped sections (MY USAGE, PREFERENCES, PRIVACY & DATA, ABOUT EASLI) with one grouped Card per section, internal hairline dividers, and a new <ListRow> helper that handles icon + title + (optional) right-side value/Switch/Chevron. Row height reduced to ~52 px (was ~80 px). Section labels rendered in uppercase 12 px muted style, iOS-Settings-typical. EU privacy banner kept at the top. Dev tools card preserved behind __DEV__. Fixed pre-existing bug: `paywall_restore` + `paywall_restored` were hardcoded in German across ALL 7 UI languages — now correctly localised (EN/ZH/VI/TR/RU/ES/de_simple). Added 3 new i18n keys: settings_section_preferences, settings_section_privacy_data, settings_section_about. No business logic changed."
 
+
+
+frontend_phase_r5_reply_assistant:
+  - task: "Phase-R5 Reply Assistant UI — ReplyAssistant component on Result screen (intent cards with Recommended badge, composer with Open in Mail / Copy / Share, source-language drafts, no em-dashes)"
+    implemented: true
+    working: "NA"
+    file: "/app/frontend/src/replyAssistant.tsx, /app/frontend/app/result.tsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+        -working: "NA"
+        -agent: "testing"
+        -comment: "SKIPPED — no_analysis_available_in_preview_env. /history on a fresh preview device-id returned 0 items. Upload+/api/analyze pipeline not reliably automatable in this harness (Expo web file-picker + 20-30s round-trip). Per review-request documented fallback, the full R5 UI regression (intent cards, Recommended badge, ActivityIndicator, composer, Copy toast, source-language heuristic, em-dash absence, intent-switch regeneration) is SKIPPED. Source inspection confirms: ReplyAssistant imported at /app/frontend/app/result.tsx:73 and rendered at line 1169 wrapped by [data-testid='reply-card'] at line 1160; the 'reply' pill at /app/frontend/app/result.tsx:938 is conditionally rendered so empty tabs auto-hide as required. Note: backend Phase-R5 tests (generate-reply endpoint, reply_options padding to ≥4, extracted_entities, em-dash-clean drafts, translate preservation) are ALL GREEN per /app/backend/_test_phase_r5_reply.py (9/9 PASS). Recommend main agent seed a device_id by calling POST /api/analyze server-side on a realistic admin letter, then re-run this UI suite with the seeded device_id in localStorage / AsyncStorage, OR extend the testing harness to support Expo web file-picker uploads."
 
 
 backend_phase_r5_reply_assistant:
@@ -829,3 +851,7 @@ agent_communication:
     -agent: "testing"
     -message: "Phase-R5 Reply Assistant regression: 6 PASS / 2 FAIL / 1 SKIPPED via /app/backend/_test_phase_r5_reply.py. Two CRITICAL issues need main-agent action:\n\n(1) /api/analyses/{id}/generate-reply is completely broken — returns HTTP 500 on every call. Backend log: `NameError: name 'LANG_LABELS' is not defined` at server.py:2158. THREE undefined symbols in generate_reply_endpoint (lines 2137-2194): LANG_LABELS (should be LANGUAGES, defined at line 111), MISTRAL_MODEL (should be MISTRAL_ANALYSIS_MODEL, defined at line 40), and call_mistral_with_retry (should be mistral_complete_with_retry, used elsewhere at line 1566). Fix is a 3-line rename inside generate_reply_endpoint. After the fix, re-run the test suite to verify em-dash cleanliness, source-language heuristic, and divergence.\n\n(2) The 'never empty' reply_options guarantee is partially implemented. Current code (server.py:1133-1165) injects 4 default options only when Mistral returns an EMPTY list. On a simple info-only letter (Stadtbibliothek extended hours — no deadline, no ask) Mistral returned exactly 1 option and the backend accepted it as-is. Review-request spec explicitly asks `length >= 4` in this case. Suggestion: after cleaning, if len < 4, pad with missing canonical ids from the DEFAULT_REPLY_OPTIONS list.\n\nPASSING: /api/analyze correctly emits extracted_entities (all 5 keys, email detected as weber@finanzamt-berlin.de) + reply_options (3 items, all canonical, 1 recommended). /translate preserves extracted_entities byte-identical AND reply_options ids+recommended flags AND reply_draft/german_reply_draft in source language; labels translated to Turkish as expected. Invalid intent → 400 with 'intent' in detail; unknown analysis → 404. Regressions green (_test_phase3_langexp.py + _test_retry.py). No privacy leakage. Test file: /app/backend/_test_phase_r5_reply.py."
 
+
+agent_communication:
+    -agent: "testing"
+    -message: "easli frontend Phase-R3/R5/Settings regression on iPhone-sized preview (https://doc-scanner-de.preview.emergentagent.com). RESULTS: (1) frontend_settings_redesign → PASS. EU privacy banner (settings-eu-banner) visible at top, green-tinted. 4 grouped Card sections present with testIDs (settings-usage-card verified by selector; MY USAGE / PREFERENCES / PRIVACY & DATA / ABOUT EASLI rendered as uppercase muted-grey labels — all 4 strings matched). Each section is one Card with internal hairline dividers (no per-row cards). All expected rows present: settings-restore, settings-change-language, settings-large-font-toggle, settings-save-originals-toggle, settings-delete-all, settings-delete-account, settings-privacy-policy, settings-export. Change language row shows '🇬🇧 English' + chevron. Toggle rows render with Switches on the right. Destructive rows (Delete all analyses / Delete my data) in RED. BUGFIX VERIFIED: settings-restore label is 'Restore purchases' (English) — NOT hardcoded German 'Käufe wiederherstellen'. Zero em-dashes (—) anywhere on the rendered settings page. Screenshots: .screenshots/settings_top.png, .screenshots/settings_bottom.png. (2) frontend_result_redesign_phase_r3 → SKIPPED (no_analysis_available_in_preview_env). /history on a fresh device-id returned 0 items; the upload+/api/analyze pipeline (20-30s multimodal call + Expo-web file-picker) is not reliably automatable in this harness. Source inspection /app/frontend/app/result.tsx:925-938 confirms [data-testid='result-tabs'] + [data-testid=`result-tab-${key}`] pills for overview/actions/deadlines/reply/details exist and auto-hide when empty per the review spec. (3) frontend_phase_r5_reply_assistant → SKIPPED (same reason). ReplyAssistant imported at /app/frontend/app/result.tsx:73 and rendered at line 1169 wrapped by [data-testid='reply-card']; the pill at line 938 is conditionally rendered so empty reply-tabs auto-hide. Backend Phase-R5 suite (/app/backend/_test_phase_r5_reply.py 9/9 PASS) confirms the API surface that the UI consumes is healthy. RECOMMENDATION for main agent: seed a device_id by calling POST /api/analyze server-side on a realistic German admin letter (Finanzamt/Krankenkasse), then re-run the Phase-R5 + Phase-R3 UI suite with that device_id preloaded in localStorage, OR extend the harness to support Expo-web file-picker uploads. No critical frontend failures found in the parts that could be tested."
