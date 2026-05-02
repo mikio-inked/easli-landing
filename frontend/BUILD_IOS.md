@@ -103,7 +103,7 @@ Projekt-Identifier kennt.
 Beim ersten Build wirst du gefragt:
 - Apple ID + App-spezifisches Passwort eingeben (oder via 2FA)
 - EAS legt automatisch Provisioning Profile + Distribution Certificate an
-- **Bundle Identifier:** `com.klarpost.app` muss in deinem Apple Developer Account verfügbar sein
+- **Bundle Identifier:** `com.easli.app` muss in deinem Apple Developer Account verfügbar sein
 
 ---
 
@@ -183,9 +183,9 @@ eas submit --platform ios --latest
 **Fix:** Lösche das `extra.eas` Objekt aus `app.json` und führe `eas init` neu aus.
 
 ### „Bundle Identifier already in use"
-→ `com.klarpost.app` ist bereits in einem anderen Apple Developer Account registriert.
+→ `com.easli.app` ist bereits in einem anderen Apple Developer Account registriert.
 **Fix:** Entweder den anderen Account aufräumen, ODER in `app.json` eine andere Bundle ID setzen
-(z.B. `com.klarpost.ios`) und in App Store Connect neu registrieren.
+(z.B. `com.easli.ios`) und in App Store Connect neu registrieren.
 
 ### Build läuft 30+ Min in der Queue
 → Free-Tier-Queue ist voll.

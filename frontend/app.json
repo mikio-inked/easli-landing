@@ -17,7 +17,7 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.klarpost.app",
+      "bundleIdentifier": "com.easli.app",
       "infoPlist": {
         "NSCameraUsageDescription": "Scan letters to translate and explain them.",
         "NSPhotoLibraryUsageDescription": "Pick a photo of a letter to analyze.",
@@ -48,7 +48,7 @@
       }
     },
     "android": {
-      "package": "com.klarpost.app",
+      "package": "com.easli.app",
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#FAFAF7"
