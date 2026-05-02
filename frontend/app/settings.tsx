@@ -34,7 +34,6 @@ import {
   Trash2,
   Type,
 } from 'lucide-react-native';
-import { Card } from '../src/ui';
 import { deleteAllAnalyses, exportMyData } from '../src/api';
 import {
   ensureDeviceId,
@@ -234,6 +233,48 @@ export default function SettingsScreen() {
 
   const langMeta = getLanguageMeta(lang);
 
+  // The plan label shown in the Subscription section header.
+  const planLabel = usage?.plus_active
+    ? t(lang, 'usage_plus_status_active')
+    : t(lang, 'usage_plus_status_inactive');
+  // Pre-built usage rows so we can hide the ones that don't apply to the
+  // current paywall mode (e.g. soft_extra is hidden on hard mode, plus is
+  // hidden when not active).
+  const usageEntries: { label: string; used: number; total?: number }[] = [
+    {
+      label: t(lang, 'usage_free'),
+      used: usage?.free_analyses_used ?? 0,
+      total: usage?.free_analyses_total ?? 0,
+    },
+    ...(usage?.paywall_mode === 'soft'
+      ? [
+          {
+            label: t(lang, 'usage_soft_test'),
+            used: usage?.soft_extra_used ?? 0,
+            total: usage?.soft_extra_total ?? 0,
+          },
+        ]
+      : []),
+    {
+      label: t(lang, 'usage_single_credits'),
+      used: usage?.single_letter_credits ?? 0,
+    },
+    ...(usage?.plus_active
+      ? [
+          {
+            label: t(lang, 'usage_plus_remaining'),
+            used: usage?.plus_monthly_used ?? 0,
+            total: usage?.plus_monthly_total ?? 0,
+          },
+        ]
+      : []),
+    {
+      label: t(lang, 'usage_chat_total'),
+      used: usage?.total_chat_questions_used ?? 0,
+      total: usage?.total_chat_questions_total ?? 0,
+    },
+  ];
+
   return (
     <SafeAreaView style={styles.safe} testID="settings-screen">
       <View style={styles.header}>
@@ -244,13 +285,14 @@ export default function SettingsScreen() {
         <View style={{ width: 26 }} />
       </View>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        {/* ---------- EU privacy banner — kept prominent on top ---------- */}
         <Pressable
           onPress={() => router.push('/privacy')}
           style={styles.euBanner}
           testID="settings-eu-banner"
         >
           <View style={styles.euBannerIcon}>
-            <Globe2 color={colors.green.text} size={22} strokeWidth={2.6} />
+            <Globe2 color={colors.green.text} size={20} strokeWidth={2.6} />
           </View>
           <View style={{ flex: 1 }}>
             <Text style={styles.euBannerTitle}>
@@ -260,343 +302,219 @@ export default function SettingsScreen() {
               {t(lang, 'privacy_p_residency')}
             </Text>
           </View>
-          <ChevronRight color={colors.green.text} size={22} strokeWidth={2.4} />
+          <ChevronRight color={colors.green.text} size={20} strokeWidth={2.4} />
         </Pressable>
-
-        <Card>
-          <View style={styles.row}>
-            <View style={[styles.rowIcon, { backgroundColor: colors.primarySoft }]}>
-              <HardDrive color={colors.primary} size={20} strokeWidth={2.4} />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.rowTitle}>{t(lang, 'save_originals')}</Text>
-              <Text style={styles.rowSub}>{t(lang, 'save_originals_sub')}</Text>
-            </View>
-            <Switch
-              value={saveOriginals}
-              onValueChange={onToggleSaveOriginals}
-              trackColor={{ false: colors.border, true: colors.primary }}
-              thumbColor={colors.white}
-              testID="settings-save-originals-toggle"
-            />
-          </View>
-        </Card>
-
-        <Pressable
-          onPress={() => router.push('/storage')}
-          style={({ pressed }) => [
-            styles.row,
-            styles.cardLike,
-            pressed && { opacity: 0.7 },
-          ]}
-          testID="settings-open-storage"
-        >
-          <View style={[styles.rowIcon, { backgroundColor: colors.primarySoft }]}>
-            <HardDrive color={colors.primary} size={20} strokeWidth={2.4} />
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.rowTitle}>{t(lang, 'view_storage')}</Text>
-            <Text style={styles.rowSub}>
-              {storageStatsLabel ?? `${t(lang, 'local_storage_title')} · …`}
-            </Text>
-          </View>
-          <ChevronRight color={colors.textMuted} size={20} strokeWidth={2.4} />
-        </Pressable>
-
-        <Card>
-          <View style={styles.row}>
-            <View style={[styles.rowIcon, { backgroundColor: colors.primarySoft }]}>
-              <Type color={colors.primary} size={20} strokeWidth={2.4} />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.rowTitle}>{t(lang, 'onb_large_font')}</Text>
-            </View>
-            <Switch
-              value={largeFont}
-              onValueChange={(v) => {
-                setLargeFontEnabled(v).catch(() => {
-                  // ignore — the toggle still flips locally via the hook
-                });
-              }}
-              trackColor={{ false: colors.border, true: colors.primary }}
-              thumbColor={colors.white}
-              testID="settings-large-font-toggle"
-            />
-          </View>
-        </Card>
-
-        <Card>
-          <Pressable
-            onPress={() => router.push('/language')}
-            style={styles.row}
-            testID="settings-change-language"
-          >
-            <View style={styles.rowIcon}>
-              <LanguagesIcon color={colors.primary} size={20} strokeWidth={2.4} />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.rowTitle}>{t(lang, 'change_language')}</Text>
-              <Text style={styles.rowSub}>
-                {langMeta.flag}  {langMeta.nativeName} · {langMeta.englishName}
-              </Text>
-            </View>
-            <ChevronRight color={colors.textMuted} size={22} strokeWidth={2.4} />
-          </Pressable>
-        </Card>
-
-        <Card>
-          <Pressable
-            onPress={onExport}
-            style={styles.row}
-            disabled={exporting}
-            testID="settings-export"
-          >
-            <View style={styles.rowIcon}>
-              <DownloadCloud color={colors.primary} size={20} strokeWidth={2.4} />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.rowTitle}>{t(lang, 'export_my_data')}</Text>
-              <Text style={styles.rowSub}>{t(lang, 'export_my_data_sub')}</Text>
-            </View>
-            <ChevronRight color={colors.textMuted} size={22} strokeWidth={2.4} />
-          </Pressable>
-        </Card>
-
-        <Card>
-          <Pressable
-            onPress={onDeleteAll}
-            style={styles.row}
-            testID="settings-delete-all"
-          >
-            <View style={[styles.rowIcon, { backgroundColor: colors.red.bg }]}>
-              <Trash2 color={colors.red.text} size={20} strokeWidth={2.4} />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.rowTitle}>{t(lang, 'delete_all_data')}</Text>
-              <Text style={styles.rowSub}>{t(lang, 'privacy_short')}</Text>
-            </View>
-            <ChevronRight color={colors.textMuted} size={22} strokeWidth={2.4} />
-          </Pressable>
-          <View style={styles.divider} />
-          <Pressable
-            onPress={onDeleteAccount}
-            style={styles.row}
-            testID="settings-delete-account"
-          >
-            <View style={[styles.rowIcon, { backgroundColor: colors.red.bg }]}>
-              <ShieldAlert color={colors.red.text} size={20} strokeWidth={2.4} />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.rowTitle}>{t(lang, 'delete_account')}</Text>
-            </View>
-            <ChevronRight color={colors.textMuted} size={22} strokeWidth={2.4} />
-          </Pressable>
-        </Card>
-
-        <Card>
-          <Pressable
-            onPress={() => router.push('/privacy')}
-            style={styles.row}
-            testID="settings-privacy-policy"
-          >
-            <View style={[styles.rowIcon, { backgroundColor: colors.green.bg }]}>
-              <ShieldCheck color={colors.green.text} size={20} strokeWidth={2.4} />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.rowTitle}>{t(lang, 'privacy_policy')}</Text>
-              <Text style={styles.rowSub}>{t(lang, 'privacy_short')}</Text>
-            </View>
-            <ChevronRight color={colors.textMuted} size={22} strokeWidth={2.4} />
-          </Pressable>
-          <View style={styles.divider} />
-          <View style={styles.row}>
-            <View style={styles.rowIcon}>
-              <Lock color={colors.primary} size={20} strokeWidth={2.4} />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.rowTitle}>{t(lang, 'disclaimer_title')}</Text>
-              <Text style={styles.rowSub}>{t(lang, 'disclaimer_long')}</Text>
-            </View>
-          </View>
-          <View style={styles.divider} />
-          <Pressable
-            onPress={() => router.push('/legal' as any)}
-            style={styles.row}
-            testID="settings-legal"
-            accessibilityRole="button"
-            accessibilityLabel={t(lang, 'legal')}
-          >
-            <View style={styles.rowIcon}>
-              <Scale color={colors.primary} size={20} strokeWidth={2.4} />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.rowTitle}>{t(lang, 'legal')}</Text>
-              <Text style={styles.rowSub}>{t(lang, 'legal_subtitle')}</Text>
-            </View>
-            <ChevronRight color={colors.textMuted} size={22} strokeWidth={2.4} />
-          </Pressable>
-        </Card>
-
-        <Card>
-          <Pressable
-            onPress={() =>
-              Alert.alert(t(lang, 'support'), 'support@klarpost.app')
-            }
-            style={styles.row}
-            testID="settings-support"
-          >
-            <View style={styles.rowIcon}>
-              <HelpCircle color={colors.primary} size={20} strokeWidth={2.4} />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.rowTitle}>{t(lang, 'support')}</Text>
-              <Text style={styles.rowSub}>support@klarpost.app</Text>
-            </View>
-            <ChevronRight color={colors.textMuted} size={22} strokeWidth={2.4} />
-          </Pressable>
-        </Card>
 
         {/* ---------- Subscription / Usage ---------- */}
-        <Card testID="settings-usage-card">
-          <View style={styles.row}>
+        <SectionLabel>{t(lang, 'usage_title')}</SectionLabel>
+        <View style={styles.groupCard} testID="settings-usage-card">
+          <View style={styles.usageHeader}>
             <View style={[styles.rowIcon, { backgroundColor: colors.primarySoft }]}>
-              <BarChart3 color={colors.primary} size={20} strokeWidth={2.4} />
+              <BarChart3 color={colors.primary} size={18} strokeWidth={2.4} />
             </View>
             <View style={{ flex: 1 }}>
               <Text style={styles.rowTitle}>{t(lang, 'usage_title')}</Text>
-              <Text style={styles.rowSub}>
-                {usage?.plus_active
-                  ? t(lang, 'usage_plus_status_active')
-                  : t(lang, 'usage_plus_status_inactive')}
-              </Text>
+              <Text style={styles.rowSubMuted}>{planLabel}</Text>
             </View>
           </View>
-
           <View style={styles.usageGrid}>
-            <UsageRow
-              label={t(lang, 'usage_free')}
-              used={usage?.free_analyses_used ?? 0}
-              total={usage?.free_analyses_total ?? 0}
-            />
-            {usage?.paywall_mode === 'soft' && (
-              <UsageRow
-                label={t(lang, 'usage_soft_test')}
-                used={usage?.soft_extra_used ?? 0}
-                total={usage?.soft_extra_total ?? 0}
-              />
-            )}
-            <UsageRow
-              label={t(lang, 'usage_single_credits')}
-              used={usage?.single_letter_credits ?? 0}
-            />
-            {usage?.plus_active && (
-              <UsageRow
-                label={t(lang, 'usage_plus_remaining')}
-                used={usage?.plus_monthly_used ?? 0}
-                total={usage?.plus_monthly_total ?? 0}
-              />
-            )}
-            <UsageRow
-              label={t(lang, 'usage_chat_total')}
-              used={usage?.total_chat_questions_used ?? 0}
-              total={usage?.total_chat_questions_total ?? 0}
-            />
+            {usageEntries.map((u) => (
+              <UsageRow key={u.label} label={u.label} used={u.used} total={u.total} />
+            ))}
           </View>
-        </Card>
-
-        <Card>
-          <Pressable
-            onPress={onManagePlus}
-            style={styles.row}
-            testID="settings-manage-plus"
-          >
-            <View style={[styles.rowIcon, { backgroundColor: colors.primarySoft }]}>
-              <Crown color={colors.primary} size={20} strokeWidth={2.4} />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.rowTitle}>{t(lang, 'manage_plus')}</Text>
-              <Text style={styles.rowSub}>
-                {usage?.plus_active
-                  ? t(lang, 'usage_plus_status_active')
-                  : t(lang, 'usage_plus_status_inactive')}
-              </Text>
-            </View>
-            <ChevronRight color={colors.textMuted} size={22} strokeWidth={2.4} />
-          </Pressable>
           <View style={styles.divider} />
-          <Pressable
+          <ListRow
+            icon={<Crown color={colors.primary} size={18} strokeWidth={2.4} />}
+            title={t(lang, 'manage_plus')}
+            onPress={onManagePlus}
+            testID="settings-manage-plus"
+          />
+          <View style={styles.divider} />
+          <ListRow
+            icon={<RotateCw color={colors.primary} size={18} strokeWidth={2.4} />}
+            title={t(lang, 'paywall_restore')}
             onPress={onRestore}
             disabled={restoring}
-            style={styles.row}
             testID="settings-restore"
-          >
-            <View style={styles.rowIcon}>
-              <RotateCw color={colors.primary} size={20} strokeWidth={2.4} />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.rowTitle}>{t(lang, 'paywall_restore')}</Text>
-            </View>
-            <ChevronRight color={colors.textMuted} size={22} strokeWidth={2.4} />
-          </Pressable>
-        </Card>
+            isLast
+          />
+        </View>
+
+        {/* ---------- Preferences ---------- */}
+        <SectionLabel>{t(lang, 'settings_section_preferences')}</SectionLabel>
+        <View style={styles.groupCard}>
+          <ListRow
+            icon={<LanguagesIcon color={colors.primary} size={18} strokeWidth={2.4} />}
+            title={t(lang, 'change_language')}
+            valueText={`${langMeta.flag}  ${langMeta.nativeName}`}
+            onPress={() => router.push('/language')}
+            testID="settings-change-language"
+          />
+          <View style={styles.divider} />
+          <ListRow
+            icon={<Type color={colors.primary} size={18} strokeWidth={2.4} />}
+            title={t(lang, 'onb_large_font')}
+            right={
+              <Switch
+                value={largeFont}
+                onValueChange={(v) => {
+                  setLargeFontEnabled(v).catch(() => {});
+                }}
+                trackColor={{ false: colors.border, true: colors.primary }}
+                thumbColor={colors.white}
+                testID="settings-large-font-toggle"
+              />
+            }
+            isLast
+          />
+        </View>
+
+        {/* ---------- Privacy & Data ---------- */}
+        <SectionLabel>{t(lang, 'settings_section_privacy_data')}</SectionLabel>
+        <View style={styles.groupCard}>
+          <ListRow
+            icon={<HardDrive color={colors.primary} size={18} strokeWidth={2.4} />}
+            title={t(lang, 'save_originals')}
+            right={
+              <Switch
+                value={saveOriginals}
+                onValueChange={onToggleSaveOriginals}
+                trackColor={{ false: colors.border, true: colors.primary }}
+                thumbColor={colors.white}
+                testID="settings-save-originals-toggle"
+              />
+            }
+          />
+          <View style={styles.divider} />
+          <ListRow
+            icon={<HardDrive color={colors.primary} size={18} strokeWidth={2.4} />}
+            title={t(lang, 'view_storage')}
+            valueText={storageStatsLabel ?? '…'}
+            onPress={() => router.push('/storage')}
+            testID="settings-open-storage"
+          />
+          <View style={styles.divider} />
+          <ListRow
+            icon={<DownloadCloud color={colors.primary} size={18} strokeWidth={2.4} />}
+            title={t(lang, 'export_my_data')}
+            onPress={onExport}
+            disabled={exporting}
+            testID="settings-export"
+          />
+          <View style={styles.divider} />
+          <ListRow
+            icon={<Trash2 color={colors.red.text} size={18} strokeWidth={2.4} />}
+            iconBg={colors.red.bg}
+            title={t(lang, 'delete_all_data')}
+            onPress={onDeleteAll}
+            destructive
+            testID="settings-delete-all"
+          />
+          <View style={styles.divider} />
+          <ListRow
+            icon={<ShieldAlert color={colors.red.text} size={18} strokeWidth={2.4} />}
+            iconBg={colors.red.bg}
+            title={t(lang, 'delete_account')}
+            onPress={onDeleteAccount}
+            destructive
+            testID="settings-delete-account"
+            isLast
+          />
+        </View>
+
+        {/* ---------- About easli ---------- */}
+        <SectionLabel>{t(lang, 'settings_section_about')}</SectionLabel>
+        <View style={styles.groupCard}>
+          <ListRow
+            icon={<ShieldCheck color={colors.green.text} size={18} strokeWidth={2.4} />}
+            iconBg={colors.green.bg}
+            title={t(lang, 'privacy_policy')}
+            onPress={() => router.push('/privacy')}
+            testID="settings-privacy-policy"
+          />
+          <View style={styles.divider} />
+          <ListRow
+            icon={<Lock color={colors.primary} size={18} strokeWidth={2.4} />}
+            title={t(lang, 'disclaimer_title')}
+            // no onPress — informative only; modal-on-tap could come later
+          />
+          <View style={styles.divider} />
+          <ListRow
+            icon={<Scale color={colors.primary} size={18} strokeWidth={2.4} />}
+            title={t(lang, 'legal')}
+            onPress={() => router.push('/legal' as any)}
+            testID="settings-legal"
+          />
+          <View style={styles.divider} />
+          <ListRow
+            icon={<HelpCircle color={colors.primary} size={18} strokeWidth={2.4} />}
+            title={t(lang, 'support')}
+            valueText="support@easli.app"
+            onPress={() =>
+              Alert.alert(t(lang, 'support'), 'support@easli.app')
+            }
+            testID="settings-support"
+            isLast
+          />
+        </View>
 
         {/* ---------- Dev tools (only in development builds) ---------- */}
         {__APP_DEV__ && (
-          <Card testID="settings-devtools-card">
-            <View style={styles.row}>
-              <View style={[styles.rowIcon, { backgroundColor: colors.yellow.bg }]}>
-                <FlaskConical color={colors.yellow.text} size={20} strokeWidth={2.4} />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.rowTitle}>Dev tools</Text>
-                <Text style={styles.rowSub}>
+          <>
+            <SectionLabel>Dev tools</SectionLabel>
+            <View style={styles.groupCard} testID="settings-devtools-card">
+              <View style={styles.devHeader}>
+                <View style={[styles.rowIcon, { backgroundColor: colors.yellow.bg }]}>
+                  <FlaskConical color={colors.yellow.text} size={18} strokeWidth={2.4} />
+                </View>
+                <Text style={styles.devHeaderText}>
                   Only visible in development builds (__DEV__).
                 </Text>
               </View>
+              <View style={styles.devGrid}>
+                <DevButton
+                  label="Reset usage"
+                  onPress={() => callDevTool('reset', '')}
+                  testID="dev-reset"
+                />
+                <DevButton
+                  label="Free limit"
+                  onPress={() => callDevTool('simulate', 'scenario=free_limit')}
+                  testID="dev-free-limit"
+                />
+                <DevButton
+                  label="Soft limit"
+                  onPress={() => callDevTool('simulate', 'scenario=soft_limit')}
+                  testID="dev-soft-limit"
+                />
+                <DevButton
+                  label="Plus active"
+                  onPress={() => callDevTool('simulate', 'scenario=plus_active')}
+                  testID="dev-plus-active"
+                />
+                <DevButton
+                  label="Plus expired"
+                  onPress={() => callDevTool('simulate', 'scenario=plus_expired')}
+                  testID="dev-plus-expired"
+                />
+                <DevButton
+                  label="Plus monthly limit"
+                  onPress={() => callDevTool('simulate', 'scenario=plus_monthly_limit')}
+                  testID="dev-plus-monthly-limit"
+                />
+                <DevButton
+                  label="Add 1-letter credit"
+                  onPress={() => callDevTool('simulate', 'scenario=add_single_letter')}
+                  testID="dev-add-credit"
+                />
+                <DevButton
+                  label="Reset chat"
+                  onPress={() => callDevTool('simulate', 'scenario=reset_chat')}
+                  testID="dev-reset-chat"
+                />
+              </View>
             </View>
-            <View style={styles.devGrid}>
-              <DevButton
-                label="Reset usage"
-                onPress={() => callDevTool('reset', '')}
-                testID="dev-reset"
-              />
-              <DevButton
-                label="Free limit"
-                onPress={() => callDevTool('simulate', 'scenario=free_limit')}
-                testID="dev-free-limit"
-              />
-              <DevButton
-                label="Soft limit"
-                onPress={() => callDevTool('simulate', 'scenario=soft_limit')}
-                testID="dev-soft-limit"
-              />
-              <DevButton
-                label="Plus active"
-                onPress={() => callDevTool('simulate', 'scenario=plus_active')}
-                testID="dev-plus-active"
-              />
-              <DevButton
-                label="Plus expired"
-                onPress={() => callDevTool('simulate', 'scenario=plus_expired')}
-                testID="dev-plus-expired"
-              />
-              <DevButton
-                label="Plus monthly limit"
-                onPress={() => callDevTool('simulate', 'scenario=plus_monthly_limit')}
-                testID="dev-plus-monthly-limit"
-              />
-              <DevButton
-                label="Add 1-letter credit"
-                onPress={() => callDevTool('simulate', 'scenario=add_single_letter')}
-                testID="dev-add-credit"
-              />
-              <DevButton
-                label="Reset chat"
-                onPress={() => callDevTool('simulate', 'scenario=reset_chat')}
-                testID="dev-reset-chat"
-              />
-            </View>
-          </Card>
+          </>
         )}
 
         <Text style={styles.version}>easli · v1.0.0 (MVP)</Text>
@@ -620,41 +538,82 @@ const styles = StyleSheet.create({
     fontWeight: fontWeight.bold,
     color: colors.textPrimary,
   },
+  // Tighter outer rhythm: only spacing.sm between section-label and its
+  // group-card so the sections feel connected. Each group-card is its own
+  // padded container, so we don't need spacing inside `content` between
+  // unrelated rows.
   content: {
-    padding: spacing.lg,
-    gap: spacing.md,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.md,
+    paddingBottom: spacing.xl,
   },
+  // EU privacy banner (kept on top, prominent).
   euBanner: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.md,
     padding: spacing.md,
-    borderRadius: radius.xl,
+    borderRadius: radius.lg,
     backgroundColor: colors.green.bg,
     borderWidth: 1,
     borderColor: colors.green.border ?? colors.green.bg,
+    marginBottom: spacing.md,
   },
   euBannerIcon: {
-    width: 44,
-    height: 44,
+    width: 38,
+    height: 38,
     borderRadius: radius.full,
     backgroundColor: colors.white,
     alignItems: 'center',
     justifyContent: 'center',
   },
   euBannerTitle: {
-    fontSize: fontSize.base,
-    fontWeight: fontWeight.extrabold,
+    fontSize: fontSize.body,
+    fontWeight: fontWeight.bold,
     color: colors.green.text,
     letterSpacing: -0.2,
   },
   euBannerSub: {
     marginTop: 2,
-    fontSize: fontSize.sm,
+    fontSize: fontSize.xs,
     color: colors.green.text,
-    lineHeight: 19,
+    lineHeight: 17,
     opacity: 0.9,
   },
+  // iOS-Settings-style section label rendered above each group-card.
+  sectionLabel: {
+    fontSize: 12,
+    fontWeight: fontWeight.semibold,
+    color: colors.textMuted,
+    textTransform: 'uppercase',
+    letterSpacing: 0.6,
+    marginTop: spacing.lg,
+    marginBottom: spacing.sm,
+    paddingHorizontal: spacing.xs,
+  },
+  // Group card — one card per section, each row separated by a hairline
+  // divider rendered between rows.
+  groupCard: {
+    backgroundColor: colors.surface,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    overflow: 'hidden',
+  },
+  // List row — compact, ~52 px high, single-line title by default.
+  listRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    paddingVertical: 12,
+    paddingHorizontal: spacing.md,
+    minHeight: 52,
+  },
+  listRowDisabled: {
+    opacity: 0.5,
+  },
+  // Legacy alias — preserved for usage-card header rendered through plain
+  // <View> rather than <ListRow>.
   row: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -662,44 +621,73 @@ const styles = StyleSheet.create({
   },
   cardLike: {
     backgroundColor: colors.surface,
-    borderRadius: radius.lg,
+    borderRadius: radius.md,
     borderWidth: 1,
     borderColor: colors.border,
     padding: spacing.md,
   },
   rowIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: radius.md,
+    width: 32,
+    height: 32,
+    borderRadius: 10,
     backgroundColor: colors.primarySoft,
     alignItems: 'center',
     justifyContent: 'center',
   },
   rowTitle: {
-    fontSize: fontSize.base,
-    fontWeight: fontWeight.bold,
+    fontSize: fontSize.body,
+    fontWeight: fontWeight.semibold,
     color: colors.textPrimary,
+  },
+  rowTitleDestructive: {
+    color: colors.red.text,
   },
   rowSub: {
     fontSize: fontSize.sm,
     color: colors.textSecondary,
     marginTop: 2,
-    lineHeight: 20,
+    lineHeight: 18,
+  },
+  rowSubMuted: {
+    fontSize: fontSize.xs,
+    color: colors.textMuted,
+    marginTop: 1,
+  },
+  // Right-aligned secondary text inside a list row (e.g. current language
+  // pick, storage size, support email).
+  listRowValue: {
+    fontSize: fontSize.sm,
+    color: colors.textMuted,
+    maxWidth: 160,
+    textAlign: 'right',
   },
   divider: {
     height: 1,
     backgroundColor: colors.borderLight,
-    marginVertical: 4,
+    // Indent under the icon column so the hairline doesn't run into it —
+    // standard iOS settings-row treatment.
+    marginLeft: spacing.md + 32 + spacing.md,
   },
   version: {
     textAlign: 'center',
     color: colors.textMuted,
     fontSize: fontSize.xs,
-    marginTop: spacing.lg,
+    marginTop: spacing.xl,
+    marginBottom: spacing.lg,
+  },
+  // Subscription card internals -------------------------------------------
+  usageHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    paddingTop: spacing.md,
+    paddingHorizontal: spacing.md,
   },
   usageGrid: {
-    marginTop: spacing.md,
-    gap: 8,
+    paddingHorizontal: spacing.md,
+    paddingTop: spacing.sm,
+    paddingBottom: spacing.md,
+    gap: 6,
   },
   usageItemRow: {
     flexDirection: 'row',
@@ -720,8 +708,24 @@ const styles = StyleSheet.create({
     color: colors.primary,
     fontVariant: ['tabular-nums'],
   },
+  // Dev-tools card internals ----------------------------------------------
+  devHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    paddingTop: spacing.md,
+    paddingHorizontal: spacing.md,
+  },
+  devHeaderText: {
+    flex: 1,
+    fontSize: fontSize.xs,
+    color: colors.textSecondary,
+    lineHeight: 17,
+  },
   devGrid: {
-    marginTop: spacing.md,
+    paddingHorizontal: spacing.md,
+    paddingTop: spacing.sm,
+    paddingBottom: spacing.md,
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 8,
@@ -742,6 +746,89 @@ const styles = StyleSheet.create({
 });
 
 // ---- Sub-components scoped to settings.tsx -----------------------------
+
+/** Small uppercase label rendered above each group-card. */
+function SectionLabel({ children }: { children: React.ReactNode }) {
+  return <Text style={styles.sectionLabel}>{children}</Text>;
+}
+
+interface ListRowProps {
+  /** Lucide icon node, sized 18 px. */
+  icon: React.ReactNode;
+  /** Optional override for the icon-bubble background colour. */
+  iconBg?: string;
+  title: string;
+  /** Right-aligned secondary text (e.g. current value). Mutually exclusive
+   *  with `right` — when `right` is provided the value text is ignored. */
+  valueText?: string;
+  /** Custom right-side slot (e.g. <Switch />). Wins over `valueText`. */
+  right?: React.ReactNode;
+  onPress?: () => void;
+  destructive?: boolean;
+  disabled?: boolean;
+  testID?: string;
+  /** When true, the chevron and right-padding hairline alignment treat this
+   *  row as the last in its group (used purely for the divider element
+   *  rendered between rows by the parent — this prop is informational and
+   *  doesn't change the row itself today). */
+  isLast?: boolean;
+}
+
+function ListRow({
+  icon,
+  iconBg,
+  title,
+  valueText,
+  right,
+  onPress,
+  destructive,
+  disabled,
+  testID,
+}: ListRowProps) {
+  // Pick the right-side slot. Priority: explicit `right` → valueText →
+  // chevron (when navigable) → nothing.
+  const rightSlot =
+    right ??
+    (valueText ? (
+      <Text style={styles.listRowValue} numberOfLines={1}>
+        {valueText}
+      </Text>
+    ) : onPress ? (
+      <ChevronRight color={colors.textMuted} size={18} strokeWidth={2.4} />
+    ) : null);
+
+  const content = (
+    <>
+      <View style={[styles.rowIcon, iconBg ? { backgroundColor: iconBg } : null]}>
+        {icon}
+      </View>
+      <View style={{ flex: 1 }}>
+        <Text style={[styles.rowTitle, destructive && styles.rowTitleDestructive]}>
+          {title}
+        </Text>
+      </View>
+      {rightSlot}
+    </>
+  );
+
+  if (!onPress) {
+    return <View style={[styles.listRow, disabled && styles.listRowDisabled]}>{content}</View>;
+  }
+  return (
+    <Pressable
+      onPress={onPress}
+      disabled={disabled}
+      testID={testID}
+      style={({ pressed }) => [
+        styles.listRow,
+        disabled && styles.listRowDisabled,
+        pressed && { backgroundColor: colors.surfaceMuted },
+      ]}
+    >
+      {content}
+    </Pressable>
+  );
+}
 
 function UsageRow({
   label,
