@@ -272,6 +272,14 @@ export default function ResultScreen() {
   // smartly auto-open Reply Draft only when a reply is required, etc.
   // After the user toggles, their explicit choice wins (stored as bool).
   const [openSections, setOpenSections] = useState<Record<string, boolean>>({});
+  // Phase R3: result-screen redesign — segmented "tab" navigation. The
+  // user sees ONE tab's content at a time so the page no longer scrolls
+  // forever. Tabs that have no content are simply not rendered, so the
+  // pill-bar always reflects what's actually available for THIS document.
+  // Default tab is 'overview' (calm summary + any scam warning).
+  const [activeTab, setActiveTab] = useState<
+    'overview' | 'actions' | 'deadlines' | 'reply' | 'details'
+  >('overview');
   // ---- "Change language" feature state ----
   // `displayLang` is which language version of the analysis the user is
   // CURRENTLY looking at. It defaults to the analysis's primary language,
@@ -544,6 +552,25 @@ export default function ResultScreen() {
     return '';
   })();
   const hasSourceLang = !!sourceLangLabel;
+  // Tab definitions for Phase R3. We only render a pill for tabs that have
+  // content (e.g. the Reply pill is hidden when the document doesn't need
+  // a reply). The Overview tab is always present.
+  type TabKey = 'overview' | 'actions' | 'deadlines' | 'reply' | 'details';
+  const availableTabs: { key: TabKey; label: string; count?: number }[] = [
+    { key: 'overview', label: t(lang, 'tab_overview') },
+    ...(hasActions
+      ? [{ key: 'actions' as TabKey, label: t(lang, 'tab_actions'), count: r.required_actions!.length }]
+      : []),
+    ...(hasDeadlines
+      ? [{ key: 'deadlines' as TabKey, label: t(lang, 'deadlines'), count: r.deadlines!.length }]
+      : []),
+    ...(hasReplyDraft ? [{ key: 'reply' as TabKey, label: t(lang, 'tab_reply') }] : []),
+    { key: 'details' as TabKey, label: t(lang, 'tab_details') },
+  ];
+  // If the active tab is no longer available (e.g. after a language switch
+  // that wiped the reply_draft), fall back gracefully.
+  const safeActiveTab: TabKey =
+    availableTabs.some((t) => t.key === activeTab) ? activeTab : 'overview';
   const mainAct = pickMainAction(r);
   const replyNeeded = replyRequired(r);
   const importantUncertainty = hasImportantUncertainty(r);
@@ -879,7 +906,49 @@ export default function ResultScreen() {
         ) : null}
 
         {/* ============================================================
-            3. SCAM WARNING (near top per Rule 3 — calm tone)
+            PILLS / TABS — Phase R3 redesign
+            Single horizontal bar that filters which sections render below.
+            ============================================================ */}
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.pillsRow}
+          testID="result-tabs"
+        >
+          {availableTabs.map((tabDef) => {
+            const isActive = tabDef.key === safeActiveTab;
+            return (
+              <Pressable
+                key={tabDef.key}
+                onPress={() => setActiveTab(tabDef.key)}
+                style={({ pressed }) => [
+                  styles.pill,
+                  isActive && styles.pillActive,
+                  pressed && !isActive && { opacity: 0.7 },
+                ]}
+                testID={`result-tab-${tabDef.key}`}
+                accessibilityRole="tab"
+                accessibilityState={{ selected: isActive }}
+              >
+                <Text style={[styles.pillText, isActive && styles.pillTextActive]}>
+                  {tabDef.label}
+                </Text>
+                {typeof tabDef.count === 'number' && tabDef.count > 0 ? (
+                  <View style={[styles.pillBadge, isActive && styles.pillBadgeActive]}>
+                    <Text
+                      style={[styles.pillBadgeText, isActive && styles.pillBadgeTextActive]}
+                    >
+                      {tabDef.count}
+                    </Text>
+                  </View>
+                ) : null}
+              </Pressable>
+            );
+          })}
+        </ScrollView>
+
+        {/* ============================================================
+            3. SCAM WARNING (always visible — security overrides tabs)
             ============================================================ */}
         {hasScam ? (
           <View style={styles.scamCard} testID="scam-warning-card">
@@ -900,10 +969,8 @@ export default function ResultScreen() {
           </View>
         ) : null}
 
-        {/* ============================================================
-            4. PLAIN SUMMARY (default open)
-            ============================================================ */}
-        {r.simple_explanation_translated || r.summary_translated ? (
+        {/* === Section 4: SUMMARY — Overview tab === */}
+        {safeActiveTab === 'overview' && (r.simple_explanation_translated || r.summary_translated) ? (
           <Accordion
             id="summary"
             title={t(lang, 'what_this_means')}
@@ -927,10 +994,8 @@ export default function ResultScreen() {
           </Accordion>
         ) : null}
 
-        {/* ============================================================
-            5. NEXT STEPS CHECKLIST (default open)
-            ============================================================ */}
-        {hasActions ? (
+        {/* === Section 5: ACTIONS — Actions tab === */}
+        {safeActiveTab === 'actions' && hasActions ? (
           <Accordion
             id="actions"
             title={t(lang, 'what_to_do_next')}
@@ -960,10 +1025,8 @@ export default function ResultScreen() {
           </Accordion>
         ) : null}
 
-        {/* ============================================================
-            6. DEADLINES — only if any exist (no empty state)
-            ============================================================ */}
-        {hasDeadlines ? (
+        {/* === Section 6: DEADLINES — Deadlines tab === */}
+        {safeActiveTab === 'deadlines' && hasDeadlines ? (
           <View style={styles.pyramidCard} testID="deadlines-card">
             <SectionRow
               icon={<CalendarClock color={colors.primary} size={18} strokeWidth={2.5} />}
@@ -1083,7 +1146,7 @@ export default function ResultScreen() {
         {/* ============================================================
             7. REPLY DRAFT — auto-open ONLY if a reply is needed AND not scam
             ============================================================ */}
-        {hasReplyDraft ? (
+        {safeActiveTab === 'reply' && hasReplyDraft ? (
           <Accordion
             id="reply"
             title={t(lang, 'reply_draft')}
@@ -1128,10 +1191,8 @@ export default function ResultScreen() {
           </Accordion>
         ) : null}
 
-        {/* ============================================================
-            8. QUESTIONS TO ASK (default closed)
-            ============================================================ */}
-        {hasQuestions ? (
+        {/* === Section 8: QUESTIONS — Details tab === */}
+        {safeActiveTab === 'details' && hasQuestions ? (
           <Accordion
             id="questions"
             title={t(lang, 'questions_to_ask')}
@@ -1151,10 +1212,8 @@ export default function ResultScreen() {
           </Accordion>
         ) : null}
 
-        {/* ============================================================
-            9. DETAILS / KEY POINTS (default closed) — also holds sender
-            ============================================================ */}
-        {hasKeyPoints || hasSenderText || r.document_type ? (
+        {/* === Section 9: DETAILS — Details tab === */}
+        {safeActiveTab === 'details' && (hasKeyPoints || hasSenderText || r.document_type) ? (
           <Accordion
             id="details"
             title={t(lang, 'key_points_title')}
@@ -1196,12 +1255,8 @@ export default function ResultScreen() {
           </Accordion>
         ) : null}
 
-        {/* ============================================================
-            10. PLEASE DOUBLE-CHECK (uncertainties)
-            Open by default if scam_warning OR an "important" uncertainty is
-            detected (date / amount / payment / sender / legal / medical).
-            ============================================================ */}
-        {hasUncertainties ? (
+        {/* === Section 10: UNCERTAINTIES — Details tab === */}
+        {safeActiveTab === 'details' && hasUncertainties ? (
           <Accordion
             id="uncertainties"
             title={t(lang, 'double_check')}
@@ -1672,6 +1727,61 @@ const styles = StyleSheet.create({
     borderColor: colors.borderLight,
     gap: spacing.md,
     ...shadows.card,
+  },
+
+  // ---- Pills / Tabs (Phase R3) ----
+  // Horizontal segmented control used to filter visible sections.
+  pillsRow: {
+    paddingVertical: spacing.sm,
+    paddingHorizontal: 2,
+    gap: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  pill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    borderRadius: radius.pill,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    minHeight: 36,
+  },
+  pillActive: {
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
+  },
+  pillText: {
+    fontSize: 14,
+    fontWeight: fontWeight.semibold,
+    color: colors.textPrimary,
+  },
+  pillTextActive: {
+    color: colors.white,
+  },
+  pillBadge: {
+    minWidth: 20,
+    height: 20,
+    paddingHorizontal: 6,
+    borderRadius: 10,
+    backgroundColor: colors.primarySoft,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  pillBadgeActive: {
+    backgroundColor: 'rgba(255,255,255,0.25)',
+  },
+  pillBadgeText: {
+    fontSize: 11,
+    fontWeight: fontWeight.bold,
+    color: colors.primary,
+    fontVariant: ['tabular-nums'],
+  },
+  pillBadgeTextActive: {
+    color: colors.white,
   },
 
   // ---- Detail Accordions ----

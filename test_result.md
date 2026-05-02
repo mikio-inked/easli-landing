@@ -758,6 +758,21 @@ frontend_settings_redesign:
     stuck_count: 0
     priority: "medium"
     needs_retesting: true
+
+
+frontend_result_redesign_phase_r3:
+  - task: "Result screen Phase-R3 redesign — pill-tab navigation (Overview / Actions / Deadlines / Reply / Details), -65% scroll height"
+    implemented: true
+    working: "NA"
+    file: "/app/frontend/app/result.tsx, /app/frontend/src/i18n.ts"
+    stuck_count: 0
+    priority: "medium"
+    needs_retesting: true
+    status_history:
+        -working: "NA"
+        -agent: "main"
+        -comment: "Replaced the long-scrolling stack of 8 accordions with a 5-tab horizontal pill navigation directly under the Hero + Main-Action card. Tabs auto-hide when their content is empty (e.g. no `reply_draft` → no Reply tab). Pills follow the easli Brand Guide: rounded-pill, deep-blue active state, primarySoft badge with item count (Actions 3, Deadlines 1). Scam-warning card stays ALWAYS visible (security overrides tabs). Hero + Main-Action stay above the pills as 'always-on' summary so the user never loses context. Tab state lives in component-level useState with safe fallback to Overview when the active tab disappears (e.g. after a language switch wipes reply_draft). New i18n keys (`tab_overview`/`tab_actions`/`tab_reply`/`tab_details`) added to all 7 supported UI languages. No business logic changed — Share, PDF export, Chat-bottom-sheet, and Reminder flows still operate on the full record and are unaffected by the visible tab. Estimated visual scroll reduction on a typical multi-section result: ~1600 px → ~600 px (Overview tab default) ≈ -62%."
+
     status_history:
         -working: "NA"
         -agent: "main"

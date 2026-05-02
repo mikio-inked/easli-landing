@@ -76,6 +76,10 @@ export type UIKey =
   | 'sender'
   | 'document_type'
   | 'source_language_detected'
+  | 'tab_overview'
+  | 'tab_actions'
+  | 'tab_reply'
+  | 'tab_details'
   | 'settings_section_preferences'
   | 'settings_section_privacy_data'
   | 'settings_section_about'
@@ -320,6 +324,10 @@ const en: UIStrings = {
   settings_section_preferences: 'Preferences',
   settings_section_privacy_data: 'Privacy & data',
   settings_section_about: 'About easli',
+  tab_overview: 'Overview',
+  tab_actions: 'Actions',
+  tab_reply: 'Reply',
+  tab_details: 'Details',
   reply_draft: 'Reply draft',
   reply_explanation: 'What this reply says',
   questions_to_ask: 'Questions you can ask',
@@ -564,6 +572,10 @@ const zh: UIStrings = {
   settings_section_preferences: '偏好设置',
   settings_section_privacy_data: '隐私与数据',
   settings_section_about: '关于 easli',
+  tab_overview: '概览',
+  tab_actions: '行动',
+  tab_reply: '回信',
+  tab_details: '详情',
   reply_draft: '回信草稿',
   reply_explanation: '这封回信的意思',
   questions_to_ask: '您可以提的问题',
@@ -804,6 +816,10 @@ const vi: UIStrings = {
   settings_section_preferences: 'Tùy chọn',
   settings_section_privacy_data: 'Quyền riêng tư & dữ liệu',
   settings_section_about: 'Về easli',
+  tab_overview: 'Tổng quan',
+  tab_actions: 'Hành động',
+  tab_reply: 'Trả lời',
+  tab_details: 'Chi tiết',
   reply_draft: 'Bản nháp trả lời',
   reply_explanation: 'Bản trả lời này nói gì',
   questions_to_ask: 'Câu hỏi bạn có thể đặt',
@@ -1046,6 +1062,10 @@ const tr: UIStrings = {
   settings_section_preferences: 'Tercihler',
   settings_section_privacy_data: 'Gizlilik & veri',
   settings_section_about: 'easli hakkında',
+  tab_overview: 'Genel bakış',
+  tab_actions: 'İşlemler',
+  tab_reply: 'Yanıt',
+  tab_details: 'Ayrıntılar',
   reply_draft: 'Yanıt taslağı',
   reply_explanation: 'Bu yanıt ne diyor',
   questions_to_ask: 'Sorabileceğiniz sorular',
@@ -1288,6 +1308,10 @@ const ru: UIStrings = {
   settings_section_preferences: 'Настройки',
   settings_section_privacy_data: 'Приватность и данные',
   settings_section_about: 'О easli',
+  tab_overview: 'Обзор',
+  tab_actions: 'Действия',
+  tab_reply: 'Ответ',
+  tab_details: 'Детали',
   reply_draft: 'Черновик ответа',
   reply_explanation: 'Что говорит этот ответ',
   questions_to_ask: 'Вопросы, которые можно задать',
@@ -1530,6 +1554,10 @@ const es: UIStrings = {
   settings_section_preferences: 'Preferencias',
   settings_section_privacy_data: 'Privacidad y datos',
   settings_section_about: 'Sobre easli',
+  tab_overview: 'Resumen',
+  tab_actions: 'Acciones',
+  tab_reply: 'Respuesta',
+  tab_details: 'Detalles',
   reply_draft: 'Borrador de respuesta',
   reply_explanation: 'Qué dice esta respuesta',
   questions_to_ask: 'Preguntas que puedes hacer',
@@ -1774,6 +1802,10 @@ const de_simple: UIStrings = {
   settings_section_preferences: 'Einstellungen',
   settings_section_privacy_data: 'Privatsphäre & Daten',
   settings_section_about: 'Über easli',
+  tab_overview: 'Übersicht',
+  tab_actions: 'Aufgaben',
+  tab_reply: 'Antwort',
+  tab_details: 'Details',
   reply_draft: 'Antwort-Entwurf',
   reply_explanation: 'Was bedeutet die Antwort?',
   questions_to_ask: 'Diese Fragen können Sie stellen',
