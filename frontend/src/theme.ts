@@ -1,72 +1,99 @@
-// Centralized theme tokens for **easli** (Phase R1 — Brand Foundation).
+// Centralized theme tokens for **easli**.
 //
-// Brand DNA:
-//  • Primary (Sage Green #7FD4A6) — calm, modern, trustworthy
-//  • Trust (Deep Blue #1E3A8A) — financial credibility, anchor for serious info
-//  • Warm Off-White (#FAFAF7) — soft, paper-like backdrop
-//  • Inter typography — universal, excellent multi-script i18n
+// These values come 1:1 from the Brand Guide ("easli – final"):
 //
-// Backwards-compatibility: The legacy `colors.primary*` keys still exist and
-// now map to the new sage palette. Most existing screens read
-// `colors.primary` / `colors.primarySoft` and will pick up the new look
-// automatically. Components that explicitly want the trust-blue use
-// `colors.trust*`.
+//   Primary (Trust / Struktur)
+//     Deep Blue           #1E3A8A   ← solid actions, headlines, anchors
+//     Primary Hover       #2F6FED   ← pressed / hover state
+//     Primary Light       #E8EDFF   ← chip backgrounds, info badges
+//
+//   Secondary (Accent — sparingly! ≤10% of UI surface)
+//     Soft Teal           #2EC4B6   ← highlights, focus, accent CTA
+//     Light Teal          #E6FAF8   ← subtle accent backgrounds
+//
+//   Neutrals
+//     Background          #FAFAF7   ← warm off-white app canvas
+//     Surface (Card)      #FFFFFF
+//     Border              #E5E7EB
+//     Text Primary        #0F172A
+//     Text Secondary      #475569
+//
+//   Status (functional, never branding)
+//     Success             #22C55E
+//     Warning             #F59E0B
+//     Error               #EF4444
+//
+// Brand mantra: "Modern clarity meets calm authority."  The icon is loud
+// (gradient blue → teal). The UI must therefore be QUIET, CLEAR, STRUCTURED.
+// → no decorative colour, no gradients in core UI, no illustration noise.
 
 export const colors = {
   // Surfaces ----------------------------------------------------------------
-  background: '#FAFAF7', // warm off-white, paper-like
+  background: '#FAFAF7',
   surface: '#FFFFFF',
-  surfaceMuted: '#F4F4EF', // subtle card divider / hover
+  surfaceMuted: '#F5F5F1',     // subtle row-divider / hover on warm bg
   surfaceElevated: '#FFFFFF',
 
-  // Primary — Sage Green (calm, modern) -------------------------------------
-  primary: '#5BBE8C', // sage 500 — solid actions, links
-  primaryDark: '#3F9F6F', // sage 700 — pressed state
-  primarySoft: '#E8F7EF', // sage 50 — chip backgrounds, soft fills
-  primaryBorder: '#B8E3CB', // sage 200 — outlined inputs / dividers
-  primaryAccent: '#7FD4A6', // sage 400 — hero accents, illustrations
+  // Primary — Deep Blue (Trust) ---------------------------------------------
+  primary: '#1E3A8A',
+  primaryDark: '#172554',       // deeper for pressed state on light bg
+  primaryHover: '#2F6FED',      // hover/pressed light state
+  primarySoft: '#E8EDFF',       // chip/badge backgrounds
+  primaryBorder: '#C7D2FE',
+  primaryAccent: '#2F6FED',     // a brighter blue for hero accents
 
-  // Trust — Deep Blue (financial credibility) -------------------------------
-  trust: '#1E3A8A', // indigo-blue 800
-  trustDark: '#172554', // indigo-blue 900 — high-emphasis text on cards
-  trustSoft: '#EEF2FF', // indigo 50 — backdrop pills
-  trustBorder: '#C7D2FE', // indigo 200
-  trustText: '#1E3A8A', // for KPI numbers, deadlines
+  // Secondary — Soft Teal (Accent) ------------------------------------------
+  // Use sparingly — the Brand Guide explicitly forbids using teal as a
+  // dominant colour. Reserved for: focus rings, success-positive nuance,
+  // accent CTAs (≤10% of surface area).
+  accent: '#2EC4B6',
+  accentSoft: '#E6FAF8',
+  accentBorder: '#A8E6E0',
+
+  // Trust alias — kept for components that previously used `colors.trust*`
+  // to avoid a wide-reaching rename. Maps to the new primary.
+  trust: '#1E3A8A',
+  trustDark: '#172554',
+  trustSoft: '#E8EDFF',
+  trustBorder: '#C7D2FE',
+  trustText: '#1E3A8A',
 
   // Text --------------------------------------------------------------------
-  textPrimary: '#0F172A', // near-black, very high contrast
-  textSecondary: '#475569', // body text
-  textMuted: '#64748B', // captions, metadata
+  textPrimary: '#0F172A',
+  textSecondary: '#475569',
+  textMuted: '#64748B',
   textInverse: '#FFFFFF',
 
   // Borders -----------------------------------------------------------------
-  border: '#E5E5E0', // hairline on warm bg
-  borderLight: '#EFEFEA',
-  borderStrong: '#CFCFCA',
+  border: '#E5E7EB',
+  borderLight: '#F1F1EE',
+  borderStrong: '#CBD5E1',
 
   // Neutral utilities -------------------------------------------------------
   white: '#FFFFFF',
   black: '#000000',
-  overlay: 'rgba(15, 23, 42, 0.55)', // modal scrim
+  overlay: 'rgba(15, 23, 42, 0.55)',
 
-  // Status colors — refreshed to match the new palette ----------------------
+  // Status — refreshed to Brand-Guide values --------------------------------
+  // Risk badges (green/yellow/red) now map to the Tailwind-ish status
+  // tokens specified in the guide.
   green: {
-    bg: '#E8F7EF',
-    text: '#1F6B45',
-    border: '#B8E3CB',
-    solid: '#5BBE8C',
+    bg: '#EAF7F1',         // positive badge bg
+    text: '#0F6B36',       // legible green on light bg
+    border: '#BBE5CC',
+    solid: '#22C55E',      // success solid
   },
   yellow: {
-    bg: '#FFF6E2',
-    text: '#7A4F00',
-    border: '#FBE3A1',
-    solid: '#E5A53A',
+    bg: '#FFF7ED',         // hint badge bg
+    text: '#7C4D04',       // legible amber on light bg
+    border: '#FCD9A1',
+    solid: '#F59E0B',      // warning solid
   },
   red: {
-    bg: '#FDECEC',
-    text: '#8C1F1F',
-    border: '#F6C2C2',
-    solid: '#D94F4F',
+    bg: '#FEEDEC',         // error badge bg
+    text: '#9B2520',       // legible red on light bg
+    border: '#F8C5C0',
+    solid: '#EF4444',      // error solid
   },
 };
 
@@ -81,10 +108,10 @@ export const spacing = {
   '3xl': 56,
 };
 
-// Radii — slightly rounder for modern feel ----------------------------------
+// Radii — Brand Guide says cards = 14px ------------------------------------
 export const radius = {
   sm: 10,
-  md: 14,
+  md: 14,         // ← Brand Guide default for cards, inputs, chips
   lg: 18,
   xl: 22,
   xxl: 28,
@@ -92,24 +119,25 @@ export const radius = {
   full: 9999,
 };
 
-// Type scale — slightly tighter than before for modern hierarchy ------------
+// Type scale aligned to the Brand Guide -------------------------------------
+//   H1 (Hauptaussage):   28–32 px, SemiBold
+//   H2 (Section):        18–20 px, Medium
+//   Body:                14–16 px, Regular
+//   Helper:              12–13 px
 export const fontSize = {
-  xs: 12,
-  sm: 14,
-  base: 16,
-  lg: 18,
-  xl: 20,
+  xs: 12,         // helper-min
+  sm: 13,         // helper
+  base: 16,       // body
+  body: 14,       // body-min
+  lg: 18,         // h2-min
+  xl: 20,         // h2-max
   '2xl': 24,
-  '3xl': 30,
-  '4xl': 36,
-  '5xl': 44,
-  '6xl': 56, // for hero headlines
+  '3xl': 28,      // h1-min
+  '4xl': 32,      // h1-max
+  '5xl': 40,
+  '6xl': 56,
 };
 
-// Font families — set on <Text> via font_loader.tsx -------------------------
-//  When the Inter family fails to load (rare, e.g. air-plane mode boot), we
-//  fall back to the platform default by NOT setting fontFamily at all. The
-//  helper `tx()` in components handles that gracefully.
 export const fontFamily = {
   regular: 'Inter_400Regular',
   medium: 'Inter_500Medium',
@@ -126,7 +154,6 @@ export const fontWeight = {
   extrabold: '800' as const,
 };
 
-// Line-heights paired to the type scale --------------------------------------
 export const lineHeight = {
   tight: 1.15,
   snug: 1.3,
@@ -134,33 +161,33 @@ export const lineHeight = {
   relaxed: 1.65,
 };
 
-// Shadows — softer, paper-like ----------------------------------------------
+// Shadows — Brand Guide specifies 0 2px 6px rgba(0,0,0,0.04) for cards. ----
 export const shadows = {
-  // Subtle hairline + tiny elevation. The default for content cards.
+  // Default content card — quiet, structural.
   card: {
-    shadowColor: '#0F172A',
+    shadowColor: '#000000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.04,
-    shadowRadius: 10,
-    elevation: 2,
+    shadowRadius: 6,
+    elevation: 1,
   },
   // Elevated surface (modal, sticky bar). Slightly more prominent.
   raised: {
-    shadowColor: '#0F172A',
+    shadowColor: '#000000',
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.08,
     shadowRadius: 24,
     elevation: 6,
   },
-  // Primary button — sage tint
+  // Primary button — deep-blue tint
   button: {
-    shadowColor: '#3F9F6F',
+    shadowColor: '#1E3A8A',
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.18,
     shadowRadius: 16,
     elevation: 4,
   },
-  // Trust button — deep blue tint
+  // Trust button alias (legacy callsites) — same as button now.
   buttonTrust: {
     shadowColor: '#1E3A8A',
     shadowOffset: { width: 0, height: 6 },
@@ -170,27 +197,35 @@ export const shadows = {
   },
 };
 
+// Brand Gradient — ONLY for splash, onboarding hero, marketing surfaces ----
+export const gradient = {
+  brand: {
+    colors: ['#1E3A8A', '#2EC4B6'] as [string, string],
+    /** Approximation of the icon: top-left deep-blue → bottom-right teal. */
+    start: { x: 0, y: 0 },
+    end: { x: 1, y: 1 },
+  },
+};
+
 // Brand metadata -------------------------------------------------------------
 export const brand = {
   name: 'easli',
   tagline: 'Understand any letter.',
-  // Hex strings re-exported for places that need raw colour values
-  // (animations, gradients, native modules) without importing the whole
-  // palette object.
   hex: {
-    sage: '#7FD4A6',
-    sageDark: '#3F9F6F',
-    deepBlue: '#1E3A8A',
-    offWhite: '#FAFAF7',
+    primary: '#1E3A8A',
+    primaryHover: '#2F6FED',
+    primaryLight: '#E8EDFF',
+    accent: '#2EC4B6',
+    accentLight: '#E6FAF8',
+    background: '#FAFAF7',
   },
 };
 
-// Easing curves & durations for spring-style microanimations -----------------
+// Easing curves & durations for spring-style microanimations ----------------
 export const motion = {
   fast: 180,
   base: 240,
   slow: 360,
-  // Cubic-bezier values matching iOS spring-feel
   bezier: {
     standard: [0.4, 0.0, 0.2, 1] as const,
     decel: [0.0, 0.0, 0.2, 1] as const,
