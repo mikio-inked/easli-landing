@@ -798,6 +798,36 @@ frontend_onboarding_gradient_hero:
 
     status_history:
         -working: "NA"
+
+
+frontend_phase_r5_reply_assistant:
+  - task: "Reply Assistant — intent-driven interactive replies, mailto: composer, copy + share"
+    implemented: true
+    working: "NA"
+    file: "/app/frontend/src/replyAssistant.tsx, /app/frontend/app/result.tsx, /app/frontend/src/api.ts, /app/frontend/src/i18n.ts, /app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+        -working: "NA"
+        -agent: "main"
+        -comment: "Phase R5 — replaces the old static reply_draft section with an interactive intent-driven Reply Assistant: 4-6 intent cards (Recommended badge), tap → POST /api/analyses/{id}/generate-reply produces a tailored reply in source-document language → editable composer with extracted email/subject/contact/reference + 3 actions (Open in Mail via mailto, Copy, Share). Backend always pads reply_options to ≥4 canonical options (inquiry/extension/confirm/objection) for the never-empty UX guarantee. System prompt rewritten to easli persona (calm, direct, B1 level, no AI tells, no em-dashes). 17 new i18n keys in 7 UI languages. Backend tests: 9/9 PASS. Frontend Web preview test: SKIPPED (no historical analysis available in preview env, code review confirms wiring is correct). NEEDS in-app verification on TestFlight."
+        -agent: "testing"
+        -comment: "Tests deferred: end-to-end Result/Reply tab verification needs a seeded analysis in preview AsyncStorage. Backend 9/9 confirms server-side guarantees. Settings redesign verified PASS independently."
+
+frontend_tone_sweep_phase_r5c:
+  - task: "Tone sweep — du-Form across de_simple, removed 92 em-dashes (i18n + privacy + onboarding demo letters), softened analyzing_title in 6 languages"
+    implemented: true
+    working: true
+    file: "/app/frontend/src/i18n.ts, /app/frontend/app/legal/privacy.tsx, /app/frontend/app/onboarding.tsx"
+    stuck_count: 0
+    priority: "low"
+    needs_retesting: false
+    status_history:
+        -working: true
+        -agent: "main"
+        -comment: "Converted entire de_simple block from Sie to Du form (35 specific rewrites, 0 remaining 'Sie' occurrences verified). Removed 70 em-dashes from i18n.ts + 15 from legal/privacy.tsx + 7 from onboarding demo letters using a smart-heuristic replacement (lowercase next char → ', ', uppercase → '. '). Softened `analyzing_title` from 'Analyzing your document' (AI-process language) to 'Reading your letter' across 6 languages. de_simple already used 'easli liest deinen Brief'. Verified: 0 AI-tell phrases (Bitte beachten Sie, Wir möchten, Hiermit, etc.) remain in the de_simple block. Native Chinese '——' punctuation kept since it's standard CJK punctuation, not an AI tell for Chinese readers."
+
         -agent: "main"
         -comment: "Settings used to render every row inside its own <Card>, producing 10+ stacked cards and excessive scrolling. Restructured into 4 grouped sections (MY USAGE, PREFERENCES, PRIVACY & DATA, ABOUT EASLI) with one grouped Card per section, internal hairline dividers, and a new <ListRow> helper that handles icon + title + (optional) right-side value/Switch/Chevron. Row height reduced to ~52 px (was ~80 px). Section labels rendered in uppercase 12 px muted style, iOS-Settings-typical. EU privacy banner kept at the top. Dev tools card preserved behind __DEV__. Fixed pre-existing bug: `paywall_restore` + `paywall_restored` were hardcoded in German across ALL 7 UI languages — now correctly localised (EN/ZH/VI/TR/RU/ES/de_simple). Added 3 new i18n keys: settings_section_preferences, settings_section_privacy_data, settings_section_about. No business logic changed."
 
