@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "easli",
-    "slug": "klarpost",
+    "slug": "easli",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
@@ -121,7 +121,7 @@
     },
     "extra": {
       "eas": {
-        "projectId": "2e32d367-22a7-403f-8381-bd3a20c7fa80"
+        "projectId": "a75fe430-b0be-46ec-82ef-a029512879b2"
       }
     }
   }
