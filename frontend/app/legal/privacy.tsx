@@ -115,27 +115,27 @@ export default function PrivacyPublicScreen() {
             <Bullet>
               <Text style={styles.body}>
                 <Text style={styles.bold}>Mistral AI</Text> (96 Boulevard Haussmann, 75008
-                Paris, Frankreich) — Sprachmodell für OCR, Analyse und Erklärung. Daten
+                Paris, Frankreich). Sprachmodell für OCR, Analyse und Erklärung. Daten
                 werden in der EU verarbeitet, kein Transfer in Drittländer für KlarPost-Anfragen.
               </Text>
             </Bullet>
             <Bullet>
               <Text style={styles.body}>
                 <Text style={styles.bold}>MongoDB Atlas</Text> (MongoDB Limited, EU-Region
-                Frankfurt) — Speicherung der strukturierten Analyseergebnisse.
+                Frankfurt). Speicherung der strukturierten Analyseergebnisse.
                 Auftragsverarbeitungsvertrag (AVV) gemäß Art. 28 DSGVO geschlossen.
               </Text>
             </Bullet>
             <Bullet>
               <Text style={styles.body}>
                 <Text style={styles.bold}>Railway Corp.</Text> (USA, mit Server-Standort
-                EU) — Hosting des Backend-Servers (api.klarpost.app). Standardvertragsklauseln
+                EU). Hosting des Backend-Servers (api.klarpost.app). Standardvertragsklauseln
                 der EU-Kommission, Daten werden in einer EU-Region gehostet.
               </Text>
             </Bullet>
             <Bullet>
               <Text style={styles.body}>
-                <Text style={styles.bold}>RevenueCat, Inc.</Text> (USA) — nur falls Sie
+                <Text style={styles.bold}>RevenueCat, Inc.</Text> (USA), nur falls Sie
                 ein Abonnement abschließen. Es werden ausschließlich App-interne
                 Kauf-IDs (kein Klartext-Identifier) übertragen. Standardvertragsklauseln
                 EU-Kommission. Im Soft-Mode (Beta) deaktiviert.
@@ -168,13 +168,13 @@ export default function PrivacyPublicScreen() {
             </Text>
             <Bullet>
               <Text style={styles.body}>
-                <Text style={styles.bold}>Datenexport</Text> — Einstellungen → Meine Daten
+                <Text style={styles.bold}>Datenexport</Text>. Einstellungen → Meine Daten
                 exportieren (JSON).
               </Text>
             </Bullet>
             <Bullet>
               <Text style={styles.body}>
-                <Text style={styles.bold}>Löschung</Text> — Einstellungen → Meine Daten
+                <Text style={styles.bold}>Löschung</Text>. Einstellungen → Meine Daten
                 löschen.
               </Text>
             </Bullet>
@@ -185,7 +185,7 @@ export default function PrivacyPublicScreen() {
 
           <Section title="7. Beschwerderecht">
             <Text style={styles.body}>
-              Sie haben das Recht, sich bei einer Aufsichtsbehörde zu beschweren — z. B.
+              Sie haben das Recht, sich bei einer Aufsichtsbehörde zu beschweren, z. B.
               dem Bundesbeauftragten für den Datenschutz und die Informationsfreiheit
               (BfDI) oder bei der für Sie zuständigen Landesdatenschutzbehörde.
             </Text>
@@ -231,14 +231,14 @@ export default function PrivacyPublicScreen() {
             </Bullet>
             <Bullet>
               <Text style={styles.body}>
-                The letter content you upload — sent over TLS to our EU server, immediately
+                The letter content you upload, sent over TLS to our EU server, immediately
                 forwarded to Mistral AI (Paris, EU) for analysis. The original image / PDF
                 is <Text style={styles.bold}>not</Text> persisted.
               </Text>
             </Bullet>
             <Bullet>
               <Text style={styles.body}>
-                Structured analysis result (summary, deadlines, risk, reply draft) — stored
+                Structured analysis result (summary, deadlines, risk, reply draft), stored
                 in our EU MongoDB tied to your anonymous device-ID only.
               </Text>
             </Bullet>
@@ -252,7 +252,7 @@ export default function PrivacyPublicScreen() {
 
           <Section title="Legal basis">
             <Text style={styles.body}>
-              Art. 6 (1) (b) GDPR — performance of the service you requested. Where we
+              Art. 6 (1) (b) GDPR, performance of the service you requested. Where we
               rely on legitimate interest (e.g. abuse prevention) it is Art. 6 (1) (f).
             </Text>
           </Section>
@@ -260,23 +260,23 @@ export default function PrivacyPublicScreen() {
           <Section title="Processors">
             <Bullet>
               <Text style={styles.body}>
-                <Text style={styles.bold}>Mistral AI</Text> (Paris, France) — language model.
+                <Text style={styles.bold}>Mistral AI</Text> (Paris, France), language model.
               </Text>
             </Bullet>
             <Bullet>
               <Text style={styles.body}>
-                <Text style={styles.bold}>MongoDB</Text> — EU-hosted database.
+                <Text style={styles.bold}>MongoDB</Text>. EU-hosted database.
               </Text>
             </Bullet>
             <Bullet>
               <Text style={styles.body}>
-                <Text style={styles.bold}>RevenueCat, Inc.</Text> (USA) — only if you take
+                <Text style={styles.bold}>RevenueCat, Inc.</Text> (USA), only if you take
                 a paid subscription. Standard Contractual Clauses. Disabled in soft-mode beta.
               </Text>
             </Bullet>
             <Bullet>
               <Text style={styles.body}>
-                <Text style={styles.bold}>Apple / Google</Text> — store distribution and
+                <Text style={styles.bold}>Apple / Google</Text>, store distribution and
                 payment processing.
               </Text>
             </Bullet>
@@ -292,7 +292,7 @@ export default function PrivacyPublicScreen() {
 
           <Section title="Your rights">
             <Text style={styles.body}>
-              Access, rectification, erasure, restriction, portability, objection — all
+              Access, rectification, erasure, restriction, portability, objection, all
               available directly in the app (Settings → Export / Delete) or by email at
               kontakt@klarpost.app. You may also lodge a complaint with the
               competent data protection authority.
