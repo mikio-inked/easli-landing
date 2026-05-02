@@ -1162,6 +1162,24 @@ async def analyze_from_ocr_text(
             # Ensure exactly one recommended item.
             if not any(o["recommended"] for o in cleaned):
                 cleaned[0]["recommended"] = True
+            # "Never empty / never tiny" guarantee: pad with missing canonical
+            # ids until the user has at least 4 distinct options. The model
+            # often returns 1-2 options for simple letters, but the UI feels
+            # broken with so few intent cards.
+            if len(cleaned) < 4:
+                labels = REPLY_OPTION_LABELS_DE if target_language_code == "de_simple" else REPLY_OPTION_LABELS_EN
+                existing_ids = {o["id"] for o in cleaned}
+                for canonical_id, label in labels.items():
+                    if canonical_id in existing_ids:
+                        continue
+                    cleaned.append({
+                        "id": canonical_id,
+                        "label": label,
+                        "reason": "",
+                        "recommended": False,
+                    })
+                    if len(cleaned) >= 4:
+                        break
         parsed["reply_options"] = cleaned
 
     # Normalise extracted_entities: ensure it's a dict with the expected keys.
@@ -2155,7 +2173,7 @@ async def generate_reply_endpoint(analysis_id: str, req: GenerateReplyRequest):
         raise HTTPException(status_code=404, detail="Analysis not found")
 
     target_lang = (doc.get("target_language") or "en").strip()
-    target_label = LANG_LABELS.get(target_lang, "English")
+    target_label = LANGUAGES.get(target_lang, "English")
 
     sys_prompt = build_reply_generation_prompt(
         doc, intent, target_label, req.custom_instruction or ""
@@ -2166,12 +2184,12 @@ async def generate_reply_endpoint(analysis_id: str, req: GenerateReplyRequest):
     ]
 
     try:
-        resp = await call_mistral_with_retry(
+        resp = await mistral_complete_with_retry(
+            label="generate_reply",
+            model=MISTRAL_ANALYSIS_MODEL,
             messages=msgs,
-            model=MISTRAL_MODEL,
             temperature=0.4,
             max_tokens=600,
-            label="generate_reply",
         )
     except HTTPException:
         raise
