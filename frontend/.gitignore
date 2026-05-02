@@ -37,3 +37,6 @@ yarn-error.*
 *.tsbuildinfo
 
 app-example
+
+# Prevent accidental npm lockfile (we use yarn)
+package-lock.json
