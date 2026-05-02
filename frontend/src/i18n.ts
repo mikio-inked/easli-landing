@@ -14,7 +14,7 @@ export interface Language {
 // Sorted alphabetically by native name (Latin scripts first, then Cyrillic,
 // then CJK — same convention iOS/macOS use).
 export const LANGUAGES: Language[] = [
-  { code: 'de_simple', nativeName: 'Einfaches Deutsch', englishName: 'Simple German', flag: '🇩🇪' },
+  { code: 'de_simple', nativeName: 'Deutsch', englishName: 'German', flag: '🇩🇪' },
   { code: 'en', nativeName: 'English', englishName: 'English', flag: '🇬🇧' },
   { code: 'es', nativeName: 'Español', englishName: 'Spanish', flag: '🇪🇸' },
   { code: 'vi', nativeName: 'Tiếng Việt', englishName: 'Vietnamese', flag: '🇻🇳' },

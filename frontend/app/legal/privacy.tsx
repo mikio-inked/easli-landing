@@ -56,7 +56,7 @@ export default function PrivacyPublicScreen() {
 
           <Section title="2. Welche Daten verarbeiten wir?">
             <Text style={styles.body}>
-              KlarPost ist bewusst datenarm gebaut. Wir verarbeiten nur die folgenden
+              easli ist bewusst datenarm gebaut. Wir verarbeiten nur die folgenden
               Daten, und nur dann, wenn Sie die App aktiv nutzen:
             </Text>
             <Bullet>
@@ -116,7 +116,7 @@ export default function PrivacyPublicScreen() {
               <Text style={styles.body}>
                 <Text style={styles.bold}>Mistral AI</Text> (96 Boulevard Haussmann, 75008
                 Paris, Frankreich). Sprachmodell für OCR, Analyse und Erklärung. Daten
-                werden in der EU verarbeitet, kein Transfer in Drittländer für KlarPost-Anfragen.
+                werden in der EU verarbeitet, kein Transfer in Drittländer für easli-Anfragen.
               </Text>
             </Bullet>
             <Bullet>
