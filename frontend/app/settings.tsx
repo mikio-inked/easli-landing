@@ -52,6 +52,7 @@ import {
   PaymentsUnavailableError,
   restorePurchases,
 } from '../src/billing';
+import * as Updates from 'expo-updates';
 import { colors, fontSize, fontWeight, radius, spacing } from '../src/theme';
 
 const BACKEND = process.env.EXPO_PUBLIC_BACKEND_URL || '';
@@ -518,10 +519,200 @@ export default function SettingsScreen() {
         )}
 
         <Text style={styles.version}>easli · v1.0.0 (MVP)</Text>
+
+        {/* ---------- OTA Update Debug Block (visible in production) ---------- */}
+        <OtaDebugBlock />
       </ScrollView>
     </SafeAreaView>
   );
 }
+
+/**
+ * Small diagnostic block showing the current OTA Update state.
+ * Helps verify whether `eas update` pushes are reaching the device.
+ * Safe to ship to production — only shows non-sensitive metadata.
+ */
+function OtaDebugBlock() {
+  const updates = Updates.useUpdates();
+  const [checking, setChecking] = useState(false);
+
+  const fmt = (d?: Date | null) =>
+    d ? new Date(d).toLocaleString() : '—';
+
+  const onCheckNow = useCallback(async () => {
+    setChecking(true);
+    try {
+      const res = await Updates.checkForUpdateAsync();
+      if (res.isAvailable) {
+        Alert.alert(
+          'Update gefunden',
+          'Wird heruntergeladen…',
+        );
+        await Updates.fetchUpdateAsync();
+        Alert.alert(
+          'Update bereit',
+          'App startet jetzt neu, um das Update zu aktivieren.',
+          [
+            { text: 'Abbrechen', style: 'cancel' },
+            { text: 'Neu starten', onPress: () => Updates.reloadAsync() },
+          ],
+        );
+      } else {
+        Alert.alert('Kein Update', 'Du nutzt bereits die neueste Version.');
+      }
+    } catch (e: any) {
+      Alert.alert('Fehler', String(e?.message ?? e));
+    } finally {
+      setChecking(false);
+    }
+  }, []);
+
+  const running = updates.currentlyRunning;
+  const available = updates.availableUpdate;
+
+  return (
+    <View style={otaStyles.card}>
+      <Text style={otaStyles.title}>OTA Update Status</Text>
+
+      <DebugRow label="Channel" value={(Updates.channel as string) || '—'} />
+      <DebugRow label="Runtime Version" value={Updates.runtimeVersion || '—'} />
+      <DebugRow
+        label="Embedded Build"
+        value={running?.isEmbeddedLaunch ? 'Yes (no OTA applied)' : 'No (running OTA bundle)'}
+      />
+      <DebugRow
+        label="Active Update ID"
+        value={running?.updateId ? running.updateId.slice(0, 8) + '…' : 'embedded'}
+      />
+      <DebugRow
+        label="Created At"
+        value={fmt(running?.createdAt)}
+      />
+      <DebugRow
+        label="Last Check"
+        value={fmt(updates.lastCheckForUpdateTimeSinceRestart)}
+      />
+      <DebugRow
+        label="Update Available?"
+        value={updates.isUpdateAvailable ? 'YES — pending' : 'No'}
+      />
+      <DebugRow
+        label="Update Pending?"
+        value={updates.isUpdatePending ? 'YES — restart to apply' : 'No'}
+      />
+      {available?.updateId && (
+        <DebugRow
+          label="Available ID"
+          value={available.updateId.slice(0, 8) + '…'}
+        />
+      )}
+      {!!updates.checkError && (
+        <DebugRow
+          label="Check Error"
+          value={String(updates.checkError.message)}
+        />
+      )}
+      {!!updates.downloadError && (
+        <DebugRow
+          label="Download Error"
+          value={String(updates.downloadError.message)}
+        />
+      )}
+
+      <Pressable
+        style={[otaStyles.btn, checking && otaStyles.btnDisabled]}
+        onPress={onCheckNow}
+        disabled={checking}
+      >
+        <Text style={otaStyles.btnText}>
+          {checking ? 'Prüfe…' : 'Jetzt nach Update prüfen'}
+        </Text>
+      </Pressable>
+
+      {updates.isUpdatePending && (
+        <Pressable
+          style={[otaStyles.btn, otaStyles.btnPrimary]}
+          onPress={() => Updates.reloadAsync()}
+        >
+          <Text style={[otaStyles.btnText, otaStyles.btnTextPrimary]}>
+            Update jetzt anwenden (App neu starten)
+          </Text>
+        </Pressable>
+      )}
+    </View>
+  );
+}
+
+function DebugRow({ label, value }: { label: string; value: string }) {
+  return (
+    <View style={otaStyles.row}>
+      <Text style={otaStyles.rowLabel}>{label}</Text>
+      <Text style={otaStyles.rowValue} numberOfLines={2}>{value}</Text>
+    </View>
+  );
+}
+
+const otaStyles = StyleSheet.create({
+  card: {
+    marginHorizontal: spacing.lg,
+    marginTop: spacing.md,
+    marginBottom: spacing.xl,
+    padding: spacing.md,
+    backgroundColor: colors.surface,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  title: {
+    fontSize: fontSize.sm,
+    fontWeight: fontWeight.bold,
+    color: colors.textSecondary,
+    marginBottom: spacing.sm,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  row: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    paddingVertical: 4,
+    gap: spacing.sm,
+  },
+  rowLabel: {
+    fontSize: fontSize.xs,
+    color: colors.textSecondary,
+    flexShrink: 0,
+  },
+  rowValue: {
+    fontSize: fontSize.xs,
+    color: colors.textPrimary,
+    fontWeight: fontWeight.medium,
+    textAlign: 'right',
+    flexShrink: 1,
+  },
+  btn: {
+    marginTop: spacing.md,
+    paddingVertical: 10,
+    paddingHorizontal: spacing.md,
+    borderRadius: radius.sm,
+    backgroundColor: colors.background,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: 'center',
+  },
+  btnDisabled: { opacity: 0.5 },
+  btnPrimary: {
+    marginTop: spacing.sm,
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
+  },
+  btnText: {
+    fontSize: fontSize.sm,
+    fontWeight: fontWeight.medium,
+    color: colors.textPrimary,
+  },
+  btnTextPrimary: { color: colors.surface },
+});
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.background },
