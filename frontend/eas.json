@@ -66,6 +66,12 @@
     }
   },
   "submit": {
-    "production": {}
+    "production": {
+      "ios": {
+        "appleId": "m.tran@icloud.com",
+        "ascAppId": "6765859779",
+        "appleTeamId": "PGL9WMXPG7"
+      }
+    }
   }
 }
