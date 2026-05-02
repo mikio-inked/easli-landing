@@ -131,6 +131,37 @@ class RequiredAction(BaseModel):
     reason: str = ""
 
 
+class ExtractedEntities(BaseModel):
+    """Concrete data points pulled from the document — used by the Reply
+    Assistant to pre-fill recipient / subject / contact fields without
+    forcing the user to type them again. Every field is optional because
+    the OCR may not contain the value (privacy-positive default)."""
+    email: str = ""
+    subject: str = ""
+    reference_number: str = ""
+    contact_person: str = ""
+    organization: str = ""
+
+
+class ReplyOption(BaseModel):
+    """One actionable reply intent the user can pick. The `id` MUST be one
+    of the canonical intent ids so the /generate-reply endpoint can
+    interpret it consistently across languages.
+
+    Canonical intent ids:
+      • inquiry          (Nachfrage stellen)
+      • extension        (Fristverlängerung erbitten)
+      • confirm          (Bestätigung / Annahme)
+      • objection        (Widerspruch einlegen)
+      • submit_documents (Unterlagen nachreichen)
+      • cancel           (Kündigung / Widerruf)
+    """
+    id: str = ""
+    label: str = ""
+    reason: str = ""
+    recommended: bool = False
+
+
 class AnalysisResult(BaseModel):
     source_language: str = ""
     # ISO-639-1 code of the detected source language ('de', 'en', 'fr', ...).
@@ -148,18 +179,24 @@ class AnalysisResult(BaseModel):
     required_actions: List[RequiredAction] = []
     risk_level: Literal["green", "yellow", "red"] = "green"
     risk_reason: str = ""
-    # Polite neutral reply draft — written in the SAME language as the source
+    # Polite neutral reply draft, written in the SAME language as the source
     # document (so the user can actually send it back to the sender). Replaces
     # the old `german_reply_draft` (kept below as alias for backward compat).
     reply_draft: str = ""
-    # Legacy alias — older clients / DB records read `german_reply_draft`.
-    # We mirror the same value here so old data + old app versions keep
+    # Legacy alias. Older clients / DB records read `german_reply_draft`.
+    # We mirror the same value here so old data and old app versions keep
     # working without a migration.
     german_reply_draft: str = ""
     reply_draft_explanation_translated: str = ""
     questions_to_ask: List[str] = []
     uncertainties: List[str] = []
     disclaimer: str = ""
+    # ---- Reply Assistant (interactive intent-based replies) ----------------
+    # Phase-R5. Optional fields. Older records / older app versions ignore
+    # these gracefully. The frontend Reply Assistant uses these to render
+    # intent cards and pre-fill the mail composer.
+    extracted_entities: ExtractedEntities = Field(default_factory=ExtractedEntities)
+    reply_options: List[ReplyOption] = []
     # NEW — high-level category used for filtering & sorting in history.
     category: Literal[
         "tax",
@@ -365,8 +402,18 @@ Your job:
 2. Detect the PRIMARY language of the document yourself from the text. Use English names for `source_language` (e.g. "German", "English", "French", "Spanish", "Italian", "Dutch", "Polish", "Portuguese", "Turkish"). Provide the ISO-639-1 code separately in `source_language_code` (e.g. "de", "en", "fr", "es", "it", "nl", "pl", "pt", "tr").
 3. Explain it clearly in {target_language_label}.
 4. Identify deadlines, required actions, and risk level.
-5. Provide a neutral reply draft in the SAME language as the source document (so the user can send it back to the sender) — see `reply_draft` below.
+5. Provide a neutral reply draft in the SAME language as the source document (so the user can send it back to the sender), see `reply_draft` below.
 6. Translate the explanation of the reply draft into {target_language_label}.
+
+PERSONA & TONE (very important — apply to every natural-language field):
+You are easli, a calm and trustworthy assistant that helps people understand official or complex documents. Your job is NOT to summarise — it is to make the user feel "I understand what this is, and I know what to do next."
+- Calm, clear, direct. Supportive but not emotional.
+- Use simple, everyday language at roughly B1 level. No legal/technical jargon unless strictly necessary.
+- NEVER use generic AI phrases. Forbidden openings include: "Based on the provided information", "It appears that", "I analyzed", "After analyzing", "This document seems to indicate".
+- NEVER mention AI, models, OCR, analysis, or how the reply was produced. Talk to the user directly about the letter, not about the process.
+- Never use em-dashes (— or –) or en-dashes. Use a comma, period, or colon instead. (Em-dashes are an AI tell.)
+- Risk: if something is likely safe, say it clearly. If something might be risky, calmly explain why. Never exaggerate.
+- Adapt tone naturally to the language, do not translate word-by-word.
 
 CRITICAL RULES:
 - You MUST NOT provide legal, tax, financial, or medical advice.
@@ -449,13 +496,33 @@ JSON Schema:
   "reply_draft_explanation_translated": "short explanation in {target_language_label} of what the reply draft says",
   "questions_to_ask": ["helpful, neutral questions the user could ask the sender or a qualified advisor — in {target_language_label}"],
   "uncertainties": ["clearly note anything uncertain, unreadable, or low-confidence — in {target_language_label}"],
-  "disclaimer": "short disclaimer in {target_language_label} stating: KlarPost does not provide legal, tax, financial or medical advice; always confirm with a qualified professional or the sender.",
+  "disclaimer": "short disclaimer in {target_language_label} stating: easli does not provide legal, tax, financial or medical advice; always confirm with a qualified professional or the sender.",
   "category": "tax|insurance|rent|bank|health|government|court|utilities|telecom|work|education|other",
   "scam_warning": false,
-  "scam_reason": "string in {target_language_label} — only when scam_warning is true, otherwise empty"
+  "scam_reason": "string in {target_language_label}, only when scam_warning is true, otherwise empty",
+  "extracted_entities": {{
+    "email": "the most likely contact email address as written in the document, or empty string",
+    "subject": "string, a short subject line in the SOURCE language for a reply email, or empty string",
+    "reference_number": "case/file/customer/invoice number as written, or empty string",
+    "contact_person": "name of a specific contact person as written in the document, or empty string",
+    "organization": "the sender organisation as written, or empty string"
+  }},
+  "reply_options": [
+    {{
+      "id": "one of: inquiry|extension|confirm|objection|submit_documents|cancel",
+      "label": "short, action-oriented label in {target_language_label}, max 4 words",
+      "reason": "one short calm sentence in {target_language_label} explaining when to pick this, or empty string",
+      "recommended": true
+    }}
+  ]
 }}
 
 Use ONLY {target_language_label} for translated natural-language fields. Keep `reply_draft` and `german_reply_draft` in the SOURCE document's language. Keep document_type concise. Be conservative with deadlines and risk levels. If unsure, say so in uncertainties.
+
+REPLY OPTIONS guidance:
+- Pick 2 to 4 distinct options that genuinely make sense for THIS document. Do NOT include options that are clearly not applicable. If the document does not need any reply (pure information letter), return an empty array.
+- Mark exactly ONE option as `"recommended": true` (the most useful one for the user). The rest must be `false`.
+- Use these canonical ids only: `inquiry` (ask a clarifying question), `extension` (ask for more time), `confirm` (acknowledge / accept), `objection` (formal objection / disagreement), `submit_documents` (send missing documents), `cancel` (cancel / withdraw).
 """
 
 
@@ -1048,6 +1115,67 @@ async def analyze_from_ocr_text(
     elif isinstance(grd, str) and grd.strip() and not (isinstance(rd, str) and rd.strip()):
         parsed["reply_draft"] = grd
 
+    # Reply Assistant (Phase R5): if Mistral returned nothing we provide a
+    # safe localised fallback so the Reply tab in the UI is never empty.
+    # We use a tiny per-language label map with English as the safety net.
+    REPLY_OPTION_LABELS_EN = {
+        "inquiry": "Ask for clarification",
+        "extension": "Ask for more time",
+        "confirm": "Confirm receipt",
+        "objection": "File an objection",
+    }
+    REPLY_OPTION_LABELS_DE = {
+        "inquiry": "Nachfrage stellen",
+        "extension": "Frist verlängern",
+        "confirm": "Bestätigung",
+        "objection": "Widerspruch einlegen",
+    }
+    raw_options = parsed.get("reply_options")
+    if not isinstance(raw_options, list) or not raw_options:
+        labels = REPLY_OPTION_LABELS_DE if target_language_code == "de_simple" else REPLY_OPTION_LABELS_EN
+        parsed["reply_options"] = [
+            {"id": k, "label": v, "reason": "", "recommended": (k == "inquiry")}
+            for k, v in labels.items()
+        ]
+    else:
+        # Keep only entries whose id is canonical, and sanitise types.
+        cleaned = []
+        for opt in raw_options:
+            if not isinstance(opt, dict):
+                continue
+            oid = (opt.get("id") or "").strip().lower()
+            if oid not in INTENT_DESCRIPTIONS:
+                continue
+            cleaned.append({
+                "id": oid,
+                "label": (opt.get("label") or "").strip(),
+                "reason": (opt.get("reason") or "").strip(),
+                "recommended": bool(opt.get("recommended")),
+            })
+        if not cleaned:
+            labels = REPLY_OPTION_LABELS_DE if target_language_code == "de_simple" else REPLY_OPTION_LABELS_EN
+            cleaned = [
+                {"id": k, "label": v, "reason": "", "recommended": (k == "inquiry")}
+                for k, v in labels.items()
+            ]
+        else:
+            # Ensure exactly one recommended item.
+            if not any(o["recommended"] for o in cleaned):
+                cleaned[0]["recommended"] = True
+        parsed["reply_options"] = cleaned
+
+    # Normalise extracted_entities: ensure it's a dict with the expected keys.
+    ee = parsed.get("extracted_entities")
+    if not isinstance(ee, dict):
+        ee = {}
+    parsed["extracted_entities"] = {
+        "email": (ee.get("email") or "").strip(),
+        "subject": (ee.get("subject") or "").strip(),
+        "reference_number": (ee.get("reference_number") or "").strip(),
+        "contact_person": (ee.get("contact_person") or "").strip(),
+        "organization": (ee.get("organization") or "").strip(),
+    }
+
     _sanitize_literal_fields(parsed)
 
     try:
@@ -1590,6 +1718,9 @@ async def translate_analysis_with_mistral(
         "reply_draft", "german_reply_draft", "reply_draft_explanation_translated",
         "questions_to_ask", "uncertainties", "disclaimer", "category",
         "scam_warning", "scam_reason",
+        # Phase R5 — preserved invariant fields (no translation needed for
+        # extracted entities; reply_options labels DO get translated though).
+        "extracted_entities", "reply_options",
     }
     slim = {k: v for k, v in (source_result or {}).items() if k in ALLOWED_KEYS}
     # If the source only has the legacy `german_reply_draft` (old DB record),
@@ -1670,9 +1801,30 @@ async def translate_analysis_with_mistral(
         "german_reply_draft",
         "source_language",
         "source_language_code",
+        # Phase R5 — preserve extracted entities byte-identical (they're
+        # facts pulled from the document, not natural-language fields).
+        "extracted_entities",
     ):
         if k in slim:
             parsed[k] = slim[k]
+    # reply_options: keep ids + recommended booleans intact, but allow the
+    # model to localise `label` and `reason` into the new target language.
+    src_options = slim.get("reply_options")
+    new_options = parsed.get("reply_options")
+    if isinstance(src_options, list) and isinstance(new_options, list):
+        # Build an id → src lookup so we can re-anchor by id regardless of
+        # ordering changes by the model.
+        src_by_id = {o.get("id"): o for o in src_options if isinstance(o, dict)}
+        for opt in new_options:
+            if not isinstance(opt, dict):
+                continue
+            src_o = src_by_id.get(opt.get("id"))
+            if src_o:
+                opt["id"] = src_o.get("id", opt.get("id", ""))
+                opt["recommended"] = bool(src_o.get("recommended", opt.get("recommended", False)))
+    elif isinstance(src_options, list):
+        # Model didn't re-emit reply_options, fall back to source.
+        parsed["reply_options"] = src_options
     # Keep reply_draft ↔ german_reply_draft in sync after invariants applied.
     if parsed.get("reply_draft") and not parsed.get("german_reply_draft"):
         parsed["german_reply_draft"] = parsed["reply_draft"]
@@ -1886,6 +2038,160 @@ async def translate_analysis_endpoint(analysis_id: str, req: TranslateRequest):
         **rec.dict(),
         "usage": _to_usage_response(refreshed).dict(),
     }
+
+
+
+
+# ============================================================================
+# Reply Assistant — interactive intent-based reply generation (Phase R5)
+# ============================================================================
+
+# Canonical reply intents. Always available as a safe fallback when the
+# analysis itself didn't produce any reply_options. This guarantees the
+# Reply Assistant UI never feels "empty / broken" on simple letters.
+DEFAULT_REPLY_OPTIONS = [
+    {"id": "inquiry",   "label_de": "Nachfrage stellen",        "label_en": "Ask for clarification"},
+    {"id": "extension", "label_de": "Frist verlängern",         "label_en": "Ask for more time"},
+    {"id": "confirm",   "label_de": "Bestätigung",              "label_en": "Confirm / acknowledge"},
+    {"id": "objection", "label_de": "Widerspruch einlegen",     "label_en": "File an objection"},
+]
+
+# Description string for each intent — fed into the reply-generation prompt
+# so the model produces a tonally-correct draft.
+INTENT_DESCRIPTIONS = {
+    "inquiry":          "Politely ask the sender to clarify a specific point in the letter that is unclear.",
+    "extension":        "Politely request more time to respond / pay / submit, with a brief reason if helpful.",
+    "confirm":          "Briefly confirm receipt and/or acknowledge what the letter requests, no further questions.",
+    "objection":        "Calmly state that the recipient disagrees with the decision/claim and intends to formally object. Keep it short and factual.",
+    "submit_documents": "Acknowledge the request and state that the missing documents will be supplied. List placeholders for which documents.",
+    "cancel":           "State the intention to cancel / withdraw / terminate the contract or service. Reference the sender's letter as context.",
+}
+
+
+class GenerateReplyRequest(BaseModel):
+    device_id: str
+    intent: str = ""
+    custom_instruction: str = ""
+
+
+class GenerateReplyResponse(BaseModel):
+    reply_text: str
+    intent: str
+
+
+def build_reply_generation_prompt(
+    record: dict,
+    intent: str,
+    target_language_label: str,
+    custom_instruction: str = "",
+) -> str:
+    """Return a concise system prompt for Mistral to generate a single
+    reply-draft tailored to one intent. The reply text is produced in the
+    SOURCE-document language (so it can actually be sent to the sender)."""
+    result = record.get("result", {}) or {}
+    ee = result.get("extracted_entities") or {}
+    intent_desc = INTENT_DESCRIPTIONS.get(intent, "")
+    src_lang = result.get("source_language") or "the source language"
+    src_lang_code = result.get("source_language_code") or ""
+
+    context = {
+        "document_type": result.get("document_type", ""),
+        "sender": result.get("sender", ""),
+        "summary": result.get("summary_translated", ""),
+        "deadlines": result.get("deadlines", [])[:3],
+        "required_actions": result.get("required_actions", [])[:3],
+        "reference_number": ee.get("reference_number", ""),
+        "contact_person": ee.get("contact_person", ""),
+        "organization": ee.get("organization", ""),
+    }
+    instruction_block = (
+        f"\n\nADDITIONAL USER INSTRUCTION (must be followed):\n{custom_instruction}"
+        if custom_instruction.strip()
+        else ""
+    )
+
+    return f"""You are easli's reply-draft writer. Produce ONE polite, calm, ready-to-send reply email body for the following intent:
+
+INTENT: {intent}
+{intent_desc}
+
+The reply MUST be written in {src_lang} ({src_lang_code or 'detected from context'}). The user will read it through an in-app preview written in {target_language_label}, but the email itself goes to the sender, so it stays in the source language.
+
+PERSONA & TONE:
+- Calm, clear, direct. No emotion, no AI phrases ("Based on…", "I analyzed…", "It appears that…").
+- B1-level everyday language. No legal jargon unless strictly needed.
+- Never use em-dashes (— or –). Use comma, period, or colon.
+- Do not mention easli, AI, models, or how this draft was made.
+- Address a specific person if known (use `contact_person`); otherwise use a neutral salutation appropriate for {src_lang}.
+- Reference the document briefly (use `reference_number` if present).
+- Keep it 80 to 180 words, no bullet lists, no markdown, no signature placeholder block beyond a simple polite sign-off.
+
+DOCUMENT CONTEXT (JSON):
+{json.dumps(context, ensure_ascii=False)}{instruction_block}
+
+OUTPUT:
+Plain text body only. No subject line, no "Subject:" prefix, no markdown, no quotes around the text, no commentary. Just the email body, ready for the user to copy or send.
+"""
+
+
+@api_router.post("/analyses/{analysis_id}/generate-reply", response_model=GenerateReplyResponse)
+async def generate_reply_endpoint(analysis_id: str, req: GenerateReplyRequest):
+    """Generate a tailored reply draft for a specific intent.
+
+    The intent must be one of the canonical ids (inquiry / extension /
+    confirm / objection / submit_documents / cancel). Returns the reply
+    text in the SOURCE document's language so the user can paste it
+    straight into a mailto: composer.
+    """
+    intent = (req.intent or "").strip().lower()
+    if intent not in INTENT_DESCRIPTIONS:
+        raise HTTPException(status_code=400, detail=f"Unsupported intent: {intent}")
+
+    doc = await db.analyses.find_one(
+        {"id": analysis_id, "device_id": req.device_id},
+        {"_id": 0, "created_at_dt": 0},
+    )
+    if not doc:
+        raise HTTPException(status_code=404, detail="Analysis not found")
+
+    target_lang = (doc.get("target_language") or "en").strip()
+    target_label = LANG_LABELS.get(target_lang, "English")
+
+    sys_prompt = build_reply_generation_prompt(
+        doc, intent, target_label, req.custom_instruction or ""
+    )
+    msgs = [
+        {"role": "system", "content": sys_prompt},
+        {"role": "user",   "content": f"Generate the reply now. Intent: {intent}."},
+    ]
+
+    try:
+        resp = await call_mistral_with_retry(
+            messages=msgs,
+            model=MISTRAL_MODEL,
+            temperature=0.4,
+            max_tokens=600,
+            label="generate_reply",
+        )
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.exception("generate_reply_call_failed analysis=%s intent=%s", analysis_id, intent)
+        raise HTTPException(status_code=502, detail="Reply generation failed") from exc
+
+    raw = (resp.choices[0].message.content or "").strip()
+    # Defensive: strip accidental markdown fences or "Subject:" prefixes.
+    if raw.startswith("```"):
+        raw = raw.strip("`").strip()
+        if raw.startswith("plaintext\n"):
+            raw = raw[len("plaintext\n"):]
+    for prefix in ("Subject:", "Betreff:", "Asunto:", "Konu:"):
+        if raw.lower().startswith(prefix.lower()):
+            # Drop the first line entirely.
+            nl = raw.find("\n")
+            raw = raw[nl + 1 :].strip() if nl != -1 else raw
+
+    return GenerateReplyResponse(reply_text=raw, intent=intent)
 
 
 

@@ -22,6 +22,8 @@ import {
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Clipboard from 'expo-clipboard';
+import * as Linking from 'expo-linking';
+import { Share } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   AlertTriangle,
@@ -68,6 +70,7 @@ import { deleteOriginal, hasOriginal } from '../src/originals';
 import { colors, fontSize, fontWeight, radius, shadows, spacing } from '../src/theme';
 import { ReadAloudButton } from '../src/components/ReadAloudButton';
 import { ScamWarningModal } from '../src/components/ScamWarningModal';
+import { ReplyAssistant } from '../src/replyAssistant';
 
 // Enable LayoutAnimation on Android (iOS supports it natively).
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
@@ -272,6 +275,9 @@ export default function ResultScreen() {
   // smartly auto-open Reply Draft only when a reply is required, etc.
   // After the user toggles, their explicit choice wins (stored as bool).
   const [openSections, setOpenSections] = useState<Record<string, boolean>>({});
+  // Device id for backend calls. Loaded once on mount; the ReplyAssistant
+  // and other tab content rely on it.
+  const [deviceId, setDeviceId] = useState<string>('');
   // Phase R3: result-screen redesign — segmented "tab" navigation. The
   // user sees ONE tab's content at a time so the page no longer scrolls
   // forever. Tabs that have no content are simply not rendered, so the
@@ -347,6 +353,7 @@ export default function ResultScreen() {
       }
       try {
         const did = await ensureDeviceId();
+        setDeviceId(did);
         const r = await getAnalysis(id, did);
         setLastResult(r);
         setRecord(r);
@@ -564,7 +571,9 @@ export default function ResultScreen() {
     ...(hasDeadlines
       ? [{ key: 'deadlines' as TabKey, label: t(lang, 'deadlines'), count: r.deadlines!.length }]
       : []),
-    ...(hasReplyDraft ? [{ key: 'reply' as TabKey, label: t(lang, 'tab_reply') }] : []),
+    ...(hasReplyDraft || (r.reply_options && r.reply_options.length > 0)
+      ? [{ key: 'reply' as TabKey, label: t(lang, 'tab_reply') }]
+      : []),
     { key: 'details' as TabKey, label: t(lang, 'tab_details') },
   ];
   // If the active tab is no longer available (e.g. after a language switch
@@ -1146,32 +1155,9 @@ export default function ResultScreen() {
         {/* ============================================================
             7. REPLY DRAFT — auto-open ONLY if a reply is needed AND not scam
             ============================================================ */}
-        {safeActiveTab === 'reply' && hasReplyDraft ? (
-          <Accordion
-            id="reply"
-            title={t(lang, 'reply_draft')}
-            icon={<Reply color={colors.primary} size={18} strokeWidth={2.5} />}
-            open={isOpen('reply', replyNeeded && !hasScam)}
-            onToggle={toggleSection}
-            testID="reply-card"
-          >
-            <View style={styles.replyBox}>
-              <Text style={styles.replyText}>{replyDraftText}</Text>
-            </View>
-            <Pressable
-              onPress={copyReply}
-              style={styles.copyBtn}
-              testID="reply-copy"
-              accessibilityRole="button"
-              accessibilityLabel={t(lang, 'copy')}
-            >
-              {copied ? (
-                <CheckCircle2 color={colors.green.text} size={18} strokeWidth={2.5} />
-              ) : (
-                <Copy color={colors.primary} size={18} strokeWidth={2.5} />
-              )}
-              <Text style={styles.copyLabel}>{copied ? t(lang, 'copied') : t(lang, 'copy')}</Text>
-            </Pressable>
+        {/* === Section 7: REPLY ASSISTANT (Phase R5) === */}
+        {safeActiveTab === 'reply' && (hasReplyDraft || (r.reply_options && r.reply_options.length > 0)) ? (
+          <View style={styles.replyTabWrapper} testID="reply-card">
             {hasScam ? (
               <View style={styles.scamInlineCaution}>
                 <ShieldAlert color={colors.red.text} size={16} strokeWidth={2.5} />
@@ -1180,15 +1166,16 @@ export default function ResultScreen() {
                 </Text>
               </View>
             ) : null}
-            {r.reply_draft_explanation_translated ? (
-              <View style={{ marginTop: spacing.sm }}>
-                <Text style={styles.subSectionTitle}>{t(lang, 'reply_explanation')}</Text>
-                <Text style={[styles.body, { marginTop: 6 }]}>
-                  {r.reply_draft_explanation_translated}
-                </Text>
-              </View>
-            ) : null}
-          </Accordion>
+            <ReplyAssistant
+              record={record}
+              uiLang={lang}
+              options={r.reply_options || []}
+              entities={r.extracted_entities || {}}
+              legacyReplyDraft={replyDraftText}
+              sourceLanguageLabel={sourceLangLabel}
+              deviceId={deviceId}
+            />
+          </View>
         ) : null}
 
         {/* === Section 8: QUESTIONS — Details tab === */}
@@ -1727,6 +1714,11 @@ const styles = StyleSheet.create({
     borderColor: colors.borderLight,
     gap: spacing.md,
     ...shadows.card,
+  },
+  // Reply-tab wrapper (Phase R5). Holds the optional scam-caution banner
+  // above the embedded ReplyAssistant component.
+  replyTabWrapper: {
+    gap: spacing.md,
   },
 
   // ---- Pills / Tabs (Phase R3) ----

@@ -30,6 +30,21 @@ export type Category =
   | 'education'
   | 'other';
 
+export interface ReplyOption {
+  id: 'inquiry' | 'extension' | 'confirm' | 'objection' | 'submit_documents' | 'cancel' | string;
+  label: string;
+  reason?: string;
+  recommended?: boolean;
+}
+
+export interface ExtractedEntities {
+  email?: string;
+  subject?: string;
+  reference_number?: string;
+  contact_person?: string;
+  organization?: string;
+}
+
 export interface AnalysisResult {
   source_language: string;
   /** ISO-639-1 code of the detected source language ('de', 'en', 'fr', ...).
@@ -45,10 +60,10 @@ export interface AnalysisResult {
   required_actions: RequiredAction[];
   risk_level: 'green' | 'yellow' | 'red';
   risk_reason: string;
-  /** Polite reply draft — in the SAME language as the source document.
+  /** Polite reply draft, in the SAME language as the source document.
    * Preferred field since Phase-3 (multi-source-language). */
   reply_draft?: string;
-  /** Legacy alias — kept for backward compat with older records. Mirrors
+  /** Legacy alias, kept for backward compat with older records. Mirrors
    * `reply_draft` when both are populated. Readers should prefer
    * `reply_draft ?? german_reply_draft`. */
   german_reply_draft: string;
@@ -59,6 +74,9 @@ export interface AnalysisResult {
   category: Category;
   scam_warning: boolean;
   scam_reason: string;
+  /** Reply Assistant (Phase R5). Optional on legacy records. */
+  extracted_entities?: ExtractedEntities;
+  reply_options?: ReplyOption[];
 }
 
 export interface AnalysisRecord {
@@ -333,4 +351,38 @@ export async function clearChatMessages(analysisId: string, deviceId: string): P
     { method: 'DELETE' }
   );
   await jsonOrThrow(res);
+}
+
+/**
+ * Generate a tailored reply draft for a single intent. Returns the reply
+ * body in the SOURCE document's language so the user can paste it
+ * straight into a mailto: composer.
+ *
+ * Phase R5 (Reply Assistant). Backend endpoint:
+ *   POST /api/analyses/{id}/generate-reply
+ *     body: { device_id, intent, custom_instruction? }
+ *     200: { reply_text, intent }
+ *     400: invalid intent
+ *     404: analysis not found
+ *     502: Mistral failure
+ */
+export async function generateReply(
+  analysisId: string,
+  deviceId: string,
+  intent: string,
+  customInstruction?: string,
+): Promise<{ reply_text: string; intent: string }> {
+  const res = await fetch(
+    `${BASE_URL}/api/analyses/${encodeURIComponent(analysisId)}/generate-reply`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        device_id: deviceId,
+        intent,
+        custom_instruction: customInstruction || '',
+      }),
+    },
+  );
+  return jsonOrThrow<{ reply_text: string; intent: string }>(res);
 }
