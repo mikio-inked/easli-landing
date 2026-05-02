@@ -38,9 +38,10 @@ import {
 import { Button } from '../src/ui';
 import { setConsent, setLanguage, getLanguage, setOnboarded } from '../src/store';
 import { useLargeFontMode } from '../src/largeFontMode';
-import { colors, fontSize, fontWeight, radius, shadows, spacing } from '../src/theme';
+import { colors, fontSize, fontWeight, gradient, radius, shadows, spacing } from '../src/theme';
 import { EasliMark, EasliWordmark } from '../src/brand';
 import { LanguageCode, LANGUAGES, t } from '../src/i18n';
+import { LinearGradient } from 'expo-linear-gradient';
 
 // Map iOS/Android BCP-47 locales to the languages easli ships. Fallback is
 // English — never German simple (that's an opt-in accessibility flavour).
@@ -379,11 +380,24 @@ function LiveDemoStep({ lang, onGetStarted }: { lang: LanguageCode; onGetStarted
   return (
     <View style={{ flex: 1 }}>
       <ScrollView
-        contentContainerStyle={styles.stepScroll}
+        contentContainerStyle={styles.demoScroll}
         showsVerticalScrollIndicator={false}
       >
-        <Text style={styles.stepTitle}>{t(lang, 'app_tagline')}</Text>
-        <Text style={styles.stepSubtitle}>{t(lang, 'onb_demo_subtitle')}</Text>
+        {/* Phase R3 — Brand-gradient hero (Brand-Guide approved for
+            onboarding/marketing surfaces only). Sets a calm authority tone
+            on first launch and previews the icon's gradient identity. */}
+        <LinearGradient
+          colors={gradient.brand.colors}
+          start={gradient.brand.start}
+          end={gradient.brand.end}
+          style={styles.heroGradient}
+        >
+          <View style={styles.heroIconWrap}>
+            <EasliMark size={48} />
+          </View>
+          <Text style={styles.heroTitle}>{t(lang, 'app_tagline')}</Text>
+          <Text style={styles.heroSubtitle}>{t(lang, 'onb_demo_subtitle')}</Text>
+        </LinearGradient>
 
         <View style={[styles.stage, { width: stageWidth }]}>
           {/* Original German letter (fades out) */}
@@ -529,6 +543,50 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.sm,
     paddingBottom: spacing.lg,
+  },
+  // LiveDemo step uses its own scroll style — hero is full-bleed (no
+  // horizontal padding) so the gradient reaches edge-to-edge, then
+  // content below sits in its usual lg padding via the stage's own
+  // marginHorizontal: 'auto'.
+  demoScroll: {
+    paddingTop: 0,
+    paddingBottom: spacing.lg,
+    alignItems: 'center',
+  },
+  // Brand-gradient hero — used ONLY on onboarding (Brand Guide §6 forbids
+  // gradient in core UI). Soft rounded bottom corners give it a "card"
+  // feel without dominating the page.
+  heroGradient: {
+    width: '100%',
+    paddingTop: spacing.xl,
+    paddingBottom: spacing.xl,
+    paddingHorizontal: spacing.lg,
+    alignItems: 'center',
+    borderBottomLeftRadius: radius.xxl,
+    borderBottomRightRadius: radius.xxl,
+    marginBottom: spacing.lg,
+  },
+  heroIconWrap: {
+    backgroundColor: 'rgba(255,255,255,0.18)',
+    padding: 6,
+    borderRadius: 16,
+    marginBottom: spacing.md,
+  },
+  heroTitle: {
+    fontSize: fontSize['3xl'],
+    fontWeight: fontWeight.extrabold,
+    color: colors.white,
+    letterSpacing: -0.5,
+    textAlign: 'center',
+    lineHeight: fontSize['3xl'] * 1.15,
+    marginBottom: spacing.xs,
+  },
+  heroSubtitle: {
+    fontSize: fontSize.base,
+    color: 'rgba(255,255,255,0.92)',
+    textAlign: 'center',
+    lineHeight: 22,
+    maxWidth: 320,
   },
   stepTitle: {
     fontSize: fontSize['2xl'],

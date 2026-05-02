@@ -773,6 +773,21 @@ frontend_result_redesign_phase_r3:
         -agent: "main"
         -comment: "Replaced the long-scrolling stack of 8 accordions with a 5-tab horizontal pill navigation directly under the Hero + Main-Action card. Tabs auto-hide when their content is empty (e.g. no `reply_draft` → no Reply tab). Pills follow the easli Brand Guide: rounded-pill, deep-blue active state, primarySoft badge with item count (Actions 3, Deadlines 1). Scam-warning card stays ALWAYS visible (security overrides tabs). Hero + Main-Action stay above the pills as 'always-on' summary so the user never loses context. Tab state lives in component-level useState with safe fallback to Overview when the active tab disappears (e.g. after a language switch wipes reply_draft). New i18n keys (`tab_overview`/`tab_actions`/`tab_reply`/`tab_details`) added to all 7 supported UI languages. No business logic changed — Share, PDF export, Chat-bottom-sheet, and Reminder flows still operate on the full record and are unaffected by the visible tab. Estimated visual scroll reduction on a typical multi-section result: ~1600 px → ~600 px (Overview tab default) ≈ -62%."
 
+
+
+frontend_onboarding_gradient_hero:
+  - task: "Onboarding LiveDemo step — brand-gradient hero (Deep Blue → Teal) with white wordmark + tagline"
+    implemented: true
+    working: "NA"
+    file: "/app/frontend/app/onboarding.tsx"
+    stuck_count: 0
+    priority: "low"
+    needs_retesting: false
+    status_history:
+        -working: "NA"
+        -agent: "main"
+        -comment: "Added a full-bleed brand-gradient (#1E3A8A → #2EC4B6) hero card to the LiveDemo step. Hero contains the easli icon (in a soft white-18% rounded backdrop), the app tagline as a 28-32px white headline, and the demo subtitle in white-92%. Border-radius bottom-only so it cleanly sits above the calm off-white body where the animated demo letter and CTA live. Brand-Guide-compliant — gradient is restricted to onboarding/marketing surfaces only (Brand Guide §6 forbids it in core UI). Added expo-linear-gradient dependency. No regressions; language step (step 0) untouched."
+
     status_history:
         -working: "NA"
         -agent: "main"
