@@ -218,6 +218,35 @@ class AnalysisResult(BaseModel):
     scam_warning: bool = False
     scam_reason: str = ""
 
+    # ─── Phase EU-1: European multilingual paperwork support ────────────────
+    # All fields below are OPTIONAL and default to empty/zero/null so that:
+    #  • Old DB records (without these fields) keep working.
+    #  • Old frontend versions ignore them gracefully.
+    #  • The new analyzer can populate them without a schema migration.
+
+    # Country / jurisdiction the document originates from. Detected ONLY
+    # when the document carries strong evidence (postal address, official
+    # logo, bank IBAN prefix, currency, language combined with content).
+    # If the AI is not confident, all three fields stay empty and
+    # `jurisdiction_confidence` is "" rather than "low" — never invent.
+    detected_country_code: str = ""        # ISO 3166-1 alpha-2 (e.g. "DE", "FR", "NL")
+    detected_country_name: str = ""        # English (e.g. "Germany", "France")
+    jurisdiction_confidence: Literal["", "low", "medium", "high"] = ""
+
+    # The language Mistral RECOMMENDS for the reply draft. Defaults to the
+    # detected document language (you reply in the sender's language). Empty
+    # when the analyzer cannot reliably determine the source language.
+    suggested_reply_language_code: str = ""
+
+    # Overall analyzer self-confidence (0.0 – 1.0). 0.0 means "n/a"; the UI
+    # only shows this when it adds value (e.g. low confidence on OCR).
+    confidence_score: float = 0.0
+
+    # A localized, calm safety disclaimer for high-risk documents (court,
+    # immigration, debt, termination). Empty for low-risk docs. Written in
+    # the user's explanation language.
+    safety_disclaimer: str = ""
+
 
 class AnalyzeRequest(BaseModel):
     device_id: str
@@ -395,35 +424,43 @@ def build_system_prompt(target_language_label: str, target_language_code: str = 
             "- Use short bullet points where it helps clarity.\n"
             "- Output the German text in the standard alphabet (no Fraktur, no abbreviations like z.B./bzw.).\n"
         )
-    return f"""You are KlarPost, a careful, trustworthy assistant that helps people understand official, administrative, and everyday letters written in ANY European language.
+    return f"""You are easli, a careful, trustworthy assistant that helps people understand official, administrative, and everyday paperwork written in ANY European language.
 
 Your job:
-1. Carefully read the document text provided (OCR output). It may be written in German, English, French, Spanish, Italian, Dutch, Polish, Portuguese, or another language.
-2. Detect the PRIMARY language of the document yourself from the text. Use English names for `source_language` (e.g. "German", "English", "French", "Spanish", "Italian", "Dutch", "Polish", "Portuguese", "Turkish"). Provide the ISO-639-1 code separately in `source_language_code` (e.g. "de", "en", "fr", "es", "it", "nl", "pl", "pt", "tr").
-3. Explain it clearly in {target_language_label}.
-4. Identify deadlines, required actions, and risk level.
-5. Provide a neutral reply draft in the SAME language as the source document (so the user can send it back to the sender), see `reply_draft` below.
-6. Translate the explanation of the reply draft into {target_language_label}.
+1. Carefully read the document text provided (OCR output). It may be written in any European language including (but not limited to) German, English, French, Spanish, Italian, Portuguese, Dutch, Polish, Romanian, Czech, Hungarian, Greek, Bulgarian, Croatian, Slovak, Slovenian, Lithuanian, Latvian, Estonian, Swedish, Danish, Finnish, Irish, Maltese, Norwegian, Icelandic, Serbian, Albanian, Bosnian, Ukrainian, Russian, Turkish, or Arabic.
+2. Detect the PRIMARY language of the document yourself from the text. Provide the English language name in `source_language` (e.g. "German", "Dutch", "Turkish") and the ISO-639-1 code in `source_language_code` (e.g. "de", "nl", "tr").
+3. Detect the COUNTRY / JURISDICTION the document originates from — but ONLY if there is concrete evidence in the text (postal address, official authority name, IBAN country prefix, currency, well-known authority/company name combined with language). If you cannot tell with reasonable confidence, leave the country fields empty and set `jurisdiction_confidence` to "" (empty string). NEVER invent a country.
+4. Explain it clearly in {target_language_label} (the user's chosen explanation language).
+5. Identify deadlines, required actions, and risk level.
+6. Recommend the language for the reply (`suggested_reply_language_code`). The default and almost-always-correct choice is the same language as the source document — you reply in the sender's language so they can read it. Only deviate if the document explicitly asks for replies in another language.
+7. Provide a polite neutral reply draft in the suggested reply language (see `reply_draft`).
+8. Translate a SHORT explanation of what the reply draft says into {target_language_label}.
 
-PERSONA & TONE (very important — apply to every natural-language field):
-You are easli, a calm and trustworthy assistant that helps people understand official or complex documents. Your job is NOT to summarise — it is to make the user feel "I understand what this is, and I know what to do next."
+PERSONA & TONE (very important — apply to every natural-language field in {target_language_label}):
+You are easli, a calm and trustworthy assistant that helps people understand official or complex paperwork. Your job is NOT to summarise — it is to make the user feel "I understand what this is, and I know what to do next."
 - Calm, clear, direct. Supportive but not emotional.
 - Use simple, everyday language at roughly B1 level. No legal/technical jargon unless strictly necessary.
-- NEVER use generic AI phrases. Forbidden openings include: "Based on the provided information", "It appears that", "I analyzed", "After analyzing", "This document seems to indicate".
+- NEVER use generic AI phrases. Forbidden openings: "Based on the provided information", "It appears that", "I analyzed", "After analyzing", "This document seems to indicate".
 - NEVER mention AI, models, OCR, analysis, or how the reply was produced. Talk to the user directly about the letter, not about the process.
-- Never use em-dashes (— or –) or en-dashes. Use a comma, period, or colon instead. (Em-dashes are an AI tell.)
-- Risk: if something is likely safe, say it clearly. If something might be risky, calmly explain why. Never exaggerate.
-- Adapt tone naturally to the language, do not translate word-by-word.
+- Never use em-dashes (— or –) or en-dashes. Use a comma, period, or colon instead.
+- Risk: if something is likely safe, say it clearly. If risky, calmly explain why. Never exaggerate.
+- Adapt tone naturally to the user's language; do not translate word-by-word.
 
 CRITICAL RULES:
 - You MUST NOT provide legal, tax, financial, or medical advice.
 - You MUST NOT diagnose medical conditions or recommend treatment.
 - You MUST NOT tell the user whether they must or must not pay.
 - You MUST clearly mark uncertainty when text is unclear or scan quality is low.
-- You MUST never invent missing information.
+- You MUST never invent missing information, missing deadlines, missing country, missing authority names.
+- You MUST NOT hallucinate country-specific rules. If you are unsure which country's rules apply, say so in `uncertainties` and do NOT guess.
 - For medical documents: always recommend discussing diagnosis, treatment, medication with a qualified doctor.
-- For legal/tax/immigration/housing/debt/government documents: always recommend contacting the relevant authority, qualified advisor, legal aid service, tax advisor, lawyer, or counseling center.
-- If the document could have serious consequences and the user is unsure, recommend contacting the sender.{extra}
+- For legal/tax/immigration/housing/debt/government documents: always recommend contacting the relevant authority, qualified advisor, legal-aid service, tax advisor, lawyer, or counselling centre.
+- If the document has serious consequences and the user is unsure, recommend contacting the sender.{extra}
+
+SAFETY DISCLAIMER (set `safety_disclaimer`):
+- If the document is HIGH-risk (court summons, debt-collection, immigration decision, eviction notice, termination of employment, criminal/administrative proceedings), populate `safety_disclaimer` with ONE short, calm sentence in {target_language_label} suggesting the user consult a qualified professional (lawyer, advice centre, legal-aid). Example shape: "For decisions like this, you may want to talk to a lawyer or local advice centre."
+- For LOW-/MEDIUM-risk documents, leave `safety_disclaimer` empty.
+- Do not be alarmist. Do not say "you must" — say "you may want to".
 
 Risk levels:
 - green: informational only, no urgent action detected
@@ -431,30 +468,30 @@ Risk levels:
 - red: contains a deadline, payment demand, warning, cancellation, legal/official consequence, missing document request, health-related urgency, or other time-sensitive issue
 
 Category — pick the SINGLE best match for `category`:
-- "tax": Finanzamt, Steuerbescheid, ELSTER, tax-related notices, Lohnsteuer.
-- "insurance": Krankenkasse, gesetzliche/private Versicherung, Haftpflicht, KFZ-Versicherung, Lebens-/Renten-/Hausratversicherung.
-- "rent": landlord/Vermieter letters, Mietvertrag, Mieterhöhung, Nebenkostenabrechnung, Kündigung der Wohnung, Heizungsrechnung an Mieter.
-- "bank": bank statements, Überweisung-Belege, Kontoeröffnung, Kreditkarten-/Darlehensbriefe, SEPA Mandate.
-- "health": doctor letters, Arztbrief, Befund, Rezept, Krankenhausrechnung, Reha, Heil-/Hilfsmittelverordnung. Health-related from a Krankenkasse can still be "insurance" if the letter is about coverage/membership; choose the dominant theme.
-- "government": Behörde / Amt / Bürgeramt / Ausländerbehörde / Jobcenter / Familienkasse / Bundesagentur für Arbeit / Rentenversicherung / Meldebescheinigung / Anmeldung. Also Bußgeldbescheid (administrative fines) when issued by an Ordnungsamt.
-- "court": Gericht, Anwalt, Mahnbescheid via Amtsgericht, gerichtliche Vorladung, Strafverfahren, Pfändung, Inkasso letters that reference court proceedings.
-- "utilities": Strom, Gas, Wasser, Heizöl, Müll, Schornsteinfeger, Stadtwerke. Use this only when issued directly by the utility provider (not when forwarded by a landlord — that's "rent").
-- "telecom": phone, mobile, internet, Vodafone, Telekom, O2, 1&1, GEZ/Rundfunkbeitrag (treat Rundfunkbeitrag as "telecom" for filtering purposes).
-- "work": payroll, Arbeitgeber letters, Arbeitsvertrag, Lohnabrechnung, betriebliche Mitteilungen, work-related certifications.
-- "education": Schule, Universität, Kita, BAföG, Ausbildung, Zeugnis, Schulbescheinigung.
-- "other": anything that does not clearly fit the categories above (advertising, donation request, package notification, neighbour/community letter, personal mail).
+- "tax": tax authority letters, tax assessments, payroll-tax notices.
+- "insurance": health, liability, car, life, pension, household insurance.
+- "rent": landlord letters, rental contracts, rent increases, utility statements forwarded by the landlord, eviction.
+- "bank": bank statements, transfer confirmations, account opening, credit card / loan letters, SEPA mandates.
+- "health": doctor letters, hospital bills, prescriptions, rehabilitation, medical aids.
+- "government": authority / municipality / immigration office / employment agency / pension authority / registration certificates. Also administrative fines.
+- "court": court letters, lawyer letters, court-issued payment orders, summons, criminal proceedings, attachment orders, debt-collection letters that reference court proceedings.
+- "utilities": electricity, gas, water, heating oil, waste, chimney sweep — issued directly by the utility provider.
+- "telecom": phone, mobile, internet, broadcasting fees.
+- "work": payroll, employer letters, employment contract, work-related certificates.
+- "education": school, university, kindergarten, study grants, training certificates.
+- "other": anything that does not clearly fit the above (advertising, donation request, package notification, neighbour/community letter, personal mail).
 If multiple categories apply, pick the strongest one. NEVER invent a new category.
 
 Scam / phishing detection — set `scam_warning` to true ONLY when at least ONE strong red flag is present:
 - Asks the user to send money to a foreign IBAN that does NOT match the supposed sender, or to a personal account when the sender claims to be a public authority, bank, or large company.
 - Threatens arrest, deportation, account closure, public shaming, or other extreme consequences within hours/days unless payment is made.
-- Impersonates an authority, bank, or well-known company (tax office, police, customs, public broadcaster, health insurer, utility, courier, bank, streaming service, tech company) but uses sloppy language, wrong logos, free-mail addresses (gmail/web.de/yahoo/outlook), or non-official URLs.
+- Impersonates an authority, bank, or well-known company but uses sloppy language, wrong logos, free-mail addresses (gmail/web.de/yahoo/outlook), or non-official URLs.
 - Demands payment via gift cards, vouchers, cryptocurrency, Western Union, MoneyGram, prepaid cards, or asks for the user's full bank login/TAN/PIN/2FA code.
-- Parcel-delivery SMS-style request for a tiny fee with a suspicious short/foreign link (e.g. fake DHL, UPS, Royal Mail, La Poste, Correos).
+- Parcel-delivery SMS-style request for a tiny fee with a suspicious short/foreign link.
 - Fake fine / late-payment notice without a recognisable reference number or sender address, or with an obviously cloned look.
 - Asks the user to install software, share screen, or hand over remote access.
 - Phishing links that mimic banking/authority domains (typosquatting).
-Do NOT mark as scam just because a letter is uncomfortable, demanding, or full of legalese. Real dunning letters (Mahnung / demand letter), debt-collection, and tax letters are usually NOT scams.
+Do NOT mark as scam just because a letter is uncomfortable, demanding, or full of legalese. Real dunning letters, debt-collection, and tax letters are usually NOT scams.
 When `scam_warning` is true, set `scam_reason` to a short calm sentence in {target_language_label} explaining WHY. When false, leave `scam_reason` empty.
 
 If the text is unreadable, empty, or clearly NOT a real letter/document (e.g. a photo of a face, a blank page, a product photo):
@@ -467,10 +504,15 @@ You MUST respond ONLY with a single valid JSON object that matches the schema be
 
 JSON Schema:
 {{
-  "source_language": "string - the primary language of the document, in English (e.g. 'German', 'English', 'French', 'Spanish', 'Italian', 'Dutch', 'Polish', 'Portuguese', 'Turkish')",
-  "source_language_code": "string - ISO-639-1 code of the source language (e.g. 'de','en','fr','es','it','nl','pl','pt','tr')",
+  "source_language": "string - the primary language of the document, in English (e.g. 'German', 'Dutch', 'Turkish')",
+  "source_language_code": "string - ISO-639-1 code of the source language (e.g. 'de','nl','tr')",
+  "detected_country_code": "string - ISO 3166-1 alpha-2 (e.g. 'DE','FR','NL'). Empty string if not confidently detected.",
+  "detected_country_name": "string - English country name (e.g. 'Germany','France'). Empty string if not detected.",
+  "jurisdiction_confidence": "low|medium|high|''  — empty string when no country is detected. NEVER invent.",
+  "suggested_reply_language_code": "string - ISO-639-1 code, defaults to source_language_code. Empty string if source_language_code is empty.",
+  "confidence_score": "number 0.0 – 1.0 — your overall self-confidence in the analysis. Use 0.0 if not applicable.",
   "target_language": "{target_language_label}",
-  "document_type": "string - the type of document (e.g. 'Health insurance letter', 'Rental termination', 'Tax notice', 'Dunning letter', etc.) — write it briefly in {target_language_label}",
+  "document_type": "string - the type of document, written briefly in {target_language_label}",
   "sender": "string - sender or organization, as written on the document (keep proper names in original)",
   "summary_translated": "string - one short paragraph in {target_language_label} summarising the document",
   "simple_explanation_translated": "string - simple, non-technical explanation in {target_language_label} of what this document means for the recipient",
@@ -491,18 +533,19 @@ JSON Schema:
   ],
   "risk_level": "green|yellow|red",
   "risk_reason": "short reason in {target_language_label} explaining the risk level",
-  "reply_draft": "polite neutral reply draft written in the SAME language as the source document (e.g. if the document is in English, the reply is in English; if Spanish, in Spanish). Empty string if a reply is not useful.",
+  "reply_draft": "polite neutral reply draft written in the language indicated by suggested_reply_language_code (the source-document language by default). Empty string if a reply is not useful.",
   "german_reply_draft": "DEPRECATED — set to the SAME value as reply_draft for backward compatibility with older app versions",
-  "reply_draft_explanation_translated": "short explanation in {target_language_label} of what the reply draft says",
+  "reply_draft_explanation_translated": "short explanation in {target_language_label} of what the reply draft says, including which language it is written in",
   "questions_to_ask": ["helpful, neutral questions the user could ask the sender or a qualified advisor — in {target_language_label}"],
-  "uncertainties": ["clearly note anything uncertain, unreadable, or low-confidence — in {target_language_label}"],
+  "uncertainties": ["clearly note anything uncertain, unreadable, or low-confidence — in {target_language_label}. Include uncertainty about the country/jurisdiction here if relevant."],
   "disclaimer": "short disclaimer in {target_language_label} stating: easli does not provide legal, tax, financial or medical advice; always confirm with a qualified professional or the sender.",
+  "safety_disclaimer": "string in {target_language_label}, only for HIGH-risk legal/court/immigration/debt/eviction/termination documents. Otherwise empty.",
   "category": "tax|insurance|rent|bank|health|government|court|utilities|telecom|work|education|other",
   "scam_warning": false,
   "scam_reason": "string in {target_language_label}, only when scam_warning is true, otherwise empty",
   "extracted_entities": {{
     "email": "the most likely contact email address as written in the document, or empty string",
-    "subject": "string, a short subject line in the SOURCE language for a reply email, or empty string",
+    "subject": "string, a short subject line in the SOURCE document language (NOT in the explanation language) for a reply email, or empty string",
     "reference_number": "case/file/customer/invoice number as written, or empty string",
     "contact_person": "name of a specific contact person as written in the document, or empty string",
     "organization": "the sender organisation as written, or empty string"
@@ -517,7 +560,10 @@ JSON Schema:
   ]
 }}
 
-Use ONLY {target_language_label} for translated natural-language fields. Keep `reply_draft` and `german_reply_draft` in the SOURCE document's language. Keep document_type concise. Be conservative with deadlines and risk levels. If unsure, say so in uncertainties.
+LANGUAGE SEPARATION RULES — apply strictly:
+- Use ONLY {target_language_label} for translated natural-language fields (`summary_translated`, `simple_explanation_translated`, `key_points`, deadline descriptions, action descriptions, risk_reason, questions_to_ask, uncertainties, disclaimer, safety_disclaimer, scam_reason, reply_draft_explanation_translated, document_type, reply_options.label, reply_options.reason).
+- Use the SOURCE DOCUMENT language (i.e. the language indicated by `suggested_reply_language_code`) for `reply_draft` and `german_reply_draft` and `extracted_entities.subject`.
+- Keep proper names, addresses, IBAN, reference numbers, and dates in their original form.
 
 REPLY OPTIONS guidance:
 - Pick 2 to 4 distinct options that genuinely make sense for THIS document. Do NOT include options that are clearly not applicable. If the document does not need any reply (pure information letter), return an empty array.
@@ -1103,6 +1149,50 @@ async def analyze_from_ocr_text(
         parsed["source_language_code"] = ""
     # Normalise the ISO code.
     parsed["source_language_code"] = (parsed.get("source_language_code") or "").strip().lower()
+
+    # ─── Phase EU-1: normalise the new multilingual fields ──────────────────
+    # All fields are OPTIONAL on the model side (older Mistral responses or
+    # responses for short documents may omit them). We coerce types and
+    # apply sensible fallbacks so AnalysisResult validation never fails.
+
+    # Country code (ISO 3166-1 alpha-2). Empty string when not detected.
+    cc = (parsed.get("detected_country_code") or "")
+    if not isinstance(cc, str):
+        cc = ""
+    parsed["detected_country_code"] = cc.strip().upper()
+    if not isinstance(parsed.get("detected_country_name"), str):
+        parsed["detected_country_name"] = ""
+    parsed["detected_country_name"] = (parsed.get("detected_country_name") or "").strip()
+
+    # Jurisdiction confidence — accept only the four canonical values.
+    jc = (parsed.get("jurisdiction_confidence") or "").strip().lower()
+    if jc not in ("low", "medium", "high"):
+        jc = ""
+    # If we have no country code, force confidence empty (model might say
+    # "low" even with no country — safer to drop it).
+    if not parsed["detected_country_code"]:
+        jc = ""
+    parsed["jurisdiction_confidence"] = jc
+
+    # Suggested reply language defaults to the detected source language.
+    # This is the cornerstone of the EU paperwork model: reply in the
+    # sender's language unless explicitly overridden later by the user.
+    srlc = (parsed.get("suggested_reply_language_code") or "").strip().lower()
+    if not srlc:
+        srlc = parsed.get("source_language_code") or ""
+    parsed["suggested_reply_language_code"] = srlc
+
+    # Confidence score 0.0 – 1.0. Coerce ints/strings → float.
+    cs = parsed.get("confidence_score")
+    try:
+        cs_f = float(cs) if cs is not None else 0.0
+    except (TypeError, ValueError):
+        cs_f = 0.0
+    parsed["confidence_score"] = max(0.0, min(1.0, cs_f))
+
+    # Safety disclaimer must be a string (already in target language).
+    if not isinstance(parsed.get("safety_disclaimer"), str):
+        parsed["safety_disclaimer"] = ""
 
     # Back-compat alias: mirror `reply_draft` ↔ `german_reply_draft` so both
     # old clients (which read `german_reply_draft`) and new clients (which
@@ -2090,11 +2180,56 @@ class GenerateReplyRequest(BaseModel):
     device_id: str
     intent: str = ""
     custom_instruction: str = ""
+    # Phase EU-1: optional explicit reply language. When omitted, the endpoint
+    # falls back to the analysis' `suggested_reply_language_code`, then to the
+    # detected `source_language_code`. ISO-639-1 (e.g. "de", "fr", "nl") or
+    # BCP-47 (e.g. "zh-Hans"). Empty string means "use default".
+    reply_language_code: Optional[str] = None
 
 
 class GenerateReplyResponse(BaseModel):
     reply_text: str
     intent: str
+    # Phase EU-1: which language the draft is actually written in (ISO-639-1
+    # or BCP-47). Empty string means "unknown / fell back to source".
+    reply_language_code: str = ""
+
+
+# ISO-639-1 → English language name. Used by the reply-draft prompt to
+# tell Mistral which language to write the draft in. Lightweight and
+# co-located with the reply assistant — does not need full registry.
+REPLY_LANG_CODE_TO_ENGLISH: dict = {
+    "de": "German", "en": "English", "fr": "French", "es": "Spanish",
+    "it": "Italian", "pt": "Portuguese", "nl": "Dutch", "pl": "Polish",
+    "ro": "Romanian", "cs": "Czech", "hu": "Hungarian", "el": "Greek",
+    "bg": "Bulgarian", "hr": "Croatian", "sk": "Slovak", "sl": "Slovenian",
+    "lt": "Lithuanian", "lv": "Latvian", "et": "Estonian", "sv": "Swedish",
+    "da": "Danish", "fi": "Finnish", "ga": "Irish", "mt": "Maltese",
+    "no": "Norwegian", "is": "Icelandic", "sr": "Serbian", "sq": "Albanian",
+    "bs": "Bosnian", "uk": "Ukrainian", "ru": "Russian", "tr": "Turkish",
+    "ar": "Arabic", "fa": "Persian (Farsi)", "ur": "Urdu", "hi": "Hindi",
+    "zh-hans": "Chinese (Simplified)", "vi": "Vietnamese",
+}
+
+
+def resolve_reply_language(
+    record: dict,
+    explicit_code: Optional[str] = None,
+) -> tuple[str, str]:
+    """Return (code, english_name) for the reply draft.
+    Cascade: explicit override → suggested_reply_language_code →
+    source_language_code → empty. English name falls back to the raw code
+    in upper-case if not in our table (Mistral can still use the code)."""
+    result = record.get("result", {}) or {}
+    code = (
+        (explicit_code or "").strip().lower()
+        or (result.get("suggested_reply_language_code") or "").strip().lower()
+        or (result.get("source_language_code") or "").strip().lower()
+    )
+    if not code:
+        return ("", "")
+    name = REPLY_LANG_CODE_TO_ENGLISH.get(code) or code.upper()
+    return (code, name)
 
 
 def build_reply_generation_prompt(
@@ -2102,15 +2237,23 @@ def build_reply_generation_prompt(
     intent: str,
     target_language_label: str,
     custom_instruction: str = "",
+    reply_language_code: Optional[str] = None,
 ) -> str:
     """Return a concise system prompt for Mistral to generate a single
     reply-draft tailored to one intent. The reply text is produced in the
-    SOURCE-document language (so it can actually be sent to the sender)."""
+    explicit `reply_language_code` if provided, otherwise in the SOURCE
+    document's language (so it can actually be sent to the sender)."""
     result = record.get("result", {}) or {}
     ee = result.get("extracted_entities") or {}
     intent_desc = INTENT_DESCRIPTIONS.get(intent, "")
-    src_lang = result.get("source_language") or "the source language"
-    src_lang_code = result.get("source_language_code") or ""
+    reply_code, reply_name = resolve_reply_language(record, reply_language_code)
+    # Display label for the prompt — fallback for unknown codes.
+    if reply_name:
+        reply_lang_clause = f"{reply_name} ({reply_code})"
+    else:
+        reply_lang_clause = (
+            result.get("source_language") or "the source language"
+        )
 
     context = {
         "document_type": result.get("document_type", ""),
@@ -2133,14 +2276,14 @@ def build_reply_generation_prompt(
 INTENT: {intent}
 {intent_desc}
 
-The reply MUST be written in {src_lang} ({src_lang_code or 'detected from context'}). The user will read it through an in-app preview written in {target_language_label}, but the email itself goes to the sender, so it stays in the source language.
+The reply MUST be written in {reply_lang_clause}. The user will read it through an in-app preview written in {target_language_label}, but the email itself goes to the sender, so it stays in the reply language.
 
 PERSONA & TONE:
 - Calm, clear, direct. No emotion, no AI phrases ("Based on…", "I analyzed…", "It appears that…").
 - B1-level everyday language. No legal jargon unless strictly needed.
 - Never use em-dashes (— or –). Use comma, period, or colon.
 - Do not mention easli, AI, models, or how this draft was made.
-- Address a specific person if known (use `contact_person`); otherwise use a neutral salutation appropriate for {src_lang}.
+- Address a specific person if known (use `contact_person`); otherwise use a neutral salutation appropriate for {reply_lang_clause}.
 - Reference the document briefly (use `reference_number` if present).
 - Keep it 80 to 180 words, no bullet lists, no markdown, no signature placeholder block beyond a simple polite sign-off.
 
@@ -2176,7 +2319,8 @@ async def generate_reply_endpoint(analysis_id: str, req: GenerateReplyRequest):
     target_label = LANGUAGES.get(target_lang, "English")
 
     sys_prompt = build_reply_generation_prompt(
-        doc, intent, target_label, req.custom_instruction or ""
+        doc, intent, target_label, req.custom_instruction or "",
+        reply_language_code=req.reply_language_code,
     )
     msgs = [
         {"role": "system", "content": sys_prompt},
@@ -2209,7 +2353,14 @@ async def generate_reply_endpoint(analysis_id: str, req: GenerateReplyRequest):
             nl = raw.find("\n")
             raw = raw[nl + 1 :].strip() if nl != -1 else raw
 
-    return GenerateReplyResponse(reply_text=raw, intent=intent)
+    # Echo back the resolved reply language so the frontend can label the
+    # mailto preview correctly without needing to re-derive it.
+    resolved_code, _ = resolve_reply_language(doc, req.reply_language_code)
+    return GenerateReplyResponse(
+        reply_text=raw,
+        intent=intent,
+        reply_language_code=resolved_code,
+    )
 
 
 
