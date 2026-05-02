@@ -71,6 +71,11 @@ import { colors, fontSize, fontWeight, radius, shadows, spacing } from '../src/t
 import { ReadAloudButton } from '../src/components/ReadAloudButton';
 import { ScamWarningModal } from '../src/components/ScamWarningModal';
 import { ReplyAssistant } from '../src/replyAssistant';
+import {
+  countryCodeToFlag,
+  formatLanguageLabel,
+  getAnyLanguage,
+} from '../src/languages';
 
 // Enable LayoutAnimation on Android (iOS supports it natively).
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
@@ -530,34 +535,39 @@ export default function ResultScreen() {
   const hasUncertainties = (r.uncertainties?.length ?? 0) > 0;
   const hasKeyPoints = (r.key_points?.length ?? 0) > 0;
   const hasSenderText = !!(r.sender && r.sender.trim());
-  // Human-readable label for the detected source language (e.g. "English",
-  // "Français"). Falls back to the LLM-provided `source_language` (English
-  // name) when the ISO code is empty. Returns '' when nothing is known.
-  const sourceLangLabel = (() => {
-    const code = ((r as any).source_language_code || '').toLowerCase();
-    const nameMap: Record<string, string> = {
-      de: 'Deutsch',
-      en: 'English',
-      fr: 'Français',
-      es: 'Español',
-      it: 'Italiano',
-      nl: 'Nederlands',
-      pl: 'Polski',
-      pt: 'Português',
-      tr: 'Türkçe',
-      ru: 'Русский',
-      zh: '中文',
-      vi: 'Tiếng Việt',
-      ar: 'العربية',
-      uk: 'Українська',
-      ro: 'Română',
-      el: 'Ελληνικά',
-      cs: 'Čeština',
+  // Phase EU-1: Resolve language metadata once. Falls back gracefully for
+  // legacy records (no source_language_code, no detected_country_code) so
+  // old history items still render.
+  const langCtx = (() => {
+    const rr = r as any;
+    const srcCode = (rr.source_language_code || '').toLowerCase();
+    const replyCode = (rr.suggested_reply_language_code || srcCode || '').toLowerCase();
+    const targetCode = (record?.target_language || '').toLowerCase();
+    const countryCode = (rr.detected_country_code || '').toUpperCase();
+    const countryName = rr.detected_country_name || '';
+    return {
+      srcCode,
+      srcLabel:
+        formatLanguageLabel(srcCode) ||
+        (rr.source_language && rr.source_language.trim()) ||
+        '',
+      srcFlag: getAnyLanguage(srcCode)?.flag || '',
+      replyCode,
+      replyLabel: formatLanguageLabel(replyCode) || '',
+      replyFlag: getAnyLanguage(replyCode)?.flag || '',
+      targetCode,
+      targetLabel: formatLanguageLabel(targetCode) || '',
+      targetFlag: getAnyLanguage(targetCode)?.flag || '',
+      countryCode,
+      countryName,
+      countryFlag: countryCodeToFlag(countryCode),
+      jurisdictionConfidence: (rr.jurisdiction_confidence || '') as
+        | '' | 'low' | 'medium' | 'high',
+      replyEqualsSrc: replyCode === srcCode && !!srcCode,
+      explainEqualsSrc: targetCode === srcCode && !!srcCode,
     };
-    if (code && nameMap[code]) return nameMap[code];
-    if (r.source_language && r.source_language.trim()) return r.source_language;
-    return '';
   })();
+  const sourceLangLabel = langCtx.srcLabel;
   const hasSourceLang = !!sourceLangLabel;
   // Tab definitions for Phase R3. We only render a pill for tabs that have
   // content (e.g. the Reply pill is hidden when the document doesn't need
@@ -811,6 +821,77 @@ export default function ResultScreen() {
         ) : null}
 
         {/* ============================================================
+            0. LANGUAGE CONTEXT STRIP (Phase EU-1)
+            Shows: source language + country (if detected) + explanation
+            language + reply language. Only renders when at least the
+            source language is known. Calm, single-line, scrollable on
+            very narrow screens.
+            ============================================================ */}
+        {hasSourceLang ? (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.langStripRow}
+            testID="result-lang-strip"
+          >
+            <View style={styles.langChip} testID="result-lang-chip-source">
+              <Text style={styles.langChipKicker} numberOfLines={1}>
+                {t(lang, 'source_language_detected')}
+              </Text>
+              <Text style={styles.langChipValue} numberOfLines={1}>
+                {langCtx.srcFlag ? langCtx.srcFlag + ' ' : ''}
+                {langCtx.srcLabel}
+                {langCtx.countryFlag && langCtx.countryName
+                  ? '  ·  ' + langCtx.countryFlag + ' ' + langCtx.countryName
+                  : langCtx.countryFlag
+                  ? '  ·  ' + langCtx.countryFlag
+                  : ''}
+              </Text>
+            </View>
+            {/* Explanation language only when different from source */}
+            {!langCtx.explainEqualsSrc && langCtx.targetLabel ? (
+              <View style={styles.langChip} testID="result-lang-chip-target">
+                <Text style={styles.langChipKicker} numberOfLines={1}>
+                  {t(lang, 'lang_explained_in')}
+                </Text>
+                <Text style={styles.langChipValue} numberOfLines={1}>
+                  {langCtx.targetFlag ? langCtx.targetFlag + ' ' : ''}
+                  {langCtx.targetLabel}
+                </Text>
+              </View>
+            ) : null}
+            {/* Reply language only when different from source — when same we
+                imply "reply in the sender's language" via the strip layout */}
+            {!langCtx.replyEqualsSrc && langCtx.replyLabel ? (
+              <View style={styles.langChip} testID="result-lang-chip-reply">
+                <Text style={styles.langChipKicker} numberOfLines={1}>
+                  {t(lang, 'lang_reply_in')}
+                </Text>
+                <Text style={styles.langChipValue} numberOfLines={1}>
+                  {langCtx.replyFlag ? langCtx.replyFlag + ' ' : ''}
+                  {langCtx.replyLabel}
+                </Text>
+              </View>
+            ) : null}
+            {/* Soft "country unclear" hint only when we have source lang but
+                no jurisdiction. Stays calm, never alarms. */}
+            {!langCtx.countryCode && !langCtx.explainEqualsSrc ? (
+              <View
+                style={[styles.langChip, styles.langChipMuted]}
+                testID="result-lang-chip-country-unclear"
+              >
+                <Text style={styles.langChipKicker} numberOfLines={1}>
+                  {t(lang, 'lang_country_label')}
+                </Text>
+                <Text style={styles.langChipValueMuted} numberOfLines={1}>
+                  {t(lang, 'lang_country_unclear')}
+                </Text>
+              </View>
+            ) : null}
+          </ScrollView>
+        ) : null}
+
+        {/* ============================================================
             1. RISK HERO
             ============================================================ */}
         <View
@@ -865,6 +946,28 @@ export default function ResultScreen() {
             {t(lang, 'not_alone')}
           </Text>
         </View>
+
+        {/* ============================================================
+            1b. SAFETY DISCLAIMER (Phase EU-1)
+            Only renders for high-risk legal/court/immigration/debt
+            documents where Mistral added a calm professional-help hint.
+            Soft amber tint, never alarming.
+            ============================================================ */}
+        {((r as any).safety_disclaimer || '').trim() ? (
+          <View
+            style={styles.safetyDisclaimerCard}
+            testID="result-safety-disclaimer"
+          >
+            <ShieldAlert
+              color={colors.yellow.text}
+              size={18}
+              strokeWidth={2.2}
+            />
+            <Text style={styles.safetyDisclaimerText}>
+              {(r as any).safety_disclaimer}
+            </Text>
+          </View>
+        ) : null}
 
         {/* ============================================================
             2. MAIN ACTION CARD — single most-important thing
@@ -1511,6 +1614,69 @@ const styles = StyleSheet.create({
     lineHeight: 20,
     opacity: 0.85,
     fontStyle: 'italic',
+  },
+
+  // ---- Phase EU-1: Language Context Strip ----
+  langStripRow: {
+    flexDirection: 'row',
+    alignItems: 'stretch',
+    gap: spacing.sm,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.sm,
+    paddingBottom: spacing.xs,
+  },
+  langChip: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: 8,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+    minWidth: 110,
+  },
+  langChipMuted: {
+    backgroundColor: colors.background,
+    borderStyle: 'dashed',
+  },
+  langChipKicker: {
+    fontSize: 10,
+    fontWeight: fontWeight.medium,
+    color: colors.textSecondary,
+    textTransform: 'uppercase',
+    letterSpacing: 0.4,
+    marginBottom: 2,
+  },
+  langChipValue: {
+    fontSize: fontSize.sm,
+    fontWeight: fontWeight.semibold,
+    color: colors.textPrimary,
+  },
+  langChipValueMuted: {
+    fontSize: fontSize.sm,
+    fontWeight: fontWeight.medium,
+    color: colors.textSecondary,
+    fontStyle: 'italic',
+  },
+
+  // ---- Phase EU-1: Safety disclaimer card (for high-risk legal docs) ----
+  safetyDisclaimerCard: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: spacing.sm,
+    marginHorizontal: spacing.lg,
+    marginTop: spacing.sm,
+    padding: spacing.md,
+    borderRadius: radius.md,
+    backgroundColor: colors.yellow.bg,
+    borderWidth: 1,
+    borderColor: colors.yellow.border,
+  },
+  safetyDisclaimerText: {
+    flex: 1,
+    fontSize: fontSize.sm,
+    lineHeight: 20,
+    color: colors.yellow.text,
+    fontWeight: fontWeight.medium,
   },
 
   // ---- Main Action card (the single most-urgent thing) ----

@@ -76,6 +76,10 @@ export type UIKey =
   | 'sender'
   | 'document_type'
   | 'source_language_detected'
+  | 'lang_explained_in'
+  | 'lang_reply_in'
+  | 'lang_country_label'
+  | 'lang_country_unclear'
   | 'tab_overview'
   | 'tab_actions'
   | 'tab_reply'
@@ -336,6 +340,10 @@ const en: UIStrings = {
   sender: 'Sender',
   document_type: 'Document type',
   source_language_detected: 'Detected language',
+  lang_explained_in: 'Explained in',
+  lang_reply_in: 'Reply in',
+  lang_country_label: 'Country',
+  lang_country_unclear: 'Not clear from this letter',
   settings_section_preferences: 'Preferences',
   settings_section_privacy_data: 'Privacy & data',
   settings_section_about: 'About easli',
@@ -599,6 +607,10 @@ const zh: UIStrings = {
   sender: '发件人',
   document_type: '文件类型',
   source_language_detected: '检测到的语言',
+  lang_explained_in: '解释语言',
+  lang_reply_in: '回复语言',
+  lang_country_label: '国家',
+  lang_country_unclear: '从这封信中无法判断',
   settings_section_preferences: '偏好设置',
   settings_section_privacy_data: '隐私与数据',
   settings_section_about: '关于 easli',
@@ -858,6 +870,10 @@ const vi: UIStrings = {
   sender: 'Người gửi',
   document_type: 'Loại tài liệu',
   source_language_detected: 'Ngôn ngữ được phát hiện',
+  lang_explained_in: 'Giải thích bằng',
+  lang_reply_in: 'Trả lời bằng',
+  lang_country_label: 'Quốc gia',
+  lang_country_unclear: 'Không rõ từ thư này',
   settings_section_preferences: 'Tùy chọn',
   settings_section_privacy_data: 'Quyền riêng tư & dữ liệu',
   settings_section_about: 'Về easli',
@@ -1119,6 +1135,10 @@ const tr: UIStrings = {
   sender: 'Gönderen',
   document_type: 'Belge türü',
   source_language_detected: 'Algılanan dil',
+  lang_explained_in: 'Açıklama dili',
+  lang_reply_in: 'Yanıt dili',
+  lang_country_label: 'Ülke',
+  lang_country_unclear: 'Mektuptan anlaşılmıyor',
   settings_section_preferences: 'Tercihler',
   settings_section_privacy_data: 'Gizlilik & veri',
   settings_section_about: 'easli hakkında',
@@ -1380,6 +1400,10 @@ const ru: UIStrings = {
   sender: 'Отправитель',
   document_type: 'Тип документа',
   source_language_detected: 'Распознанный язык',
+  lang_explained_in: 'Перевод на',
+  lang_reply_in: 'Ответ на',
+  lang_country_label: 'Страна',
+  lang_country_unclear: 'Не ясно из этого письма',
   settings_section_preferences: 'Настройки',
   settings_section_privacy_data: 'Приватность и данные',
   settings_section_about: 'О easli',
@@ -1641,6 +1665,10 @@ const es: UIStrings = {
   sender: 'Remitente',
   document_type: 'Tipo de documento',
   source_language_detected: 'Idioma detectado',
+  lang_explained_in: 'Explicado en',
+  lang_reply_in: 'Respuesta en',
+  lang_country_label: 'País',
+  lang_country_unclear: 'No es claro en esta carta',
   settings_section_preferences: 'Preferencias',
   settings_section_privacy_data: 'Privacidad y datos',
   settings_section_about: 'Sobre easli',
@@ -1904,6 +1932,10 @@ const de_simple: UIStrings = {
   sender: 'Absender',
   document_type: 'Art von Brief',
   source_language_detected: 'Erkannte Sprache',
+  lang_explained_in: 'Erklärt auf',
+  lang_reply_in: 'Antwort auf',
+  lang_country_label: 'Land',
+  lang_country_unclear: 'Aus dem Brief nicht klar',
   settings_section_preferences: 'Einstellungen',
   settings_section_privacy_data: 'Privatsphäre & Daten',
   settings_section_about: 'Über easli',
