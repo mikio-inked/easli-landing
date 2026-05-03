@@ -1,0 +1,73 @@
+name: Sync landing → easli-landing
+
+# Triggert automatisch, wenn etwas im /landing Ordner gepusht wird.
+# Kann auch manuell im GitHub-UI ausgelöst werden (Actions → Run workflow).
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'landing/**'
+      - '.github/workflows/sync-landing.yml'
+  workflow_dispatch:
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    concurrency:
+      group: sync-landing
+      cancel-in-progress: false
+
+    steps:
+      - name: Checkout source (easli)
+        uses: actions/checkout@v4
+        with:
+          path: source
+          fetch-depth: 1
+
+      - name: Checkout target (easli-landing)
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ github.repository_owner }}/easli-landing
+          token: ${{ secrets.LANDING_DEPLOY_TOKEN }}
+          path: target
+          fetch-depth: 1
+
+      - name: Sync landing folder → target root
+        run: |
+          # Kopiert alles aus /landing ins easli-landing Repo-Root.
+          # --delete entfernt Dateien, die im Source nicht mehr existieren,
+          # aber schützt dabei CNAME, README, LICENSE, .github/ und .git/.
+          rsync -av --delete \
+            --exclude='.git' \
+            --exclude='.github' \
+            --exclude='CNAME' \
+            --exclude='README.md' \
+            --exclude='LICENSE' \
+            --exclude='_make_assets.py' \
+            source/landing/ target/
+
+      - name: Commit and push if there are changes
+        working-directory: target
+        run: |
+          git config user.name  "easli-bot"
+          git config user.email "bot@users.noreply.github.com"
+
+          git add -A
+          if git diff --staged --quiet; then
+            echo "No changes to sync."
+            exit 0
+          fi
+
+          SHORT_SHA=$(echo "${{ github.sha }}" | cut -c1-7)
+          git commit \
+            -m "Sync landing from easli@${SHORT_SHA}" \
+            -m "Auto-synced by GitHub Actions. Source commit: ${{ github.sha }}"
+          git push
+
+      - name: Summary
+        if: always()
+        run: |
+          echo "### Landing sync result" >> $GITHUB_STEP_SUMMARY
+          echo "- Source: \`${{ github.repository }}@${{ github.sha }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- Target: \`${{ github.repository_owner }}/easli-landing\`" >> $GITHUB_STEP_SUMMARY
+          echo "- Status: ${{ job.status }}" >> $GITHUB_STEP_SUMMARY
