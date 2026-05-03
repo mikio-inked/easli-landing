@@ -229,12 +229,15 @@ export function ReplyAssistant({
   const onOpenMail = async () => {
     if (!draft?.text) return;
     const to = recipient;
-    const greetingPrefix = entities.contact_person ? `${entities.contact_person},\n\n` : '';
-    const bodyText = greetingPrefix + draft.text;
+    // The Mistral-generated reply already contains a proper salutation
+    // (e.g. "Sehr geehrte Frau Müller,") — historically we additionally
+    // prefixed entities.contact_person here, which produced a duplicate
+    // greeting like "Frau Müller\n\nSehr geehrte Frau Müller,". Removed
+    // per user feedback (May 2026): trust the AI's salutation.
     const url =
       `mailto:${encodeURIComponent(to)}` +
       `?subject=${encodeURIComponent(subject)}` +
-      `&body=${encodeURIComponent(bodyText)}`;
+      `&body=${encodeURIComponent(draft.text)}`;
     try {
       await RNLinking.openURL(url);
     } catch {
