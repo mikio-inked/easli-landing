@@ -25,9 +25,12 @@ import React, { useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  FlatList,
   Linking as RNLinking,
+  Modal,
   Platform,
   Pressable,
+  SafeAreaView,
   Share,
   StyleSheet,
   Text,
@@ -39,10 +42,12 @@ import {
   Check,
   ChevronRight,
   Copy,
+  Globe,
   Mail,
   RefreshCw,
   Share2,
   Sparkles,
+  X,
 } from 'lucide-react-native';
 import {
   AnalysisRecord,
@@ -51,6 +56,11 @@ import {
   generateReply,
 } from './api';
 import { LanguageCode, t } from './i18n';
+import {
+  REPLY_LANGUAGES,
+  formatLanguageLabel,
+  getAnyLanguage,
+} from './languages';
 import { colors, fontSize, fontWeight, radius, shadows, spacing } from './theme';
 
 interface Props {
@@ -66,8 +76,13 @@ interface Props {
   legacyReplyDraft?: string;
   /** Source-document language label, shown to the user as a small hint
    *  ("Reply in English") so they understand why the draft isn't in
-   *  their UI language. */
+   *  their UI language. Used as a fallback when the language picker has no
+   *  concrete selection yet. */
   sourceLanguageLabel?: string;
+  /** Phase EU-1: ISO-639-1 code Mistral suggested for the reply (defaults
+   *  to source_language_code). When omitted, the picker still works but
+   *  has no preselected default. */
+  suggestedReplyLanguageCode?: string;
   deviceId: string;
 }
 
@@ -75,6 +90,9 @@ interface DraftState {
   intentId: string;
   text: string;
   loading: boolean;
+  /** Language the draft was generated in — echoed back from the server.
+   *  Used to keep the UI labels in sync if the user later switches. */
+  languageCode?: string;
 }
 
 export function ReplyAssistant({
@@ -83,11 +101,32 @@ export function ReplyAssistant({
   options,
   entities,
   sourceLanguageLabel,
+  suggestedReplyLanguageCode,
   deviceId,
 }: Props) {
   const [draft, setDraft] = useState<DraftState | null>(null);
   const [recipientOverride, setRecipientOverride] = useState<string>('');
   const [copied, setCopied] = useState(false);
+
+  // ---- Phase EU-1: Reply language picker state ----
+  // Default the user's reply language to the AI's suggestion. Falls back
+  // to the analysis source_language_code when no suggestion is present
+  // (legacy records). Empty string means "let backend decide".
+  const defaultReplyLang = (
+    suggestedReplyLanguageCode ||
+    (record.result as any)?.suggested_reply_language_code ||
+    (record.result as any)?.source_language_code ||
+    ''
+  ).toLowerCase();
+  const [replyLangCode, setReplyLangCode] = useState<string>(defaultReplyLang);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const replyLangIsSuggested =
+    !!defaultReplyLang && replyLangCode === defaultReplyLang;
+  const replyLangEntry = getAnyLanguage(replyLangCode);
+  const replyLangDisplay =
+    formatLanguageLabel(replyLangCode) ||
+    sourceLanguageLabel ||
+    '';
 
   // Sort options so the recommended one shows first.
   const sortedOptions = useMemo(() => {
@@ -104,14 +143,38 @@ export function ReplyAssistant({
     return record.result.document_type || t(uiLang, 'reply_default_subject');
   }, [entities, record.result.document_type, uiLang]);
 
-  const pickIntent = async (opt: ReplyOption) => {
-    setDraft({ intentId: opt.id, text: '', loading: true });
+  const pickIntent = async (opt: ReplyOption, langOverride?: string) => {
+    const lang = (langOverride ?? replyLangCode) || undefined;
+    setDraft({ intentId: opt.id, text: '', loading: true, languageCode: lang });
     try {
-      const { reply_text } = await generateReply(record.id, deviceId, opt.id);
-      setDraft({ intentId: opt.id, text: reply_text, loading: false });
+      const result = await generateReply(
+        record.id,
+        deviceId,
+        opt.id,
+        undefined,
+        lang,
+      );
+      setDraft({
+        intentId: opt.id,
+        text: result.reply_text,
+        loading: false,
+        languageCode: result.reply_language_code || lang,
+      });
     } catch (err) {
       setDraft(null);
       Alert.alert(t(uiLang, 'reply_error_title'), String((err as Error)?.message || err));
+    }
+  };
+
+  /** Apply a freshly picked language. If a draft already exists for an
+   *  intent, regenerate it in the new language. Otherwise just store. */
+  const applyReplyLanguage = (newCode: string) => {
+    setPickerOpen(false);
+    if (newCode === replyLangCode) return;
+    setReplyLangCode(newCode);
+    if (draft && !draft.loading && draft.intentId) {
+      const opt = sortedOptions.find((o) => o.id === draft.intentId);
+      if (opt) pickIntent(opt, newCode);
     }
   };
 
@@ -162,6 +225,36 @@ export function ReplyAssistant({
         <Sparkles color={colors.primary} size={18} strokeWidth={2.4} />
         <Text style={styles.headerTitle}>{t(uiLang, 'reply_pick_intent')}</Text>
       </View>
+
+      {/* ─── Phase EU-1: Reply language pickerbar ────────────────────────
+          Calm, single-line. Tells the user clearly which language the
+          draft will be in, and lets them change it. We render this
+          BEFORE intent picking so the choice is conscious. */}
+      {replyLangDisplay ? (
+        <Pressable
+          onPress={() => setPickerOpen(true)}
+          style={({ pressed }) => [
+            styles.replyLangBar,
+            pressed && { opacity: 0.7 },
+          ]}
+          testID="reply-lang-bar"
+        >
+          <Globe color={colors.primary} size={16} strokeWidth={2.4} />
+          <View style={{ flex: 1 }}>
+            <Text style={styles.replyLangBarKicker}>
+              {t(uiLang, 'lang_reply_in')}
+            </Text>
+            <Text style={styles.replyLangBarValue} numberOfLines={1}>
+              {replyLangEntry?.flag ? replyLangEntry.flag + '  ' : ''}
+              {replyLangDisplay}
+              {replyLangIsSuggested ? '  ·  ' + t(uiLang, 'lang_recommended') : ''}
+            </Text>
+          </View>
+          <Text style={styles.replyLangBarAction}>
+            {t(uiLang, 'change')}
+          </Text>
+        </Pressable>
+      ) : null}
 
       <View style={styles.intentList}>
         {sortedOptions.map((opt) => {
@@ -257,7 +350,7 @@ export function ReplyAssistant({
           {/* The reply body — editable */}
           <Text style={styles.metaLabel}>
             {t(uiLang, 'reply_body')}
-            {sourceLanguageLabel ? `  ·  ${sourceLanguageLabel}` : ''}
+            {replyLangDisplay ? `  ·  ${replyLangDisplay}` : ''}
           </Text>
           <TextInput
             value={draft.text}
@@ -319,6 +412,68 @@ export function ReplyAssistant({
           <Text style={styles.skeletonText}>{t(uiLang, 'reply_generating')}</Text>
         </View>
       ) : null}
+
+      {/* ─── Phase EU-1: Reply language picker modal ───────────────────── */}
+      <Modal
+        visible={pickerOpen}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => setPickerOpen(false)}
+      >
+        <SafeAreaView style={styles.pickerRoot}>
+          <View style={styles.pickerHeader}>
+            <Text style={styles.pickerTitle}>{t(uiLang, 'lang_pick_reply_lang')}</Text>
+            <Pressable
+              onPress={() => setPickerOpen(false)}
+              hitSlop={12}
+              testID="reply-lang-close"
+            >
+              <X color={colors.textPrimary} size={22} strokeWidth={2.4} />
+            </Pressable>
+          </View>
+          <FlatList
+            data={REPLY_LANGUAGES}
+            keyExtractor={(item) => item.code}
+            keyboardShouldPersistTaps="handled"
+            renderItem={({ item }) => {
+              const selected = item.code.toLowerCase() === replyLangCode;
+              const isSuggested = item.code.toLowerCase() === defaultReplyLang;
+              return (
+                <Pressable
+                  onPress={() => applyReplyLanguage(item.code.toLowerCase())}
+                  style={({ pressed }) => [
+                    styles.pickerRow,
+                    selected && styles.pickerRowSelected,
+                    pressed && { opacity: 0.7 },
+                  ]}
+                  accessibilityRole="button"
+                  accessibilityLabel={`${item.englishName} (${item.nativeName})`}
+                  testID={`reply-lang-${item.code}`}
+                >
+                  <Text style={styles.pickerFlag}>{item.flag || '🌐'}</Text>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.pickerNative}>{item.nativeName}</Text>
+                    <Text style={styles.pickerEnglish}>{item.englishName}</Text>
+                  </View>
+                  {isSuggested ? (
+                    <View style={styles.pickerBadge}>
+                      <Text style={styles.pickerBadgeText}>
+                        {t(uiLang, 'lang_recommended')}
+                      </Text>
+                    </View>
+                  ) : null}
+                  {selected ? (
+                    <Check color={colors.primary} size={20} strokeWidth={2.6} />
+                  ) : null}
+                </Pressable>
+              );
+            }}
+            ItemSeparatorComponent={() => (
+              <View style={styles.pickerSeparator} />
+            )}
+          />
+        </SafeAreaView>
+      </Modal>
     </View>
   );
 }
@@ -344,6 +499,91 @@ const styles = StyleSheet.create({
     fontWeight: fontWeight.semibold,
     color: colors.textPrimary,
   },
+
+  // ---- Phase EU-1: Reply language picker bar + modal ----
+  replyLangBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingVertical: 10,
+    paddingHorizontal: spacing.md,
+    backgroundColor: colors.background,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  replyLangBarKicker: {
+    fontSize: 10,
+    fontWeight: fontWeight.medium,
+    color: colors.textSecondary,
+    textTransform: 'uppercase',
+    letterSpacing: 0.4,
+  },
+  replyLangBarValue: {
+    fontSize: fontSize.sm,
+    fontWeight: fontWeight.semibold,
+    color: colors.textPrimary,
+    marginTop: 1,
+  },
+  replyLangBarAction: {
+    fontSize: fontSize.sm,
+    fontWeight: fontWeight.semibold,
+    color: colors.primary,
+  },
+  pickerRoot: { flex: 1, backgroundColor: colors.background },
+  pickerHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.border,
+  },
+  pickerTitle: {
+    fontSize: fontSize.lg,
+    fontWeight: fontWeight.semibold,
+    color: colors.textPrimary,
+  },
+  pickerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: 14,
+    backgroundColor: colors.background,
+  },
+  pickerRowSelected: { backgroundColor: colors.surface },
+  pickerFlag: { fontSize: 26 },
+  pickerNative: {
+    fontSize: fontSize.base,
+    fontWeight: fontWeight.semibold,
+    color: colors.textPrimary,
+  },
+  pickerEnglish: {
+    fontSize: fontSize.xs,
+    color: colors.textSecondary,
+    marginTop: 1,
+  },
+  pickerBadge: {
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 3,
+    borderRadius: radius.sm,
+    backgroundColor: colors.primary + '15',
+  },
+  pickerBadgeText: {
+    fontSize: 10,
+    fontWeight: fontWeight.semibold,
+    color: colors.primary,
+    letterSpacing: 0.3,
+    textTransform: 'uppercase',
+  },
+  pickerSeparator: {
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: colors.border,
+    marginLeft: spacing.lg + 26 + spacing.md,
+  },
+
   intentList: { gap: 8 },
   intentCard: {
     flexDirection: 'row',

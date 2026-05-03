@@ -80,6 +80,9 @@ export type UIKey =
   | 'lang_reply_in'
   | 'lang_country_label'
   | 'lang_country_unclear'
+  | 'lang_pick_reply_lang'
+  | 'lang_recommended'
+  | 'change'
   | 'tab_overview'
   | 'tab_actions'
   | 'tab_reply'
@@ -344,6 +347,9 @@ const en: UIStrings = {
   lang_reply_in: 'Reply in',
   lang_country_label: 'Country',
   lang_country_unclear: 'Not clear from this letter',
+  lang_pick_reply_lang: 'Choose reply language',
+  lang_recommended: 'recommended',
+  change: 'Change',
   settings_section_preferences: 'Preferences',
   settings_section_privacy_data: 'Privacy & data',
   settings_section_about: 'About easli',
@@ -611,6 +617,9 @@ const zh: UIStrings = {
   lang_reply_in: '回复语言',
   lang_country_label: '国家',
   lang_country_unclear: '从这封信中无法判断',
+  lang_pick_reply_lang: '选择回复语言',
+  lang_recommended: '推荐',
+  change: '更改',
   settings_section_preferences: '偏好设置',
   settings_section_privacy_data: '隐私与数据',
   settings_section_about: '关于 easli',
@@ -874,6 +883,9 @@ const vi: UIStrings = {
   lang_reply_in: 'Trả lời bằng',
   lang_country_label: 'Quốc gia',
   lang_country_unclear: 'Không rõ từ thư này',
+  lang_pick_reply_lang: 'Chọn ngôn ngữ trả lời',
+  lang_recommended: 'đề xuất',
+  change: 'Thay đổi',
   settings_section_preferences: 'Tùy chọn',
   settings_section_privacy_data: 'Quyền riêng tư & dữ liệu',
   settings_section_about: 'Về easli',
@@ -1139,6 +1151,9 @@ const tr: UIStrings = {
   lang_reply_in: 'Yanıt dili',
   lang_country_label: 'Ülke',
   lang_country_unclear: 'Mektuptan anlaşılmıyor',
+  lang_pick_reply_lang: 'Yanıt dilini seç',
+  lang_recommended: 'önerilen',
+  change: 'Değiştir',
   settings_section_preferences: 'Tercihler',
   settings_section_privacy_data: 'Gizlilik & veri',
   settings_section_about: 'easli hakkında',
@@ -1404,6 +1419,9 @@ const ru: UIStrings = {
   lang_reply_in: 'Ответ на',
   lang_country_label: 'Страна',
   lang_country_unclear: 'Не ясно из этого письма',
+  lang_pick_reply_lang: 'Выберите язык ответа',
+  lang_recommended: 'рекомендуется',
+  change: 'Изменить',
   settings_section_preferences: 'Настройки',
   settings_section_privacy_data: 'Приватность и данные',
   settings_section_about: 'О easli',
@@ -1669,6 +1687,9 @@ const es: UIStrings = {
   lang_reply_in: 'Respuesta en',
   lang_country_label: 'País',
   lang_country_unclear: 'No es claro en esta carta',
+  lang_pick_reply_lang: 'Elige el idioma de la respuesta',
+  lang_recommended: 'recomendado',
+  change: 'Cambiar',
   settings_section_preferences: 'Preferencias',
   settings_section_privacy_data: 'Privacidad y datos',
   settings_section_about: 'Sobre easli',
@@ -1936,6 +1957,9 @@ const de_simple: UIStrings = {
   lang_reply_in: 'Antwort auf',
   lang_country_label: 'Land',
   lang_country_unclear: 'Aus dem Brief nicht klar',
+  lang_pick_reply_lang: 'Antwortsprache wählen',
+  lang_recommended: 'empfohlen',
+  change: 'Ändern',
   settings_section_preferences: 'Einstellungen',
   settings_section_privacy_data: 'Privatsphäre & Daten',
   settings_section_about: 'Über easli',

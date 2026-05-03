@@ -1276,6 +1276,7 @@ export default function ResultScreen() {
               entities={r.extracted_entities || {}}
               legacyReplyDraft={replyDraftText}
               sourceLanguageLabel={sourceLangLabel}
+              suggestedReplyLanguageCode={langCtx.replyCode}
               deviceId={deviceId}
             />
           </View>

@@ -371,18 +371,30 @@ export async function generateReply(
   deviceId: string,
   intent: string,
   customInstruction?: string,
-): Promise<{ reply_text: string; intent: string }> {
+  /** Phase EU-1: optional explicit reply language (ISO-639-1, e.g. "de",
+   *  "fr", "nl"). When omitted, backend falls back to the analysis's
+   *  `suggested_reply_language_code`, then to `source_language_code`. */
+  replyLanguageCode?: string,
+): Promise<{ reply_text: string; intent: string; reply_language_code?: string }> {
+  const body: Record<string, unknown> = {
+    device_id: deviceId,
+    intent,
+    custom_instruction: customInstruction || '',
+  };
+  if (replyLanguageCode && replyLanguageCode.trim()) {
+    body.reply_language_code = replyLanguageCode.trim();
+  }
   const res = await fetch(
     `${BASE_URL}/api/analyses/${encodeURIComponent(analysisId)}/generate-reply`,
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        device_id: deviceId,
-        intent,
-        custom_instruction: customInstruction || '',
-      }),
+      body: JSON.stringify(body),
     },
   );
-  return jsonOrThrow<{ reply_text: string; intent: string }>(res);
+  return jsonOrThrow<{
+    reply_text: string;
+    intent: string;
+    reply_language_code?: string;
+  }>(res);
 }
