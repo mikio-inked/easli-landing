@@ -61,6 +61,7 @@ import {
   formatLanguageLabel,
   getAnyLanguage,
 } from './languages';
+import { useReplyLangPref } from './store';
 import { colors, fontSize, fontWeight, radius, shadows, spacing } from './theme';
 
 interface Props {
@@ -109,16 +110,45 @@ export function ReplyAssistant({
   const [copied, setCopied] = useState(false);
 
   // ---- Phase EU-1: Reply language picker state ----
-  // Default the user's reply language to the AI's suggestion. Falls back
-  // to the analysis source_language_code when no suggestion is present
-  // (legacy records). Empty string means "let backend decide".
-  const defaultReplyLang = (
-    suggestedReplyLanguageCode ||
-    (record.result as any)?.suggested_reply_language_code ||
-    (record.result as any)?.source_language_code ||
-    ''
-  ).toLowerCase();
+  // Default the user's reply language according to:
+  //   1. Global pref (Settings → Reply language):
+  //      - mode='fixed' → always use the pinned language (highest
+  //        priority — overrides detected sender lang).
+  //      - mode='auto'  → use Mistral's per-letter suggestion
+  //        (suggested_reply_language_code) or fall back to the detected
+  //        source language.
+  //   2. Legacy records without suggestions fall back to empty = let
+  //      backend decide.
+  // The per-analysis picker in this assistant still lets the user
+  // override for a single letter.
+  const [replyPref] = useReplyLangPref();
+  const defaultReplyLang = (() => {
+    if (replyPref.mode === 'fixed' && replyPref.fixed) {
+      return replyPref.fixed.toLowerCase();
+    }
+    return (
+      suggestedReplyLanguageCode ||
+      (record.result as any)?.suggested_reply_language_code ||
+      (record.result as any)?.source_language_code ||
+      ''
+    ).toLowerCase();
+  })();
   const [replyLangCode, setReplyLangCode] = useState<string>(defaultReplyLang);
+
+  // Keep the picker in sync when the global pref changes (e.g. user
+  // flips Settings from auto → fixed while the Reply tab is already
+  // mounted). Only re-apply when the user hasn't actively picked a
+  // different language for THIS letter yet.
+  React.useEffect(() => {
+    if (replyPref.mode === 'fixed' && replyPref.fixed) {
+      const fixed = replyPref.fixed.toLowerCase();
+      if (fixed !== replyLangCode) setReplyLangCode(fixed);
+    }
+    // intentionally omit replyLangCode from deps — we only react to
+    // EXTERNAL pref changes, not to local picker moves.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [replyPref.mode, replyPref.fixed]);
+
   const [pickerOpen, setPickerOpen] = useState(false);
   const replyLangIsSuggested =
     !!defaultReplyLang && replyLangCode === defaultReplyLang;

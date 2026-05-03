@@ -1,9 +1,17 @@
 // Language picker. Shown after onboarding (or from settings).
 //
-// Since Phase EU-1 this picker shows all 25 EXPLANATION_LANGUAGES. For the
-// 7 languages with hand-translated UI chrome we show "Deutsch", "English",
-// etc. in the user's chosen language; for the other 18, the AI explanation
-// renders in that language while the UI chrome stays English.
+// Since Phase 4 (EU-1) this screen operates in two independent modes
+// controlled by the `mode` query param:
+//
+//   mode='app'         — picks the UI-chrome language (7 first-class
+//                        hand-translated bundles). Saves to
+//                        `setAppLangOverride`. Used for users who want
+//                        German UI but their AI explanations in a
+//                        different tongue (e.g. Polish).
+//
+//   mode='explanation' — (default) picks the AI explanation language
+//                        (25 options). Saves to `setExplanationLang`.
+//                        Matches the previous /language behaviour.
 
 import { useEffect, useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
@@ -11,42 +19,78 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ArrowLeft, Check } from 'lucide-react-native';
 import { Button } from '../src/ui';
-import { LanguageCode, t } from '../src/i18n';
-import { EXPLANATION_LANGUAGES, normalizeLanguageCode } from '../src/languages';
-import { getLanguage, isOnboarded, setLanguage } from '../src/store';
+import { LANGUAGES, LanguageCode, t } from '../src/i18n';
+import { EXPLANATION_LANGUAGES, LanguageEntry, normalizeLanguageCode } from '../src/languages';
+import {
+  getAppLang,
+  getAppLangOverride,
+  getExplanationLang,
+  isOnboarded,
+  setAppLangOverride,
+  setExplanationLang,
+} from '../src/store';
 import { colors, fontSize, fontWeight, radius, spacing } from '../src/theme';
+
+type PickerMode = 'app' | 'explanation';
 
 export default function LanguageScreen() {
   const router = useRouter();
-  const { from } = useLocalSearchParams<{ from?: string }>();
+  const { from, mode } = useLocalSearchParams<{ from?: string; mode?: string }>();
+  const pickerMode: PickerMode = mode === 'app' ? 'app' : 'explanation';
   const [selected, setSelected] = useState<LanguageCode | null>(null);
   const [initial, setInitial] = useState<LanguageCode | null>(null);
 
   useEffect(() => {
-    getLanguage().then((v) => {
+    // App-Language picker reads the override (may be null → no row selected,
+    // which is fine — the resolved fallback is still shown in Settings).
+    // Explanation-Language picker reads the raw explanation pref.
+    const loader = pickerMode === 'app' ? getAppLangOverride() : getExplanationLang();
+    loader.then((v) => {
       setInitial(v);
       setSelected(v);
     });
-  }, []);
+  }, [pickerMode]);
 
   const canGoBack = from !== 'onboarding' && from !== 'gateway';
 
   // Normalise the currently-stored code against the registry so a legacy
   // `de_simple` pick still highlights the single "Deutsch" row and doesn't
-  // leave the list looking unselected.
+  // leave the list looking unselected. App-mode shows the 7-language
+  // LANGUAGES list — code stays as-is (`de_simple` is a valid row there).
   const selectedKey = useMemo(() => {
     if (!selected) return null;
+    if (pickerMode === 'app') {
+      return selected.toLowerCase();
+    }
     const norm = normalizeLanguageCode(selected).toLowerCase();
-    // `de_simple` maps to `de` in EXPLANATION_LANGUAGES.
     return norm === 'de_simple' ? 'de' : norm;
-  }, [selected]);
+  }, [selected, pickerMode]);
+
+  // The active registry for this picker. App-mode: the 7 first-class
+  // UI-translated bundles (from i18n.ts). Explanation-mode: the 25-
+  // language EU-1 registry.
+  const entries: LanguageEntry[] = useMemo(() => {
+    if (pickerMode === 'app') {
+      return LANGUAGES.map((l) => ({
+        code: l.code,
+        nativeName: l.nativeName,
+        englishName: l.englishName,
+        flag: l.flag,
+      }));
+    }
+    return EXPLANATION_LANGUAGES;
+  }, [pickerMode]);
 
   const onContinue = async () => {
     if (!selected) return;
-    await setLanguage(selected);
+    if (pickerMode === 'app') {
+      await setAppLangOverride(selected);
+    } else {
+      await setExplanationLang(selected);
+    }
     // First-run path: language picker is shown BEFORE the onboarding tutorial,
     // so we route into onboarding. From any other entry (settings / change-
-    // language) we just go home.
+    // language) we just go back or home.
     if (from === 'gateway') {
       const onboarded = await isOnboarded();
       if (!onboarded) {
@@ -54,12 +98,33 @@ export default function LanguageScreen() {
         return;
       }
     }
-    router.replace('/home');
+    if (canGoBack && router.canGoBack()) {
+      router.back();
+    } else {
+      router.replace('/home');
+    }
   };
 
-  // For the onboarding/gateway path we use English chrome until they pick.
-  // After that we can render in their chosen language live.
-  const chromeLang: LanguageCode = selected ?? initial ?? 'en';
+  // Chrome lang for titles/buttons on THIS screen — we always resolve to the
+  // UI-translated fallback via getAppLang() for predictable copy.
+  const [chromeLang, setChromeLang] = useState<LanguageCode>('en');
+  useEffect(() => {
+    getAppLang().then(setChromeLang);
+  }, [selected]);
+
+  // Copy for the title/subtitle. App-mode uses a Settings-specific caption
+  // to explain that this is the UI language, distinct from the AI
+  // explanation language. Hardcoded English with a German variant — a full
+  // i18n matrix for this sub-screen isn't worth 14×2 new keys.
+  const germanChrome = chromeLang === 'de_simple';
+  const title = pickerMode === 'app'
+    ? (germanChrome ? 'App-Sprache' : 'App language')
+    : t(chromeLang, 'choose_language');
+  const subtitle = pickerMode === 'app'
+    ? (germanChrome
+        ? 'Sprache der Menüs, Buttons und Fehlermeldungen.'
+        : 'The language of menus, buttons and error messages.')
+    : t(chromeLang, 'choose_language_subtitle');
 
   return (
     <SafeAreaView style={styles.safe} testID="language-screen">
@@ -77,10 +142,10 @@ export default function LanguageScreen() {
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
       >
-        <Text style={styles.title}>{t(chromeLang, 'choose_language')}</Text>
-        <Text style={styles.subtitle}>{t(chromeLang, 'choose_language_subtitle')}</Text>
+        <Text style={styles.title}>{title}</Text>
+        <Text style={styles.subtitle}>{subtitle}</Text>
         <View style={styles.list}>
-          {EXPLANATION_LANGUAGES.map((l) => {
+          {entries.map((l) => {
             const lcode = l.code.toLowerCase();
             const isActive = selectedKey === lcode;
             return (

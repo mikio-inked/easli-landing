@@ -2196,7 +2196,7 @@ const STRINGS: Record<UIStringCode, UIStrings> = { en, zh, vi, tr, ru, es, de_si
 // Narrow any LanguageCode (25+ in total) down to one of the 7 UI-translated
 // string bundles. Codes we have no hand-translation for fall back to English
 // — the AI analysis itself still renders in the user's chosen language.
-function toUIStringCode(lang: LanguageCode | string | null | undefined): UIStringCode {
+export function toUIStringCode(lang: LanguageCode | string | null | undefined): UIStringCode {
   if (!lang) return 'en';
   if (lang in STRINGS) return lang as UIStringCode;
   // Explicit aliases — keep the user's "Deutsch" pick feeling German.

@@ -37,11 +37,14 @@ import {
 import { deleteAllAnalyses, exportMyData } from '../src/api';
 import {
   ensureDeviceId,
-  getLanguage as getStoredLanguage,
+  getAppLang,
+  getExplanationLang,
   resetAll,
   setLastResult,
+  useReplyLangPref,
 } from '../src/store';
 import { LanguageCode, getLanguage as getLanguageMeta, t } from '../src/i18n';
+import { formatLanguageLabel, getAnyLanguage } from '../src/languages';
 import { cancelAllReminders } from '../src/notifications';
 import { deleteAllOriginals, getStorageStats, formatBytes } from '../src/originals';
 import { getSaveOriginals, setSaveOriginals } from '../src/settings';
@@ -63,7 +66,14 @@ const __APP_DEV__ =
 
 export default function SettingsScreen() {
   const router = useRouter();
+  // Phase 4 / EU-1 — three separate language prefs (see `/src/store.ts`):
+  //   lang              — App-Language (resolved, used by `t()`).
+  //   explanationLang   — Raw explanation-language pref (for the "AI
+  //                       explanation in ___" row).
+  //   replyPref         — Reply-language mode + fixed-lang.
   const [lang, setLang] = useState<LanguageCode>('en');
+  const [explanationLang, setExplanationLang] = useState<LanguageCode>('en');
+  const [replyPref] = useReplyLangPref();
   const [deviceId, setDeviceId] = useState<string | null>(null);
   const [saveOriginals, setSaveOriginalsState] = useState(false);
   const [storageStatsLabel, setStorageStatsLabel] = useState<string | null>(null);
@@ -84,7 +94,14 @@ export default function SettingsScreen() {
   useFocusEffect(
     useCallback(() => {
       (async () => {
-        setLang((await getStoredLanguage()) ?? 'en');
+        // Phase 4: load both the resolved App-Language (for UI chrome)
+        // and the raw Explanation-Language pref (for the Settings row).
+        const [appL, explL] = await Promise.all([
+          getAppLang(),
+          getExplanationLang(),
+        ]);
+        setLang(appL);
+        setExplanationLang(explL ?? appL);
         setDeviceId(await ensureDeviceId());
       })();
       getSaveOriginals().then(setSaveOriginalsState);
@@ -241,6 +258,25 @@ export default function SettingsScreen() {
 
   const langMeta = getLanguageMeta(lang);
 
+  // "Deutsch (German)" or fallback label — looks up the raw explanation
+  // pref (may be one of 25 codes) in the full EU-1 registry.
+  const explLangEntry = getAnyLanguage(explanationLang);
+  const explanationLangLabel = explLangEntry
+    ? `${explLangEntry.flag}  ${explLangEntry.nativeName}`
+    : formatLanguageLabel(explanationLang, explanationLang);
+
+  // "Automatic" / "Italiano" etc. — shows the current reply-language
+  // preference in the Settings row.
+  const germanChrome = lang === 'de_simple';
+  const replyLangValueLabel = (() => {
+    if (replyPref.mode === 'auto') {
+      return germanChrome ? 'Automatisch' : 'Automatic';
+    }
+    const entry = getAnyLanguage(replyPref.fixed);
+    if (entry) return `${entry.flag}  ${entry.nativeName}`;
+    return germanChrome ? 'Nicht gesetzt' : 'Not set';
+  })();
+
   // The plan label shown in the Subscription section header.
   const planLabel = usage?.plus_active
     ? t(lang, 'usage_plus_status_active')
@@ -351,12 +387,34 @@ export default function SettingsScreen() {
         {/* ---------- Preferences ---------- */}
         <SectionLabel>{t(lang, 'settings_section_preferences')}</SectionLabel>
         <View style={styles.groupCard}>
+          {/* App Language — UI chrome (buttons, menus, errors). 7 first-
+              class hand-translated bundles. Picker opens /language?mode=app
+              and writes to `appLangOverride`. */}
           <ListRow
             icon={<LanguagesIcon color={colors.primary} size={18} strokeWidth={2.4} />}
-            title={t(lang, 'change_language')}
+            title={lang === 'de_simple' ? 'App-Sprache' : 'App language'}
             valueText={`${langMeta.flag}  ${langMeta.nativeName}`}
-            onPress={() => router.push('/language')}
-            testID="settings-change-language"
+            onPress={() => router.push('/language?mode=app')}
+            testID="settings-app-language"
+          />
+          <View style={styles.divider} />
+          {/* Explanation Language — the language Mistral writes analyses
+              and chat answers in. 25 options. */}
+          <ListRow
+            icon={<Globe2 color={colors.primary} size={18} strokeWidth={2.4} />}
+            title={lang === 'de_simple' ? 'Erklärungssprache' : 'Explanation language'}
+            valueText={explanationLangLabel}
+            onPress={() => router.push('/language?mode=explanation')}
+            testID="settings-explanation-language"
+          />
+          <View style={styles.divider} />
+          {/* Reply Language — auto (match sender) or fixed (user-pinned). */}
+          <ListRow
+            icon={<ShieldCheck color={colors.primary} size={18} strokeWidth={2.4} />}
+            title={lang === 'de_simple' ? 'Antwortsprache' : 'Reply language'}
+            valueText={replyLangValueLabel}
+            onPress={() => router.push('/reply-language')}
+            testID="settings-reply-language"
           />
           <View style={styles.divider} />
           <ListRow
