@@ -110,7 +110,7 @@ export default function PrivacyScreen() {
           <Text style={styles.meta}>Mistral AI · Paris, France 🇫🇷</Text>
         </View>
         <Text style={styles.updated}>{t(lang, 'privacy_updated')}</Text>
-        <Text style={styles.footer}>support@klarpost.app</Text>
+        <Text style={styles.footer}>support@easli.app</Text>
       </ScrollView>
     </SafeAreaView>
   );

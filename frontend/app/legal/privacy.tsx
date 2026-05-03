@@ -50,7 +50,7 @@ export default function PrivacyPublicScreen() {
               Martin Tran (Freiberufler){'\n'}
               Alfred-Delp-Str. 33{'\n'}
               68623 Lampertheim, Deutschland{'\n'}
-              E-Mail: kontakt@klarpost.app
+              E-Mail: kontakt@easli.app
             </Text>
           </Section>
 
@@ -129,7 +129,7 @@ export default function PrivacyPublicScreen() {
             <Bullet>
               <Text style={styles.body}>
                 <Text style={styles.bold}>Railway Corp.</Text> (USA, mit Server-Standort
-                EU). Hosting des Backend-Servers (api.klarpost.app). Standardvertragsklauseln
+                EU). Hosting des Backend-Servers (api.easli.app). Standardvertragsklauseln
                 der EU-Kommission, Daten werden in einer EU-Region gehostet.
               </Text>
             </Bullet>
@@ -220,7 +220,7 @@ export default function PrivacyPublicScreen() {
               </Text>
             </Bullet>
             <Text style={styles.body}>
-              Alternativ erreichen Sie uns per E-Mail unter kontakt@klarpost.app.
+              Alternativ erreichen Sie uns per E-Mail unter kontakt@easli.app.
             </Text>
           </Section>
 
@@ -274,7 +274,7 @@ export default function PrivacyPublicScreen() {
           <Section title="Controller">
             <Text style={styles.body}>
               Martin Tran (Freelancer){'\n'}Alfred-Delp-Str. 33{'\n'}68623 Lampertheim, Germany{'\n'}
-              Email: kontakt@klarpost.app
+              Email: kontakt@easli.app
             </Text>
           </Section>
 
@@ -368,7 +368,7 @@ export default function PrivacyPublicScreen() {
             <Text style={styles.body}>
               Access, rectification, erasure, restriction, portability, objection, all
               available directly in the app (Settings → Export / Delete) or by email at
-              kontakt@klarpost.app. You may also lodge a complaint with the
+              kontakt@easli.app. You may also lodge a complaint with the
               competent data protection authority.
             </Text>
           </Section>

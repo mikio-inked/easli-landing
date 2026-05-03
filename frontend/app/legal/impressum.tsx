@@ -55,7 +55,8 @@ export default function ImpressumScreen() {
           </Section>
 
           <Section title="Kontakt">
-            <Text style={styles.body}>E-Mail: kontakt@klarpost.app</Text>
+            <Text style={styles.body}>E-Mail: kontakt@easli.app</Text>
+            <Text style={styles.body}>Web: https://easli.app</Text>
           </Section>
 
           <Section title="Verantwortlich für den Inhalt nach § 18 Abs. 2 MStV">
@@ -132,7 +133,8 @@ export default function ImpressumScreen() {
           </Section>
 
           <Section title="Contact">
-            <Text style={styles.body}>Email: kontakt@klarpost.app</Text>
+            <Text style={styles.body}>Email: kontakt@easli.app</Text>
+            <Text style={styles.body}>Web: https://easli.app</Text>
           </Section>
 
           <Section title="Editorially responsible (§ 18 (2) MStV)">

@@ -29,7 +29,7 @@ import { getLanguage as getStoredLanguage } from '../../src/store';
 
 // Replace this with the real address before publishing — it is also
 // referenced from the Impressum / Privacy pages.
-const CONTACT_EMAIL = 'kontakt@klarpost.app'; // [TODO]
+const CONTACT_EMAIL = 'kontakt@easli.app';
 
 export default function ContactScreen() {
   const router = useRouter();

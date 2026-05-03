@@ -53,7 +53,7 @@
         "disabled": true
       },
       "env": {
-        "EXPO_PUBLIC_BACKEND_URL": "https://api.klarpost.app"
+        "EXPO_PUBLIC_BACKEND_URL": "https://api.easli.app"
       }
     },
     "production-apk": {
