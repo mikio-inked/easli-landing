@@ -172,8 +172,18 @@ export async function analyzeDocument(params: {
   const timer = setTimeout(() => controller.abort(), ANALYZE_TIMEOUT_MS);
 
   let res: Response;
+  // Diagnostic (Phase EU-1 support): If BASE_URL is empty at runtime the
+  // fetch polyfill throws "Invalid URL: /api/analyze" which is confusing
+  // on real devices. Surface a precise, debuggable error instead that
+  // exposes the resolved URL and the raw env var value.
+  const targetUrl = `${BASE_URL}/api/analyze`;
+  if (!BASE_URL || !targetUrl.startsWith('http')) {
+    throw new Error(
+      `Backend URL not configured. BASE_URL="${BASE_URL}" ENV="${(process.env.EXPO_PUBLIC_BACKEND_URL as string) || ''}". Rebuild or push OTA with EXPO_PUBLIC_BACKEND_URL set.`,
+    );
+  }
   try {
-    res = await fetch(`${BASE_URL}/api/analyze`, {
+    res = await fetch(targetUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(params),
