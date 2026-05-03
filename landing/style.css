@@ -101,17 +101,11 @@ a:hover { color: var(--primary-dark); text-decoration: underline; }
   color: var(--text);
 }
 .brand-logo {
-  width: 30px; height: 30px;
-  border-radius: 9px;
-  background: linear-gradient(135deg, var(--primary), var(--primary-dark));
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  color: #fff;
-  font-weight: 800;
-  font-size: 15px;
-  letter-spacing: -0.5px;
-  box-shadow: 0 6px 14px rgba(31, 111, 235, 0.35);
+  width: 32px; height: 32px;
+  border-radius: 8px;
+  display: inline-block;
+  object-fit: cover;
+  box-shadow: 0 4px 12px rgba(31, 111, 235, 0.28);
 }
 .nav ul {
   list-style: none;
@@ -369,61 +363,142 @@ h1 .underline-wiggle::after {
 .letter p { margin: 0 0 6px; }
 .letter .blur { filter: blur(2.2px); color: #7A6A50; }
 
+/* ===== iPhone 17 Pro mockup ===== */
 .phone {
   position: relative;
   width: 300px;
-  height: 580px;
-  background: #0B1220;
-  border-radius: 44px;
-  padding: 12px;
+  height: 610px;
+  /* Titanium-like dark frame with subtle edge highlight */
+  background: linear-gradient(135deg, #2a2d36 0%, #14161c 50%, #2a2d36 100%);
+  border-radius: 54px;
+  padding: 6px; /* thinner symmetric bezels */
   box-shadow:
-    0 0 0 2px #1F2937,
+    0 0 0 1px rgba(255, 255, 255, 0.06) inset,
+    0 0 0 2px #0B1220,
     0 30px 60px rgba(15, 23, 42, 0.30),
     0 60px 120px rgba(15, 23, 42, 0.18);
   transform: rotate(3deg) translate(60px, 0);
   z-index: 2;
 }
-.phone::before {
+/* Dynamic Island — floating pill, not attached to top edge */
+.phone-island {
+  position: absolute;
+  top: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 108px;
+  height: 32px;
+  background: #000;
+  border-radius: 20px;
+  z-index: 10;
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.05),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+/* Camera dot on the Dynamic Island */
+.phone-island::after {
   content: "";
   position: absolute;
-  top: 22px; left: 50%;
-  transform: translateX(-50%);
-  width: 110px; height: 26px;
-  background: #0B1220;
-  border-radius: 0 0 16px 16px;
-  z-index: 3;
+  top: 50%;
+  right: 10px;
+  transform: translateY(-50%);
+  width: 8px;
+  height: 8px;
+  background:
+    radial-gradient(circle at 35% 35%, #2a4a6e 0%, #0a1420 55%, #000 100%);
+  border-radius: 50%;
+  box-shadow: inset 0 0 1px rgba(255, 255, 255, 0.3);
+}
+/* Action button — left side, upper */
+.phone-btn-action {
+  position: absolute;
+  left: -2px;
+  top: 110px;
+  width: 3px;
+  height: 30px;
+  background: linear-gradient(to right, #14161c, #2a2d36);
+  border-radius: 2px 0 0 2px;
+  box-shadow: inset 1px 0 0 rgba(0,0,0,0.4);
+}
+/* Volume up */
+.phone-btn-volume-up {
+  position: absolute;
+  left: -2px;
+  top: 160px;
+  width: 3px;
+  height: 46px;
+  background: linear-gradient(to right, #14161c, #2a2d36);
+  border-radius: 2px 0 0 2px;
+  box-shadow: inset 1px 0 0 rgba(0,0,0,0.4);
+}
+/* Volume down */
+.phone-btn-volume-down {
+  position: absolute;
+  left: -2px;
+  top: 220px;
+  width: 3px;
+  height: 46px;
+  background: linear-gradient(to right, #14161c, #2a2d36);
+  border-radius: 2px 0 0 2px;
+  box-shadow: inset 1px 0 0 rgba(0,0,0,0.4);
+}
+/* Camera Control button — right side, wider, iPhone 17 Pro signature */
+.phone-btn-camera {
+  position: absolute;
+  right: -2px;
+  top: 180px;
+  width: 3px;
+  height: 56px;
+  background: linear-gradient(to left, #14161c, #2a2d36);
+  border-radius: 0 2px 2px 0;
+  box-shadow: inset -1px 0 0 rgba(0,0,0,0.4), -2px 0 0 rgba(255,255,255,0.04);
 }
 .phone-screen {
   width: 100%; height: 100%;
   background: #fff;
-  border-radius: 32px;
+  border-radius: 48px;
   overflow: hidden;
   display: flex;
   flex-direction: column;
 }
+/* Status bar sits level with Dynamic Island, flanking it */
 .phone-status {
-  padding: 14px 22px 6px;
+  padding: 16px 24px 6px;
   display: flex;
   justify-content: space-between;
-  font-size: 12px;
+  align-items: center;
+  font-size: 13px;
   font-weight: 600;
   color: var(--ink);
+  min-height: 38px;
+}
+.phone-time {
+  padding-left: 4px;
+  letter-spacing: -0.2px;
+}
+.phone-status-icons {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--ink);
+}
+.phone-status-icons svg {
+  height: 12px;
+  width: auto;
+  display: block;
 }
 .phone-app-header {
-  padding: 18px 20px 10px;
+  padding: 10px 20px 10px;
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
   border-bottom: 1px solid var(--border);
-  margin-top: 22px;
 }
 .phone-app-header .dot-chip {
-  width: 24px; height: 24px;
+  width: 26px; height: 26px;
   border-radius: 7px;
-  background: linear-gradient(135deg, var(--primary), var(--primary-dark));
-  color: #fff;
-  display: flex; align-items: center; justify-content: center;
-  font-weight: 800; font-size: 12px;
+  object-fit: cover;
+  display: inline-block;
 }
 .phone-app-header h4 {
   margin: 0;
@@ -529,7 +604,13 @@ h1 .underline-wiggle::after {
   .hero { padding: 56px 20px 48px; }
   h1 { font-size: 38px; letter-spacing: -1px; }
   .eyebrow { font-size: 12px; }
-  .phone { transform: rotate(2deg) translate(24px, 0); width: 260px; height: 510px; }
+  .phone { transform: rotate(2deg) translate(24px, 0); width: 260px; height: 540px; border-radius: 46px; }
+  .phone-screen { border-radius: 40px; }
+  .phone-island { width: 96px; height: 28px; top: 14px; }
+  .phone-btn-action { top: 96px; height: 26px; }
+  .phone-btn-volume-up { top: 140px; height: 40px; }
+  .phone-btn-volume-down { top: 194px; height: 40px; }
+  .phone-btn-camera { top: 158px; height: 50px; }
   .letter { width: 220px; transform: rotate(-8deg) translate(-60px, -20px); font-size: 10px; }
   @keyframes letter-float {
     0%, 100% { transform: rotate(-8deg) translate(-60px, -20px); }
@@ -1022,7 +1103,7 @@ footer nav a:hover { color: var(--primary); }
   display: flex; align-items: center; gap: 10px;
   font-weight: 600; color: var(--text);
 }
-.footer-brand .brand-logo { width: 26px; height: 26px; font-size: 13px; }
+.footer-brand .brand-logo { width: 26px; height: 26px; border-radius: 7px; }
 .footer-legal {
   max-width: var(--max-width);
   margin: 20px auto 0;
