@@ -77,10 +77,24 @@ Für pretty URLs (`/privacy` ohne `.html`) ein `vercel.json` neben den HTMLs mit
 
 ## Was noch fehlt (TODO nach Deploy)
 
-- `og.png` — Open-Graph-Bild 1200×630 für Link-Previews (Twitter / WhatsApp / iMessage). Kannst du z. B. in Figma oder Canva exportieren. Drop ins `landing/`-Verzeichnis.
-- `apple-touch-icon.png` — 180×180 für iOS-Home-Screen-Bookmarks.
+- ~~`og.png` — Open-Graph-Bild 1200×630 für Link-Previews~~ ✅ vorhanden
+- ~~`apple-touch-icon.png` — 180×180 für iOS-Home-Screen-Bookmarks~~ ✅ vorhanden
 - App Store + Google Play Buttons aktivieren — sobald die App live ist, in `index.html` die `class="btn-store disabled"` entfernen und `href="#"` durch echte Store-URLs ersetzen.
 - Optional: Cookie-Banner — du brauchst keinen, weil keine Cookies / kein Tracking. Aber falls du z. B. später Plausible Analytics einbaust, dann ja.
+
+## Marketing-Assets neu generieren
+
+`og.png` und `apple-touch-icon.png` werden aus `_make_assets.py` erzeugt. Falls du die Texte/Farben ändern willst:
+
+```bash
+cd landing
+python3 _make_assets.py
+# überschreibt og.png und apple-touch-icon.png mit dem neuen Branding
+```
+
+Beide Dateien sind in HTML eingebunden via:
+- `<link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">`
+- `<meta property="og:image" content="https://easli.app/og.png">`
 
 ## Updaten
 
