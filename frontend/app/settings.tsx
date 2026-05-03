@@ -544,6 +544,8 @@ export default function SettingsScreen() {
 function OtaDebugBlock() {
   const updates = Updates.useUpdates();
   const [checking, setChecking] = useState(false);
+  const [testResult, setTestResult] = useState<string>('');
+  const [testing, setTesting] = useState(false);
 
   const fmt = (d?: Date | null) =>
     d ? new Date(d).toLocaleString() : '—';
@@ -642,6 +644,40 @@ function OtaDebugBlock() {
         </Text>
       </Pressable>
 
+      {/* Direct backend ping — triggers a test fetch so we can see in the
+          UI exactly what URL the bundle is actually hitting and what the
+          network layer returns. Same code path as api.ts. */}
+      <Pressable
+        style={[otaStyles.btn, testing && otaStyles.btnDisabled]}
+        onPress={async () => {
+          setTesting(true);
+          setTestResult('Running…');
+          const baseFromEnv = (process.env.EXPO_PUBLIC_BACKEND_URL as string) || '';
+          const url = `${baseFromEnv}/api/`;
+          try {
+            const r = await fetch(url);
+            const body = await r.text();
+            setTestResult(
+              `OK ${r.status}\nURL: ${url}\nBody: ${body.slice(0, 140)}`,
+            );
+          } catch (e: any) {
+            setTestResult(
+              `FAIL\nURL: ${url}\nError name: ${e?.name || '?'}\nMessage: ${(e?.message || String(e)).slice(0, 160)}`,
+            );
+          } finally {
+            setTesting(false);
+          }
+        }}
+        disabled={testing}
+      >
+        <Text style={otaStyles.btnText}>
+          {testing ? 'Pinging backend…' : 'Test backend (GET /api/)'}
+        </Text>
+      </Pressable>
+      {!!testResult && (
+        <Text style={otaStyles.testResultText}>{testResult}</Text>
+      )}
+
       {updates.isUpdatePending && (
         <Pressable
           style={[otaStyles.btn, otaStyles.btnPrimary]}
@@ -725,6 +761,15 @@ const otaStyles = StyleSheet.create({
     color: colors.textPrimary,
   },
   btnTextPrimary: { color: colors.surface },
+  testResultText: {
+    marginTop: spacing.sm,
+    padding: spacing.sm,
+    backgroundColor: colors.background,
+    borderRadius: radius.sm,
+    fontSize: 11,
+    fontFamily: Platform.select({ ios: 'Menlo', android: 'monospace' }),
+    color: colors.textPrimary,
+  },
 });
 
 const styles = StyleSheet.create({
