@@ -295,3 +295,8 @@ credentials.json
 *.pem
 *.key
 .credentials
+
+# Exception — .env.production IS committed so EAS builds and OTA updates
+# can resolve EXPO_PUBLIC_BACKEND_URL consistently. Secrets must NOT go
+# in this file; use `eas env:create --environment production` instead.
+!frontend/.env.production
