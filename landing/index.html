@@ -4,10 +4,10 @@
   <meta charset="utf-8">
   <title>easli — Endlich verstehen, was im Brief steht</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="Du bekommst einen Brief und weißt nicht, was er von dir will. Ein Foto reicht. easli erklärt dir alles in deiner Sprache. 25 Sprachen. EU-gehostet. DSGVO-konform.">
+  <meta name="description" content="Ein Foto genügt. easli erklärt dir jeden amtlichen Brief in deiner Sprache, zeigt dir Fristen und hilft dir mit einer Antwort. 25+ Sprachen. EU-gehostet. DSGVO-konform.">
   <meta name="theme-color" content="#1F6FEB">
   <meta property="og:title" content="easli — Endlich verstehen, was im Brief steht">
-  <meta property="og:description" content="Du bekommst einen Brief und weißt nicht, was er von dir will. Ein Foto reicht. easli erklärt dir alles in deiner Sprache.">
+  <meta property="og:description" content="Ein Foto genügt. easli erklärt dir jeden amtlichen Brief in deiner Sprache.">
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://easli.app">
   <meta property="og:image" content="https://easli.app/og.png">
@@ -33,9 +33,8 @@
         <span>easli</span>
       </a>
       <ul>
-        <li><a href="#problem">Problem</a></li>
-        <li><a href="#solution">Lösung</a></li>
-        <li><a href="#how">So funktioniert es</a></li>
+        <li><a href="#how">So geht's</a></li>
+        <li><a href="#languages">Sprachen</a></li>
         <li><a href="#privacy">Datenschutz</a></li>
         <li><a href="/support.html">Support</a></li>
       </ul>
@@ -52,165 +51,274 @@
 
   <main id="main">
 
-    <!-- HERO -->
+    <!-- ===== HERO ===== -->
     <section class="hero">
       <div class="hero-inner">
-        <h1>Endlich verstehen, <span class="accent">was im Brief steht</span>.</h1>
-        <p class="lede">
-          Du bekommst einen Brief und weißt nicht, was er von dir will.<br>
-          Ein Foto reicht. easli erklärt dir alles in deiner Sprache.<br>
-          Du weißt, was zu tun ist.
+        <div class="hero-copy">
+          <span class="eyebrow"><span class="dot"></span> Bald im App Store &amp; bei Google Play</span>
+          <h1>Endlich verstehen, <span class="accent">was im Brief steht</span>.</h1>
+          <p class="lede">
+            Ein Foto. Ein paar Sekunden. Und du weißt, was der Brief will, bis wann du reagieren musst und wie eine passende Antwort aussehen kann.
+          </p>
+          <div class="cta-row">
+            <a href="#" class="btn-store disabled" aria-label="Im App Store laden, bald verfügbar">
+              <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M17.05 20.28c-.98.95-2.05.8-3.08.35-1.09-.46-2.09-.48-3.24 0-1.44.62-2.2.44-3.06-.35C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.5-1.31 2.99-2.54 4.08zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z"/></svg>
+              <span><small>Demnächst im</small><strong>App Store</strong></span>
+            </a>
+            <a href="#" class="btn-store disabled" aria-label="Bei Google Play laden, bald verfügbar">
+              <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M3.6 2.2c-.3.3-.5.8-.5 1.5v16.6c0 .7.2 1.2.5 1.5l9.2-9.8L3.6 2.2zm10.3 10.4l2.6 2.8-11.1 6.3c-.5.3-1 .3-1.4.1l9.9-9.2zm4.3-1.1l-3.1-1.8-2.6 2.8 2.6 2.8 3.1-1.8c1-.6 1-1.4 0-2zM4.1 1.5c.4-.2.9-.1 1.4.1l11.1 6.3-2.6 2.8L4.1 1.5z"/></svg>
+              <span><small>Demnächst bei</small><strong>Google Play</strong></span>
+            </a>
+          </div>
+          <div class="trust-line">
+            <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> Kein Konto nötig</span>
+            <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> EU-Hosting</span>
+            <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> DSGVO-konform</span>
+          </div>
+        </div>
+
+        <div class="hero-visual" aria-hidden="true">
+          <!-- floating letter -->
+          <div class="letter">
+            <div class="letter-header">Bundesagentur für Arbeit &middot; 12345</div>
+            <div class="letter-stamp">WICHTIG<br>2 WOCHEN</div>
+            <p><b>Aufforderung zur Mitwirkung</b></p>
+            <p class="blur">gemäß § 60 SGB I in Verbindung mit § 66 SGB I teilen wir Ihnen mit, dass zur weiteren Bearbeitung Ihres Antrags folgende Unterlagen beizubringen sind...</p>
+            <p class="blur">...Nachweis über Einkommen der letzten drei Monate sowie aktuelle Meldebescheinigung vorzulegen sind...</p>
+            <p class="blur">Bei Nichtvorlage innerhalb der gesetzten Frist behalten wir uns vor...</p>
+          </div>
+
+          <!-- phone -->
+          <div class="phone">
+            <div class="phone-screen">
+              <div class="phone-status"><span>9:41</span><span>•••</span></div>
+              <div class="phone-app-header">
+                <span class="dot-chip">e</span>
+                <h4>Analyse</h4>
+              </div>
+              <div class="phone-body">
+                <span class="risk-pill high">● Wichtig · Frist läuft</span>
+                <h3 class="phone-title">Unterlagen nachreichen</h3>
+                <p class="phone-meta">Bundesagentur für Arbeit</p>
+                <div class="phone-summary">
+                  Du musst <b>Einkommensnachweise</b> der letzten 3 Monate und eine aktuelle <b>Meldebescheinigung</b> einreichen, sonst wird der Antrag nicht bearbeitet.
+                </div>
+                <div class="phone-deadline">
+                  <div class="cal"><small>MAR</small><b>14</b></div>
+                  <p>Frist in <b>14 Tagen</b><br>Reagiere rechtzeitig.</p>
+                </div>
+                <div class="phone-cta">Antwort vorbereiten</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== EMPATHY ===== -->
+    <section id="empathy" class="bg-soft">
+      <div class="section-inner">
+        <div class="section-head reveal">
+          <span class="section-eyebrow">Kennst du das?</span>
+          <h2>Drei Sekunden nach dem Öffnen.</h2>
+          <p class="section-lede">Ein Brief liegt auf dem Tisch. Und in deinem Kopf läuft sofort dasselbe ab.</p>
+        </div>
+        <div class="empathy-grid">
+          <div class="empathy-card reveal">
+            <span class="empathy-emoji">😵‍💫</span>
+            <h3>„Warum schreibt mir das Amt?"</h3>
+            <p>Der Ton klingt ernst. Die Worte sind lang. Und du verstehst nicht wirklich, worum es geht.</p>
+          </div>
+          <div class="empathy-card reveal">
+            <span class="empathy-emoji">⏳</span>
+            <h3>„Wie viel Zeit habe ich?"</h3>
+            <p>Irgendwo steht eine Frist. Vielleicht wichtig, vielleicht nicht. Sicher bist du dir nicht.</p>
+          </div>
+          <div class="empathy-card reveal">
+            <span class="empathy-emoji">🧩</span>
+            <h3>„Und was soll ich jetzt tun?"</h3>
+            <p>Etwas einreichen? Eine Antwort schreiben? Abwarten? Du willst nichts falsch machen.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== TRANSFORM ===== -->
+    <section id="transform">
+      <div class="section-inner">
+        <div class="section-head reveal">
+          <span class="section-eyebrow">Vorher · Nachher</span>
+          <h2>Aus Behördendeutsch <span class="accent">wird ein klarer Satz</span>.</h2>
+          <p class="section-lede">easli liest den Brief und übersetzt ihn nicht nur. Es erklärt dir, was du wirklich wissen musst.</p>
+        </div>
+
+        <div class="transform-wrap">
+          <div class="transform-card before reveal">
+            <h4>Original</h4>
+            <p>„gemäß § 60 SGB I in Verbindung mit § 66 SGB I teilen wir Ihnen mit, dass zur weiteren Bearbeitung Ihres Antrags folgende Unterlagen beizubringen sind. Bei Nichtvorlage innerhalb der gesetzten Frist behalten wir uns vor, den Antrag abzulehnen."</p>
+          </div>
+
+          <div class="transform-arrow" aria-hidden="true">→</div>
+
+          <div class="transform-card after reveal">
+            <h4>easli</h4>
+            <span class="risk-pill high">● Wichtig · Frist läuft</span>
+            <p class="after-title">Unterlagen nachreichen</p>
+            <p class="after-sum">Das Amt braucht von dir <b>Einkommensnachweise der letzten 3 Monate</b> und eine aktuelle <b>Meldebescheinigung</b>. Ohne diese Unterlagen wird dein Antrag abgelehnt.</p>
+            <div class="after-deadline">📅 Frist: <b>in 14 Tagen</b></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== HOW IT WORKS ===== -->
+    <section id="how" class="bg-soft">
+      <div class="section-inner">
+        <div class="section-head reveal">
+          <span class="section-eyebrow">So funktioniert's</span>
+          <h2>In zwei Minuten erledigt.</h2>
+          <p class="section-lede">Kein Account. Keine Einrichtung. Einfach öffnen und fotografieren.</p>
+        </div>
+
+        <div class="steps">
+          <div class="step reveal">
+            <span class="step-num">1</span>
+            <span class="step-emoji">📸</span>
+            <h3>Brief fotografieren</h3>
+            <p>Mit der Kamera abfotografieren oder ein PDF aus der Galerie wählen. Mehrere Seiten gehen auch.</p>
+          </div>
+          <div class="step reveal">
+            <span class="step-num">2</span>
+            <span class="step-emoji">💡</span>
+            <h3>Erklärung lesen</h3>
+            <p>Du bekommst den Kern des Briefs in deiner Sprache. Worum es geht. Wie dringend. Was als nächstes zu tun ist.</p>
+          </div>
+          <div class="step reveal">
+            <span class="step-num">3</span>
+            <span class="step-emoji">✉️</span>
+            <h3>Antwort senden</h3>
+            <p>Einen Antwort-Vorschlag übernehmen, anpassen, kopieren. Die Antwort ist automatisch in der Sprache des Absenders.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== LANGUAGES ===== -->
+    <section id="languages">
+      <div class="section-inner">
+        <div class="lang-hero reveal">
+          <span class="section-eyebrow">🌍 25+ Sprachen</span>
+          <h2>Dein Brief. Auf <span class="rotator" aria-label="deutsch, englisch, türkisch, arabisch, polnisch, spanisch, russisch">
+            <span>Deutsch.</span>
+            <span>English.</span>
+            <span>Türkçe.</span>
+            <span>العربية.</span>
+            <span>Polski.</span>
+            <span>Español.</span>
+            <span>Русский.</span>
+          </span></h2>
+          <p class="section-lede">Du liest jeden Brief in deiner Sprache — egal aus welchem Land er kommt.</p>
+        </div>
+
+        <div class="lang-strip reveal">
+          <span>🇩🇪 Deutsch</span><span>🇬🇧 English</span><span>🇫🇷 Français</span><span>🇪🇸 Español</span><span>🇮🇹 Italiano</span><span>🇵🇹 Português</span><span>🇳🇱 Nederlands</span><span>🇵🇱 Polski</span><span>🇷🇴 Română</span><span>🇨🇿 Čeština</span><span>🇭🇺 Magyar</span><span>🇬🇷 Ελληνικά</span><span>🇧🇬 Български</span><span>🇭🇷 Hrvatski</span><span>🇷🇸 Srpski</span><span>🇦🇱 Shqip</span><span>🇺🇦 Українська</span><span>🇷🇺 Русский</span><span>🇹🇷 Türkçe</span><span>🇸🇦 العربية</span><span>🇮🇷 فارسی</span><span>🇵🇰 اردو</span><span>🇮🇳 हिन्दी</span><span>🇨🇳 简体中文</span><span>🇻🇳 Tiếng Việt</span>
+        </div>
+
+        <p class="lang-note reveal">
+          ✍️ <b>Smarter Twist:</b> Du liest in deiner Sprache — aber der Antwort-Entwurf ist automatisch in der Sprache des Absenders.
+        </p>
+      </div>
+    </section>
+
+    <!-- ===== PRIVACY (dark) ===== -->
+    <section id="privacy" class="privacy-dark">
+      <div class="section-inner">
+        <div class="section-head reveal">
+          <span class="section-eyebrow">🔒 Datenschutz ist der Ausgangspunkt</span>
+          <h2>Deine Briefe bleiben deine Sache.</h2>
+          <p class="section-lede">
+            Behördenpost ist persönlich. Wir haben easli so gebaut, dass du nichts von dir preisgeben musst, was nicht nötig ist.
+          </p>
+        </div>
+
+        <div class="privacy-points">
+          <div class="privacy-point reveal">
+            <span class="pp-emoji">🙈</span>
+            <strong>Kein Konto. Keine E-Mail.</strong>
+            <span>Du brauchst weder Name noch Profil. easli funktioniert anonym.</span>
+          </div>
+          <div class="privacy-point reveal">
+            <span class="pp-emoji">🇪🇺</span>
+            <strong>Gehostet in Europa.</strong>
+            <span>Unsere Server stehen in Frankfurt. Deine Daten verlassen die EU nicht.</span>
+          </div>
+          <div class="privacy-point reveal">
+            <span class="pp-emoji">📄</span>
+            <strong>Keine Original-Briefe gespeichert.</strong>
+            <span>Das Foto wird nach der Analyse nicht dauerhaft aufbewahrt. Nur die Erklärung bleibt.</span>
+          </div>
+          <div class="privacy-point reveal">
+            <span class="pp-emoji">🗑️</span>
+            <strong>Jederzeit alles löschen.</strong>
+            <span>Ein Tipp in den Einstellungen, und dein Verlauf ist weg. Endgültig.</span>
+          </div>
+        </div>
+
+        <div class="privacy-cta">
+          <a href="/privacy.html">Vollständige Datenschutzerklärung lesen →</a>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== FOR WHO ===== -->
+    <section id="for-who">
+      <div class="section-inner">
+        <div class="section-head reveal">
+          <span class="section-eyebrow">Für wen</span>
+          <h2>Für alle, die Klarheit brauchen.</h2>
+          <p class="section-lede">easli ist gebaut für Menschen, für die amtliche Briefe kein Zuhause-Thema sind.</p>
+        </div>
+
+        <div class="persona-grid">
+          <div class="persona reveal">
+            <div class="persona-avatar">🌍</div>
+            <h4>Neu in Europa</h4>
+            <p>Die Sprache ist noch nicht Alltag. Die Behörden aber schon.</p>
+          </div>
+          <div class="persona reveal">
+            <div class="persona-avatar">🎓</div>
+            <h4>Studierende</h4>
+            <p>Miete, Semesterbeitrag, Versicherung — jede Woche Post.</p>
+          </div>
+          <div class="persona reveal">
+            <div class="persona-avatar">👨‍👩‍👧</div>
+            <h4>Familien</h4>
+            <p>Mehrere Ämter, mehrere Fristen. Einer behält den Überblick.</p>
+          </div>
+          <div class="persona reveal">
+            <div class="persona-avatar">👴</div>
+            <h4>Ältere Menschen</h4>
+            <p>Kleine Schrift, große Wirkung. easli liest laut und erklärt leise.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== FINAL CTA ===== -->
+    <section class="final-cta">
+      <div class="section-inner reveal">
+        <span class="section-eyebrow">✨ Bald verfügbar</span>
+        <h2>Schluss mit dem mulmigen Gefühl <br>beim Briefkasten.</h2>
+        <p class="section-lede">
+          easli startet in Kürze. Hinterlass uns gerne eine Notiz — wir sagen dir Bescheid, sobald es losgeht.
         </p>
         <div class="cta-row">
           <a href="#" class="btn-store disabled" aria-label="Im App Store laden, bald verfügbar">
+            <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M17.05 20.28c-.98.95-2.05.8-3.08.35-1.09-.46-2.09-.48-3.24 0-1.44.62-2.2.44-3.06-.35C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.5-1.31 2.99-2.54 4.08zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z"/></svg>
             <span><small>Demnächst im</small><strong>App Store</strong></span>
           </a>
           <a href="#" class="btn-store disabled" aria-label="Bei Google Play laden, bald verfügbar">
-            <span><small>Demnächst bei</small><strong>Google Play</strong></span>
-          </a>
-        </div>
-        <p class="trust-line">Made in Germany. EU-gehostet. DSGVO-konform.</p>
-      </div>
-    </section>
-
-    <!-- PROBLEM -->
-    <section id="problem" class="section-narrow">
-      <div class="section-inner">
-        <h2>Warum sich amtliche Post so schwer anfühlt.</h2>
-        <div class="narrative">
-          <p>Du liest den Brief mehrmals und verstehst ihn trotzdem nicht.</p>
-          <p>Du hast Angst, etwas falsch zu machen.</p>
-          <p>Du weißt nicht, ob du reagieren musst oder ob es warten kann.</p>
-          <p>Und oft bleibt am Ende nur Unsicherheit.</p>
-        </div>
-      </div>
-    </section>
-
-    <!-- SOLUTION -->
-    <section id="solution" class="bg-soft">
-      <div class="section-inner">
-        <h2>easli nimmt dir diese Unsicherheit ab.</h2>
-        <p class="section-lede">
-          Du fotografierst den Brief. easli sagt dir ruhig, worum es wirklich geht. Klar. Verständlich. Ohne Fachsprache.
-        </p>
-
-        <ul class="solution-bullets">
-          <li>
-            <svg class="bullet-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"></polyline></svg>
-            <span>Wichtige Fristen werden automatisch erkannt</span>
-          </li>
-          <li>
-            <svg class="bullet-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"></polyline></svg>
-            <span>Du weißt, ob du handeln musst oder es warten kann</span>
-          </li>
-          <li>
-            <svg class="bullet-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"></polyline></svg>
-            <span>Du bekommst einen fertigen Antwortvorschlag</span>
-          </li>
-        </ul>
-
-        <p class="section-aside">
-          Du liest alles in deiner Sprache. Die Antwort ist in der Sprache des Absenders.
-        </p>
-      </div>
-    </section>
-
-    <!-- HOW IT WORKS -->
-    <section id="how">
-      <div class="section-inner">
-        <h2>In zwei Minuten erledigt.</h2>
-        <p class="section-lede">Kein Account. Kein Stress.</p>
-
-        <div class="steps">
-          <div class="step">
-            <div class="step-num">1</div>
-            <h3>Brief fotografieren</h3>
-            <p>Halte dein Handy über den Brief. easli erkennt die Seiten automatisch.</p>
-          </div>
-          <div class="step">
-            <div class="step-num">2</div>
-            <h3>Erklärung lesen</h3>
-            <p>In wenigen Sekunden verstehst du, worum es geht. Ruhig und klar.</p>
-          </div>
-          <div class="step">
-            <div class="step-num">3</div>
-            <h3>Antwort senden</h3>
-            <p>Wähle einen Vorschlag oder passe ihn an. Dann einfach abschicken.</p>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- LANGUAGES -->
-    <section id="languages" class="bg-soft">
-      <div class="section-inner">
-        <h2>Für dich gemacht, egal welche Sprache du sprichst.</h2>
-        <p class="section-lede">
-          Du entscheidest, in welcher Sprache du den Brief verstehen willst. easli passt sich dir an.<br>
-          Über 25 Sprachen beim Lesen. Noch mehr beim Antworten.
-        </p>
-
-        <div class="lang-strip">
-          <span>Deutsch</span><span>English</span><span>Français</span><span>Español</span><span>Italiano</span><span>Português</span><span>Nederlands</span><span>Polski</span><span>Română</span><span>Čeština</span><span>Magyar</span><span>Ελληνικά</span><span>Български</span><span>Hrvatski</span><span>Srpski</span><span>Shqip</span><span>Українська</span><span>Русский</span><span>Türkçe</span><span>العربية</span><span>فارسی</span><span>اردو</span><span>हिन्दी</span><span>简体中文</span><span>Tiếng Việt</span>
-        </div>
-      </div>
-    </section>
-
-    <!-- PRIVACY -->
-    <section id="privacy">
-      <div class="section-inner">
-        <div class="privacy">
-          <h2>Deine Briefe bleiben deine Sache.</h2>
-          <p>
-            Du brauchst kein Konto. Keine E-Mail. Kein Profil.
-          </p>
-          <p>
-            Deine Daten werden nicht verkauft. Alles bleibt in Europa. Und wenn du willst, kannst du jederzeit alles löschen.
-          </p>
-          <p style="margin-top:24px">
-            <a href="/privacy.html" class="privacy-link">Vollständige Datenschutzerklärung</a>
-          </p>
-        </div>
-      </div>
-    </section>
-
-    <!-- SOCIAL PROOF -->
-    <section id="for-who" class="section-narrow">
-      <div class="section-inner">
-        <h2>Für alle, die Klarheit brauchen.</h2>
-        <ul class="for-who-list">
-          <li>
-            <svg class="bullet-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"></polyline></svg>
-            <span>Menschen, die neu in einem Land sind</span>
-          </li>
-          <li>
-            <svg class="bullet-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"></polyline></svg>
-            <span>Studentinnen und Studenten</span>
-          </li>
-          <li>
-            <svg class="bullet-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"></polyline></svg>
-            <span>Familien, die den Überblick behalten wollen</span>
-          </li>
-          <li>
-            <svg class="bullet-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"></polyline></svg>
-            <span>Ältere Menschen, die einfach verstehen wollen</span>
-          </li>
-        </ul>
-      </div>
-    </section>
-
-    <!-- FINAL CTA -->
-    <section class="final-cta">
-      <div class="section-inner" style="text-align:center">
-        <h2>Mach Schluss mit Unsicherheit.</h2>
-        <p class="section-lede">
-          Fotografiere deinen ersten Brief und sieh selbst, wie einfach es ist.
-        </p>
-        <div class="cta-row" style="justify-content:center">
-          <a href="#" class="btn-store disabled" aria-label="Im App Store laden, bald verfügbar">
-            <span><small>Demnächst im</small><strong>App Store</strong></span>
-          </a>
-          <a href="#" class="btn-store disabled" aria-label="Bei Google Play laden, bald verfügbar">
+            <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M3.6 2.2c-.3.3-.5.8-.5 1.5v16.6c0 .7.2 1.2.5 1.5l9.2-9.8L3.6 2.2zm10.3 10.4l2.6 2.8-11.1 6.3c-.5.3-1 .3-1.4.1l9.9-9.2zm4.3-1.1l-3.1-1.8-2.6 2.8 2.6 2.8 3.1-1.8c1-.6 1-1.4 0-2zM4.1 1.5c.4-.2.9-.1 1.4.1l11.1 6.3-2.6 2.8L4.1 1.5z"/></svg>
             <span><small>Demnächst bei</small><strong>Google Play</strong></span>
           </a>
         </div>
@@ -221,7 +329,7 @@
 
   <footer>
     <div class="footer-inner">
-      <div class="footer-brand">easli</div>
+      <div class="footer-brand"><span class="brand-logo">e</span> easli</div>
       <nav>
         <a href="/privacy.html">Datenschutz</a>
         <a href="/imprint.html">Impressum</a>
@@ -229,8 +337,8 @@
         <a href="mailto:kontakt@easli.app">Kontakt</a>
       </nav>
     </div>
-    <div class="footer-inner" style="margin-top:16px;color:var(--text-subtle);font-size:13px">
-      © 2026 Martin Tran. Lampertheim, Deutschland.
+    <div class="footer-legal">
+      © 2026 Martin Tran · Lampertheim, Deutschland · Gemacht in der EU 🇪🇺
     </div>
   </footer>
 </body>
