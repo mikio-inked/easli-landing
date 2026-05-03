@@ -43,6 +43,7 @@ import {
   ChevronRight,
   Copy,
   Globe,
+  Info,
   Mail,
   RefreshCw,
   Share2,
@@ -94,6 +95,11 @@ interface DraftState {
   /** Language the draft was generated in — echoed back from the server.
    *  Used to keep the UI labels in sync if the user later switches. */
   languageCode?: string;
+  /** Phase R6: a short "what this reply says" explainer, written in the
+   *  user's Explanation-Language. Shown above the editable body so a user
+   *  reading the letter via translation knows what they are about to
+   *  send. Empty when the backend couldn't produce one. */
+  explanation?: string;
 }
 
 export function ReplyAssistant({
@@ -189,6 +195,7 @@ export function ReplyAssistant({
         text: result.reply_text,
         loading: false,
         languageCode: result.reply_language_code || lang,
+        explanation: result.reply_explanation || '',
       });
     } catch (err) {
       setDraft(null);
@@ -352,25 +359,32 @@ export function ReplyAssistant({
             </Pressable>
           </View>
 
-          {/* Meta block — recipient, subject, contact */}
+          {/* Phase R6: "What this reply says" explainer — rendered in the
+              user's Explanation-Language so someone who can't read the
+              sender's language still knows what they are about to send.
+              Silently hidden when the backend didn't produce one
+              (e.g. legacy analyses or Mistral JSON parse fallback). */}
+          {draft.explanation ? (
+            <View style={styles.explainerBox} testID="reply-explainer">
+              <View style={styles.explainerHeaderRow}>
+                <Info color={colors.primary} size={15} strokeWidth={2.4} />
+                <Text style={styles.explainerTitle}>
+                  {uiLang === 'de_simple' ? 'Das sagt Ihre Antwort' : 'What this reply says'}
+                </Text>
+              </View>
+              <Text style={styles.explainerBody}>{draft.explanation}</Text>
+            </View>
+          ) : null}
+
+          {/* Meta block — subject and optional contact only. Recipient is
+              intentionally NOT required or prompted for: the user opens
+              the draft in their Mail app, which lets them type the
+              recipient there if it wasn't detected in the letter. Forcing
+              an email address in-app was a papercut per user feedback. */}
           <View style={styles.metaBlock}>
             {hasRecipient ? (
               <MetaRow label={t(uiLang, 'reply_to')} value={recipient} />
-            ) : (
-              <View style={{ marginBottom: spacing.sm }}>
-                <Text style={styles.metaLabel}>{t(uiLang, 'reply_to')}</Text>
-                <TextInput
-                  value={recipientOverride}
-                  onChangeText={setRecipientOverride}
-                  placeholder={t(uiLang, 'reply_email_missing')}
-                  placeholderTextColor={colors.textMuted}
-                  style={styles.recipientInput}
-                  keyboardType="email-address"
-                  autoCapitalize="none"
-                  testID="reply-recipient-input"
-                />
-              </View>
-            )}
+            ) : null}
             <MetaRow label={t(uiLang, 'reply_subject')} value={subject} />
             {entities.contact_person ? (
               <MetaRow label={t(uiLang, 'reply_contact_person')} value={entities.contact_person} />
@@ -391,15 +405,17 @@ export function ReplyAssistant({
             testID="reply-body-input"
           />
 
-          {/* Actions row */}
+          {/* Actions row. "Open Mail" is always available as long as the
+              draft has text — even without a detected recipient, the user
+              can fill in the To: field in the Mail app. */}
           <View style={styles.actionsRow}>
             <Pressable
               onPress={onOpenMail}
-              disabled={!hasRecipient || !draft.text}
+              disabled={!draft.text}
               style={({ pressed }) => [
                 styles.primaryBtn,
-                (!hasRecipient || !draft.text) && styles.primaryBtnDisabled,
-                pressed && hasRecipient && draft.text ? { opacity: 0.85 } : null,
+                !draft.text && styles.primaryBtnDisabled,
+                pressed && draft.text ? { opacity: 0.85 } : null,
               ]}
               testID="reply-open-mail"
             >
@@ -432,8 +448,19 @@ export function ReplyAssistant({
             </Pressable>
           </View>
 
+          {/* Soft hint when no recipient was auto-detected — no longer a
+              blocker, just an informational note so the user knows to
+              type the address once Mail opens. */}
           {!hasRecipient ? (
-            <Text style={styles.warningHint}>{t(uiLang, 'reply_email_warning')}</Text>
+            <Text style={styles.warningHint}>
+              {uiLang === 'de_simple'
+                ? 'Keine E-Mail-Adresse im Brief gefunden. Tippe sie in der Mail-App in das „An:"-Feld.'
+                : uiLang === 'de' || uiLang === 'en'
+                  ? uiLang === 'en'
+                    ? 'No email address detected in the letter. Fill in the "To:" field in your Mail app.'
+                    : 'Keine E-Mail-Adresse im Brief gefunden. Tippe sie in der Mail-App in das „An:"-Feld.'
+                  : 'No email address detected. Add it in your Mail app.'}
+            </Text>
           ) : null}
         </View>
       ) : draft?.loading ? (
@@ -755,6 +782,36 @@ const styles = StyleSheet.create({
     color: colors.yellow.text,
     fontStyle: 'italic',
     marginTop: 4,
+  },
+  // Phase R6: "What this reply says" explainer callout. Sits between the
+  // compose header and the meta/body, soft-blue fill so it reads as an
+  // informational prompt rather than a warning.
+  explainerBox: {
+    backgroundColor: colors.primarySoft,
+    borderLeftWidth: 3,
+    borderLeftColor: colors.primary,
+    borderRadius: radius.md,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    marginBottom: spacing.md,
+    gap: 6,
+  },
+  explainerHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  explainerTitle: {
+    fontSize: fontSize.xs,
+    fontWeight: fontWeight.bold,
+    color: colors.primaryDark,
+    textTransform: 'uppercase',
+    letterSpacing: 0.6,
+  },
+  explainerBody: {
+    fontSize: fontSize.sm,
+    lineHeight: 20,
+    color: colors.textPrimary,
   },
   skeletonCard: {
     flexDirection: 'row',

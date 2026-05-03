@@ -385,7 +385,15 @@ export async function generateReply(
    *  "fr", "nl"). When omitted, backend falls back to the analysis's
    *  `suggested_reply_language_code`, then to `source_language_code`. */
   replyLanguageCode?: string,
-): Promise<{ reply_text: string; intent: string; reply_language_code?: string }> {
+): Promise<{
+  reply_text: string;
+  intent: string;
+  reply_language_code?: string;
+  /** Phase R6: a 2-4 sentence explanation in the user's Explanation-
+   *  Language of what this reply says, so users scanning a letter in a
+   *  language they don't fully master know what they're about to send. */
+  reply_explanation?: string;
+}> {
   const body: Record<string, unknown> = {
     device_id: deviceId,
     intent,
@@ -406,5 +414,6 @@ export async function generateReply(
     reply_text: string;
     intent: string;
     reply_language_code?: string;
+    reply_explanation?: string;
   }>(res);
 }

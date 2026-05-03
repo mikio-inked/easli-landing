@@ -2250,6 +2250,13 @@ class GenerateReplyResponse(BaseModel):
     # Phase EU-1: which language the draft is actually written in (ISO-639-1
     # or BCP-47). Empty string means "unknown / fell back to source".
     reply_language_code: str = ""
+    # Phase R6 (Reply Explainer): a 2-4 sentence summary of what the
+    # reply says, written in the user's EXPLANATION-Language (not the
+    # sender's language). Lets a user who reads the letter via
+    # translation understand what they are about to send. Empty string
+    # when Mistral couldn't produce one — callers should gracefully hide
+    # the explainer UI in that case rather than show a blank box.
+    reply_explanation: str = ""
 
 
 # ISO-639-1 → English language name. Used by the reply-draft prompt to
@@ -2299,7 +2306,16 @@ def build_reply_generation_prompt(
     """Return a concise system prompt for Mistral to generate a single
     reply-draft tailored to one intent. The reply text is produced in the
     explicit `reply_language_code` if provided, otherwise in the SOURCE
-    document's language (so it can actually be sent to the sender)."""
+    document's language (so it can actually be sent to the sender).
+
+    Phase R6: returns a JSON object with TWO fields:
+      - reply_text:        the email body in the sender's language.
+      - reply_explanation: a short explanation of what the user is about
+                           to send, in the user's Explanation-Language
+                           (`target_language_label`). This lets a user
+                           who doesn't fully master the sender's language
+                           know what they're agreeing to / asking for.
+    """
     result = record.get("result", {}) or {}
     ee = result.get("extracted_entities") or {}
     intent_desc = INTENT_DESCRIPTIONS.get(intent, "")
@@ -2328,27 +2344,40 @@ def build_reply_generation_prompt(
         else ""
     )
 
-    return f"""You are easli's reply-draft writer. Produce ONE polite, calm, ready-to-send reply email body for the following intent:
+    return f"""You are easli's reply-draft writer. Produce ONE polite, calm, ready-to-send reply email for the following intent, AND a short explanation of what that reply says, so the user (who may not speak the sender's language fluently) knows what they are about to send.
 
 INTENT: {intent}
 {intent_desc}
 
-The reply MUST be written in {reply_lang_clause}. The user will read it through an in-app preview written in {target_language_label}, but the email itself goes to the sender, so it stays in the reply language.
+OUTPUT FORMAT — return a STRICT JSON object with exactly these two keys:
+{{
+  "reply_text": "the email body, written in {reply_lang_clause}",
+  "reply_explanation": "a short 2-4 sentence explanation of what reply_text says and what the user is asking/confirming/objecting — written in {target_language_label}"
+}}
 
-PERSONA & TONE:
+No markdown, no code fences, no leading or trailing commentary — ONLY the raw JSON object.
+
+RULES FOR reply_text (the email body going to the sender):
+- Written entirely in {reply_lang_clause}.
 - Calm, clear, direct. No emotion, no AI phrases ("Based on…", "I analyzed…", "It appears that…").
 - B1-level everyday language. No legal jargon unless strictly needed.
 - Never use em-dashes (— or –). Use comma, period, or colon.
 - Do not mention easli, AI, models, or how this draft was made.
 - Address a specific person if known (use `contact_person`); otherwise use a neutral salutation appropriate for {reply_lang_clause}.
 - Reference the document briefly (use `reference_number` if present).
-- Keep it 80 to 180 words, no bullet lists, no markdown, no signature placeholder block beyond a simple polite sign-off.
+- Keep it 80 to 180 words, no bullet lists, no markdown.
+- End with a simple polite sign-off. No "[Your Name]" placeholder — leave the signature line blank.
+
+RULES FOR reply_explanation (the in-app explainer):
+- Written entirely in {target_language_label}. This is CRITICAL — the user reads this to understand their own reply, so it MUST be in {target_language_label}, not in the sender's language.
+- 2 to 4 short sentences, plain-language, no legal jargon.
+- Start with what the reply does ("You are confirming…", "You are asking…", "You are objecting…").
+- Mention the one or two key points the user is committing to (e.g. a deadline, a request, a confirmation). Keep numbers/dates exactly.
+- No disclaimers, no "you should consult a lawyer", no mention of AI.
+- Do not repeat the whole reply — summarise its effect.
 
 DOCUMENT CONTEXT (JSON):
 {json.dumps(context, ensure_ascii=False)}{instruction_block}
-
-OUTPUT:
-Plain text body only. No subject line, no "Subject:" prefix, no markdown, no quotes around the text, no commentary. Just the email body, ready for the user to copy or send.
 """
 
 
@@ -2373,7 +2402,10 @@ async def generate_reply_endpoint(analysis_id: str, req: GenerateReplyRequest):
         raise HTTPException(status_code=404, detail="Analysis not found")
 
     target_lang = (doc.get("target_language") or "en").strip()
-    target_label = LANGUAGES.get(target_lang, "English")
+    # Phase 5: use EXPLANATION_LANGUAGES so the reply_explanation is
+    # rendered in ALL 25 Explanation-Language options, not just the
+    # legacy 7-language LANGUAGES dict.
+    target_label = EXPLANATION_LANGUAGES.get(target_lang) or LANGUAGES.get(target_lang, "English")
 
     sys_prompt = build_reply_generation_prompt(
         doc, intent, target_label, req.custom_instruction or "",
@@ -2390,7 +2422,8 @@ async def generate_reply_endpoint(analysis_id: str, req: GenerateReplyRequest):
             model=MISTRAL_ANALYSIS_MODEL,
             messages=msgs,
             temperature=0.4,
-            max_tokens=600,
+            max_tokens=800,
+            response_format={"type": "json_object"},
         )
     except HTTPException:
         raise
@@ -2399,24 +2432,45 @@ async def generate_reply_endpoint(analysis_id: str, req: GenerateReplyRequest):
         raise HTTPException(status_code=502, detail="Reply generation failed") from exc
 
     raw = (resp.choices[0].message.content or "").strip()
-    # Defensive: strip accidental markdown fences or "Subject:" prefixes.
-    if raw.startswith("```"):
-        raw = raw.strip("`").strip()
-        if raw.startswith("plaintext\n"):
-            raw = raw[len("plaintext\n"):]
+    # Phase R6: expect a strict JSON object with reply_text + reply_explanation.
+    # Fall back to treating the whole response as plain text if parsing fails,
+    # so a Mistral hiccup doesn't break the reply flow entirely — the explainer
+    # just won't show for that one draft.
+    reply_text = ""
+    reply_explanation = ""
+    try:
+        if raw.startswith("```"):
+            raw = raw.strip("`").strip()
+            if raw.lower().startswith("json"):
+                raw = raw[4:].lstrip()
+        parsed = json.loads(raw)
+        if isinstance(parsed, dict):
+            reply_text = (parsed.get("reply_text") or "").strip()
+            reply_explanation = (parsed.get("reply_explanation") or "").strip()
+    except Exception:
+        reply_text = raw
+        reply_explanation = ""
+
+    # Defensive: strip accidental markdown fences or "Subject:" prefixes from
+    # the body that some models still leak through despite JSON-mode.
+    if reply_text.startswith("```"):
+        reply_text = reply_text.strip("`").strip()
+        if reply_text.startswith("plaintext\n"):
+            reply_text = reply_text[len("plaintext\n"):]
     for prefix in ("Subject:", "Betreff:", "Asunto:", "Konu:"):
-        if raw.lower().startswith(prefix.lower()):
+        if reply_text.lower().startswith(prefix.lower()):
             # Drop the first line entirely.
-            nl = raw.find("\n")
-            raw = raw[nl + 1 :].strip() if nl != -1 else raw
+            nl = reply_text.find("\n")
+            reply_text = reply_text[nl + 1 :].strip() if nl != -1 else reply_text
 
     # Echo back the resolved reply language so the frontend can label the
     # mailto preview correctly without needing to re-derive it.
     resolved_code, _ = resolve_reply_language(doc, req.reply_language_code)
     return GenerateReplyResponse(
-        reply_text=raw,
+        reply_text=reply_text,
         intent=intent,
         reply_language_code=resolved_code,
+        reply_explanation=reply_explanation,
     )
 
 
