@@ -347,6 +347,14 @@ export default function ResultScreen() {
 
       const cached = getLastResult();
       if (cached && (!id || cached.id === id)) {
+        // Ensure device_id is always available — even on the in-memory
+        // cache fast-path. Previously this was only set in the backend-
+        // fetch branch below, which left deviceId='' for fresh scans
+        // coming from analyzing.tsx. That broke /generate-reply and
+        // any other POST that includes device_id in the body (404
+        // "Analysis not found" because Mongo filter {device_id: ""}
+        // never matched).
+        setDeviceId(await ensureDeviceId());
         setRecord(cached);
         setLoading(false);
         await refreshReminders(cached.id);
