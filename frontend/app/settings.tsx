@@ -586,6 +586,10 @@ function OtaDebugBlock() {
       <DebugRow label="Channel" value={(Updates.channel as string) || '—'} />
       <DebugRow label="Runtime Version" value={Updates.runtimeVersion || '—'} />
       <DebugRow
+        label="Backend URL"
+        value={(process.env.EXPO_PUBLIC_BACKEND_URL as string) || '(empty)'}
+      />
+      <DebugRow
         label="Embedded Build"
         value={running?.isEmbeddedLaunch ? 'Yes (no OTA applied)' : 'No (running OTA bundle)'}
       />
