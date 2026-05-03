@@ -58,7 +58,7 @@ import {
   getLanguage as getStoredLanguage,
 } from '../src/store';
 import { AnalysisRecord, deleteAnalysis, getAnalysis, translateAnalysis } from '../src/api';
-import { LANGUAGES, LanguageCode, categoryLabel, t } from '../src/i18n';
+import { LanguageCode, categoryLabel, t } from '../src/i18n';
 import { shareAnalysisAsPdf, shareAnalysisAsText } from '../src/share';
 import {
   cancelAllForAnalysis,
@@ -72,6 +72,7 @@ import { ReadAloudButton } from '../src/components/ReadAloudButton';
 import { ScamWarningModal } from '../src/components/ScamWarningModal';
 import { ReplyAssistant } from '../src/replyAssistant';
 import {
+  EXPLANATION_LANGUAGES,
   countryCodeToFlag,
   formatLanguageLabel,
   getAnyLanguage,
@@ -676,7 +677,7 @@ export default function ResultScreen() {
         <View style={styles.langSwitchPill}>
           <Globe size={16} color={colors.primary} strokeWidth={2.2} />
           <Text style={styles.langSwitchCurrent} numberOfLines={1}>
-            {LANGUAGES.find(l => l.code === effectiveDisplayLang)?.nativeName || effectiveDisplayLang}
+            {formatLanguageLabel(effectiveDisplayLang, effectiveDisplayLang)}
           </Text>
           <Text style={styles.langSwitchHint}>· {t(lang, 'change_language')}</Text>
           <ChevronDown size={14} color={colors.textSecondary} strokeWidth={2.2} />
@@ -716,14 +717,18 @@ export default function ResultScreen() {
                 <X size={22} color={colors.textSecondary} strokeWidth={2.2} />
               </Pressable>
             </View>
-            <View style={{ marginTop: spacing.xs }}>
-              {LANGUAGES.map(opt => {
-                const isActive = opt.code === effectiveDisplayLang;
-                const isCached = availableLangs.has(opt.code);
+            <ScrollView
+              style={{ maxHeight: 480, marginTop: spacing.xs }}
+              showsVerticalScrollIndicator
+              contentContainerStyle={{ paddingBottom: spacing.xs }}
+            >
+              {EXPLANATION_LANGUAGES.map(opt => {
+                const isActive = opt.code.toLowerCase() === (effectiveDisplayLang || '').toLowerCase();
+                const isCached = availableLangs.has(opt.code as LanguageCode);
                 return (
                   <Pressable
                     key={opt.code}
-                    onPress={() => onPickLanguage(opt.code)}
+                    onPress={() => onPickLanguage(opt.code as LanguageCode)}
                     style={({ pressed }) => [
                       styles.modalRow,
                       pressed && { backgroundColor: colors.borderLight },
@@ -751,7 +756,7 @@ export default function ResultScreen() {
                   </Pressable>
                 );
               })}
-            </View>
+            </ScrollView>
           </Pressable>
         </Pressable>
       </Modal>

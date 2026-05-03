@@ -1,12 +1,18 @@
 // Language picker. Shown after onboarding (or from settings).
+//
+// Since Phase EU-1 this picker shows all 25 EXPLANATION_LANGUAGES. For the
+// 7 languages with hand-translated UI chrome we show "Deutsch", "English",
+// etc. in the user's chosen language; for the other 18, the AI explanation
+// renders in that language while the UI chrome stays English.
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ArrowLeft, Check } from 'lucide-react-native';
 import { Button } from '../src/ui';
-import { LanguageCode, LANGUAGES, t } from '../src/i18n';
+import { LanguageCode, t } from '../src/i18n';
+import { EXPLANATION_LANGUAGES, normalizeLanguageCode } from '../src/languages';
 import { getLanguage, isOnboarded, setLanguage } from '../src/store';
 import { colors, fontSize, fontWeight, radius, spacing } from '../src/theme';
 
@@ -24,6 +30,16 @@ export default function LanguageScreen() {
   }, []);
 
   const canGoBack = from !== 'onboarding' && from !== 'gateway';
+
+  // Normalise the currently-stored code against the registry so a legacy
+  // `de_simple` pick still highlights the single "Deutsch" row and doesn't
+  // leave the list looking unselected.
+  const selectedKey = useMemo(() => {
+    if (!selected) return null;
+    const norm = normalizeLanguageCode(selected).toLowerCase();
+    // `de_simple` maps to `de` in EXPLANATION_LANGUAGES.
+    return norm === 'de_simple' ? 'de' : norm;
+  }, [selected]);
 
   const onContinue = async () => {
     if (!selected) return;
@@ -64,14 +80,18 @@ export default function LanguageScreen() {
         <Text style={styles.title}>{t(chromeLang, 'choose_language')}</Text>
         <Text style={styles.subtitle}>{t(chromeLang, 'choose_language_subtitle')}</Text>
         <View style={styles.list}>
-          {LANGUAGES.map((l) => {
-            const isActive = selected === l.code;
+          {EXPLANATION_LANGUAGES.map((l) => {
+            const lcode = l.code.toLowerCase();
+            const isActive = selectedKey === lcode;
             return (
               <Pressable
                 key={l.code}
-                onPress={() => setSelected(l.code)}
+                onPress={() => setSelected(l.code as LanguageCode)}
                 style={[styles.item, isActive && styles.itemActive]}
                 testID={`language-option-${l.code}`}
+                accessibilityRole="button"
+                accessibilityState={{ selected: isActive }}
+                accessibilityLabel={l.englishName}
               >
                 <Text style={styles.flag}>{l.flag}</Text>
                 <View style={{ flex: 1 }}>

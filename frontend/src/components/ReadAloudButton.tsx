@@ -14,14 +14,36 @@ import { LanguageCode, t } from '../i18n';
 import { colors, fontSize, fontWeight, radius, spacing } from '../theme';
 
 // Map our app LanguageCode → BCP-47 locales the system TTS understands.
-const TTS_LOCALES: Record<LanguageCode, string> = {
+// Only covers the 7 UI-translated languages; for Phase EU-1 codes we fall
+// back to a reasonable locale at call-time (see `pickTtsLocale` below).
+const TTS_LOCALES: Partial<Record<LanguageCode, string>> = {
   en: 'en-US',
   de_simple: 'de-DE',
+  de: 'de-DE',
   es: 'es-ES',
   ru: 'ru-RU',
   tr: 'tr-TR',
   vi: 'vi-VN',
   zh: 'zh-CN',
+  'zh-Hans': 'zh-CN',
+  fr: 'fr-FR',
+  it: 'it-IT',
+  pt: 'pt-PT',
+  nl: 'nl-NL',
+  pl: 'pl-PL',
+  ro: 'ro-RO',
+  cs: 'cs-CZ',
+  hu: 'hu-HU',
+  el: 'el-GR',
+  bg: 'bg-BG',
+  hr: 'hr-HR',
+  sr: 'sr-RS',
+  sq: 'sq-AL',
+  uk: 'uk-UA',
+  ar: 'ar-SA',
+  fa: 'fa-IR',
+  ur: 'ur-PK',
+  hi: 'hi-IN',
 };
 
 export function ReadAloudButton({

@@ -1,8 +1,27 @@
 // Supported target languages for easli.
-// Since Phase-3 (multi-source-language) the source can be any European
-// language. The user picks which language to receive the explanation in.
+//
+// Since Phase EU-1 the app supports 25 EXPLANATION languages (the language
+// the AI writes the analysis in). The UI chrome (button labels, errors)
+// is hand-translated for 7 "first-class" languages; for the remaining 18
+// languages the UI falls back gracefully to English while the AI
+// explanation itself is rendered in the user's chosen language.
+//
+// Callers should accept `LanguageCode` values coming from either set — the
+// `t()` helper below handles unknown codes safely.
 
-export type LanguageCode = 'de_simple' | 'en' | 'es' | 'vi' | 'tr' | 'ru' | 'zh';
+// All codes accepted throughout the app. A superset of UI-translated codes
+// (7 original: en, de_simple, es, vi, tr, ru, zh) plus every
+// EXPLANATION_LANGUAGE code we support (de, fr, it, pt, nl, pl, ro, cs,
+// hu, el, bg, hr, sr, sq, uk, ar, fa, ur, hi, zh-Hans).
+export type LanguageCode =
+  | 'de_simple' | 'en' | 'es' | 'vi' | 'tr' | 'ru' | 'zh'
+  | 'de' | 'fr' | 'it' | 'pt' | 'nl' | 'pl' | 'ro' | 'cs'
+  | 'hu' | 'el' | 'bg' | 'hr' | 'sr' | 'sq' | 'uk' | 'ar'
+  | 'fa' | 'ur' | 'hi' | 'zh-Hans';
+
+// The 7 languages that have full hand-translated UI chrome. Used internally
+// by `t()` and `categoryLabel()` to decide which strings bundle to render.
+type UIStringCode = 'de_simple' | 'en' | 'es' | 'vi' | 'tr' | 'ru' | 'zh';
 
 export interface Language {
   code: LanguageCode;
@@ -11,8 +30,10 @@ export interface Language {
   flag: string;
 }
 
-// Sorted alphabetically by native name (Latin scripts first, then Cyrillic,
-// then CJK — same convention iOS/macOS use).
+// Legacy: the original 7-language LANGUAGES array. Kept for the onboarding
+// demo (which only needs a short preselection list) and for back-compat
+// with any consumer expecting the 7-tile picker. New pickers should import
+// `EXPLANATION_LANGUAGES` from `./languages` instead.
 export const LANGUAGES: Language[] = [
   { code: 'de_simple', nativeName: 'Deutsch', englishName: 'German', flag: '🇩🇪' },
   { code: 'en', nativeName: 'English', englishName: 'English', flag: '🇬🇧' },
@@ -2170,11 +2191,22 @@ const de_simple: UIStrings = {
   delete_page_confirm: 'Diese Seite löschen?',
 };
 
-const STRINGS: Record<LanguageCode, UIStrings> = { en, zh, vi, tr, ru, es, de_simple };
+const STRINGS: Record<UIStringCode, UIStrings> = { en, zh, vi, tr, ru, es, de_simple };
+
+// Narrow any LanguageCode (25+ in total) down to one of the 7 UI-translated
+// string bundles. Codes we have no hand-translation for fall back to English
+// — the AI analysis itself still renders in the user's chosen language.
+function toUIStringCode(lang: LanguageCode | string | null | undefined): UIStringCode {
+  if (!lang) return 'en';
+  if (lang in STRINGS) return lang as UIStringCode;
+  // Explicit aliases — keep the user's "Deutsch" pick feeling German.
+  if (lang === 'de') return 'de_simple';
+  if (lang === 'zh-Hans' || lang === 'zh-Hant' || lang === 'zh-CN' || lang === 'zh-TW') return 'zh';
+  return 'en';
+}
 
 export function t(lang: LanguageCode | null | undefined, key: UIKey): string {
-  const code = lang && STRINGS[lang] ? lang : 'en';
-  return STRINGS[code][key];
+  return STRINGS[toUIStringCode(lang)][key];
 }
 
 // ---------------------------------------------------------------------------
@@ -2226,7 +2258,7 @@ export const CATEGORY_EMOJI: Record<CategoryCode, string> = {
   other: '📄',
 };
 
-const CATEGORY_LABELS: Record<LanguageCode, Record<CategoryCode, string>> = {
+const CATEGORY_LABELS: Record<UIStringCode, Record<CategoryCode, string>> = {
   en: {
     tax: 'Tax',
     insurance: 'Insurance',
@@ -2332,13 +2364,39 @@ export function categoryLabel(
   code: string | null | undefined,
 ): string {
   const safe = (CATEGORY_ORDER.includes(code as CategoryCode) ? code : 'other') as CategoryCode;
-  const lc = lang && CATEGORY_LABELS[lang] ? lang : 'en';
+  const lc = toUIStringCode(lang);
   return CATEGORY_LABELS[lc][safe];
 }
 
 export function getLanguage(code: LanguageCode | null | undefined): Language {
+  // Check the first-class (UI-localised) 7 languages first — they have
+  // hand-crafted flag + name metadata here.
+  const legacy = LANGUAGES.find((l) => l.code === code);
+  if (legacy) return legacy;
+
+  // Fallback: look the code up in the full EU-1 EXPLANATION_LANGUAGES
+  // registry so the Settings row can still show "🇵🇱 Polski" etc. Uses a
+  // lazy require to avoid a circular import between i18n.ts and
+  // languages.ts (both are leaf modules, but Metro can still trip up).
+  if (code) {
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const { getExplanationLanguage } = require('./languages') as typeof import('./languages');
+      const entry = getExplanationLanguage(code);
+      if (entry) {
+        return {
+          code: entry.code as LanguageCode,
+          nativeName: entry.nativeName,
+          englishName: entry.englishName,
+          flag: entry.flag,
+        };
+      }
+    } catch {
+      // ignore — fall through to English default
+    }
+  }
+
   return (
-    LANGUAGES.find((l) => l.code === code) ??
     LANGUAGES.find((l) => l.code === 'en') ??
     LANGUAGES[0]
   );

@@ -40,24 +40,35 @@ import { setConsent, setLanguage, getLanguage, setOnboarded } from '../src/store
 import { useLargeFontMode } from '../src/largeFontMode';
 import { colors, fontSize, fontWeight, gradient, radius, shadows, spacing } from '../src/theme';
 import { EasliMark, EasliWordmark } from '../src/brand';
-import { LanguageCode, LANGUAGES, t } from '../src/i18n';
+import { LanguageCode, t } from '../src/i18n';
+import { EXPLANATION_LANGUAGES, normalizeLanguageCode } from '../src/languages';
 import { LinearGradient } from 'expo-linear-gradient';
 
-// Map iOS/Android BCP-47 locales to the languages easli ships. Fallback is
-// English — never German simple (that's an opt-in accessibility flavour).
+// Map iOS/Android BCP-47 locales to the closest supported explanation
+// language. Falls back to English if the system locale is not in our
+// registry. Since Phase EU-1 we support 25 explanation languages, so
+// almost every European locale picks its native match automatically.
+const EXPLANATION_CODES = new Set(
+  EXPLANATION_LANGUAGES.map((l) => l.code.toLowerCase()),
+);
+
 function detectInitialLang(): LanguageCode {
   try {
     const locales = Localization.getLocales?.() ?? [];
     for (const l of locales) {
-      const tag = (l.languageTag || l.languageCode || '').toLowerCase();
-      if (!tag) continue;
-      if (tag.startsWith('zh')) return 'zh';
-      if (tag.startsWith('vi')) return 'vi';
-      if (tag.startsWith('tr')) return 'tr';
-      if (tag.startsWith('ru')) return 'ru';
-      if (tag.startsWith('es')) return 'es';
-      if (tag.startsWith('en')) return 'en';
-      if (tag.startsWith('de')) return 'de_simple';
+      const raw = (l.languageTag || l.languageCode || '').toLowerCase();
+      if (!raw) continue;
+      const norm = normalizeLanguageCode(raw).toLowerCase();
+      // Prefer an exact match in EXPLANATION_LANGUAGES (e.g. `pl`, `fr`,
+      // `zh-hans`, `fa` …). Our registry stores `zh-Hans` as the Chinese
+      // code so check both cases.
+      if (EXPLANATION_CODES.has(norm)) {
+        // Preserve the registry's canonical casing for `zh-Hans`.
+        const entry = EXPLANATION_LANGUAGES.find(
+          (e) => e.code.toLowerCase() === norm,
+        );
+        return (entry?.code ?? norm) as LanguageCode;
+      }
     }
   } catch {
     // expo-localization is safe-by-default but never throw during onboarding
@@ -160,6 +171,13 @@ interface LanguageStepProps {
 }
 
 function LanguageStep({ lang, onPick, largeFont, onToggleLargeFont, onContinue }: LanguageStepProps) {
+  // Normalised version of the currently-selected code so a legacy `de_simple`
+  // pick still highlights the single "Deutsch" row.
+  const selectedKey = (() => {
+    const norm = normalizeLanguageCode(lang).toLowerCase();
+    return norm === 'de_simple' ? 'de' : norm;
+  })();
+
   return (
     <View style={{ flex: 1 }}>
       <ScrollView
@@ -169,16 +187,21 @@ function LanguageStep({ lang, onPick, largeFont, onToggleLargeFont, onContinue }
         <Text style={styles.stepTitle}>{t(lang, 'onb_pick_lang_title')}</Text>
         <Text style={styles.stepSubtitle}>{t(lang, 'choose_language_subtitle')}</Text>
 
-        <View style={styles.grid}>
-          {LANGUAGES.map((l) => {
-            const selected = l.code === lang;
+        {/* Scrollable list — replaces the 7-tile grid. With 25 EU-1 languages,
+            a 2-column grid becomes too tall and hurts scannability; a single
+            column with flag + native + English name (the iOS Settings pattern)
+            is more accessible and matches /language.tsx from the Settings path. */}
+        <View style={styles.list}>
+          {EXPLANATION_LANGUAGES.map((l) => {
+            const lcode = l.code.toLowerCase();
+            const selected = selectedKey === lcode;
             return (
               <Pressable
                 key={l.code}
-                onPress={() => onPick(l.code)}
+                onPress={() => onPick(l.code as LanguageCode)}
                 style={({ pressed }) => [
-                  styles.langTile,
-                  selected && styles.langTileSelected,
+                  styles.langRow,
+                  selected && styles.langRowSelected,
                   pressed && { opacity: 0.85 },
                 ]}
                 testID={`onb-lang-${l.code}`}
@@ -186,18 +209,33 @@ function LanguageStep({ lang, onPick, largeFont, onToggleLargeFont, onContinue }
                 accessibilityState={{ selected }}
                 accessibilityLabel={l.englishName}
               >
-                <Text style={styles.langFlag}>{l.flag}</Text>
-                <Text
-                  style={[styles.langName, selected && styles.langNameSelected]}
-                  numberOfLines={1}
+                <Text style={styles.langRowFlag}>{l.flag}</Text>
+                <View style={{ flex: 1 }}>
+                  <Text
+                    style={[styles.langRowName, selected && styles.langRowNameSelected]}
+                    numberOfLines={1}
+                  >
+                    {l.nativeName}
+                  </Text>
+                  {l.englishName && l.englishName !== l.nativeName ? (
+                    <Text style={styles.langRowSub} numberOfLines={1}>
+                      {l.englishName}
+                    </Text>
+                  ) : null}
+                </View>
+                <View
+                  style={[
+                    styles.langRowCheckChip,
+                    selected && {
+                      backgroundColor: colors.primary,
+                      borderColor: colors.primary,
+                    },
+                  ]}
                 >
-                  {l.nativeName}
-                </Text>
-                {selected ? (
-                  <View style={styles.langCheck}>
-                    <Check color={colors.white} size={12} strokeWidth={3} />
-                  </View>
-                ) : null}
+                  {selected ? (
+                    <Check color={colors.white} size={16} strokeWidth={3} />
+                  ) : null}
+                </View>
               </Pressable>
             );
           })}
@@ -239,7 +277,13 @@ function LanguageStep({ lang, onPick, largeFont, onToggleLargeFont, onContinue }
 // Demo content per language. Keeping this locally-defined rather than pushing
 // into i18n.ts on purpose: these strings are only ever shown in the onboarding
 // demo and are short enough to maintain in place.
-const DEMO: Record<LanguageCode, { summary: string; deadline: string; amount: string; category: string; cta: string }> = {
+//
+// NOTE: Since Phase EU-1 the picker shows 25 explanation languages but the
+// live demo script is expensive to translate for all of them. We keep the
+// 7 original locales here and rely on `DEMO[lang] || DEMO.en` to degrade to
+// English for any other choice — still a good preview of the feature.
+type DemoContent = { summary: string; deadline: string; amount: string; category: string; cta: string };
+const DEMO: Partial<Record<LanguageCode, DemoContent>> = {
   de_simple: {
     summary: 'Rundfunkbeitrag: 55,08 € offen, bitte bis zum Stichtag zahlen.',
     deadline: 'Frist: 30.11.2026',
@@ -292,7 +336,7 @@ const DEMO: Record<LanguageCode, { summary: string; deadline: string; amount: st
 };
 
 function LiveDemoStep({ lang, onGetStarted }: { lang: LanguageCode; onGetStarted: () => void }) {
-  const demo = DEMO[lang] || DEMO.en;
+  const demo = DEMO[lang] || (DEMO.en as DemoContent);
 
   // Animated values: letter fades down, three pills rise and fade in, then
   // the summary card fades in. Reanimated would be cleaner but the stock
@@ -600,6 +644,50 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     marginBottom: spacing.lg,
     lineHeight: 22,
+  },
+
+  // Language list (scrollable) — EU-1 supports 25 languages so a tile grid
+  // would be too dense; a single-column list with flag + native + English
+  // name is more accessible and matches the /language.tsx pattern.
+  list: {
+    gap: spacing.sm,
+  },
+  langRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.surface,
+    borderRadius: radius.lg,
+    borderWidth: 2,
+    borderColor: colors.border,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.md,
+    minHeight: 62,
+    gap: spacing.md,
+  },
+  langRowSelected: {
+    borderColor: colors.primary,
+    backgroundColor: colors.primarySoft,
+  },
+  langRowFlag: { fontSize: 26 },
+  langRowName: {
+    fontSize: fontSize.base,
+    fontWeight: fontWeight.bold,
+    color: colors.textPrimary,
+  },
+  langRowNameSelected: { color: colors.primaryDark },
+  langRowSub: {
+    fontSize: fontSize.sm,
+    color: colors.textSecondary,
+    marginTop: 2,
+  },
+  langRowCheckChip: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    borderWidth: 2,
+    borderColor: colors.border,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 
   // Language grid ---------------------------------------------------------
