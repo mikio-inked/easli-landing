@@ -32,7 +32,11 @@ import {
   listChatMessages,
   sendChatMessage,
 } from '../src/api';
-import { ensureDeviceId, getLanguage as getStoredLanguage } from '../src/store';
+import {
+  ensureDeviceId,
+  getAppLang,
+  getExplanationLang,
+} from '../src/store';
 import { LanguageCode, t } from '../src/i18n';
 import { colors, fontSize, fontWeight, radius, spacing } from '../src/theme';
 
@@ -43,12 +47,23 @@ interface DisplayMessage extends ChatMessage {
 export default function ChatScreen() {
   const router = useRouter();
   const { id, lang: langParam } = useLocalSearchParams<{ id?: string; lang?: string }>();
-  // `lang` is used for BOTH the UI chrome AND for telling the backend which
-  // language the assistant should reply in. If the user passed ?lang= (from
-  // the result screen's "change language" switcher), that wins — otherwise
-  // fall back to the stored user preference. `contentLang` is the one sent
-  // to the server so chat answers always match what's visible on the
-  // result screen the user came from.
+  // Phase 4/5 strict 3-part language model for the chat screen:
+  //
+  //   `lang`         — resolved APP-Language (UI chrome only: labels,
+  //                    buttons, error copy). One of the 7 hand-translated
+  //                    bundles.
+  //
+  //   `contentLang`  — the language the ASSISTANT must reply in. Priority:
+  //                      1. `?lang=` URL param (explicit per-analysis
+  //                         override coming from the Result screen's
+  //                         language switch).
+  //                      2. User's global Explanation-Language pref.
+  //                    If neither is set the server falls back to the
+  //                    document's original target_language.
+  //
+  // This enforces the Phase-5 strictness rule: a user with Polish-explanation
+  // and German-UI gets CHROME in German but CHAT ANSWERS in Polish —
+  // independently of whatever the document's original language was.
   const [lang, setLang] = useState<LanguageCode>('en');
   const [contentLang, setContentLang] = useState<LanguageCode | null>(
     (langParam as LanguageCode) || null,
@@ -66,8 +81,18 @@ export default function ChatScreen() {
 
   useEffect(() => {
     (async () => {
-      const l = (await getStoredLanguage()) ?? 'en';
-      setLang(l);
+      // UI chrome (labels/buttons) — resolved app-lang with auto-fallback.
+      const appL = await getAppLang();
+      setLang(appL);
+
+      // Content-language fallback — user's Explanation-Language pref.
+      // Only applied when no explicit URL param was passed (langParam
+      // from the Result-screen switcher wins).
+      if (!langParam) {
+        const explL = await getExplanationLang();
+        if (explL) setContentLang(explL);
+      }
+
       if (!id) {
         setLoading(false);
         return;
@@ -82,7 +107,7 @@ export default function ChatScreen() {
         setMessages(msgs);
         scrollToEnd();
       } catch (e: any) {
-        Alert.alert(t(lang, 'error_generic'), e?.message || '');
+        Alert.alert(t(appL, 'error_generic'), e?.message || '');
       } finally {
         setLoading(false);
       }

@@ -158,9 +158,50 @@ export default function PrivacyPublicScreen() {
               {' '}<Text style={styles.bold}>Einstellungen → Meine Daten löschen</Text>.
               Originale (Foto, PDF, OCR-Volltext) werden niemals dauerhaft gespeichert.
             </Text>
+            <Text style={styles.body}>
+              <Text style={styles.bold}>Gesetzliche Aufbewahrungspflichten:</Text> Für
+              Rechnungen und steuerrelevante Unterlagen gelten Aufbewahrungsfristen von
+              bis zu <Text style={styles.bold}>10 Jahren</Text> (§ 147 AO, § 257 HGB).
+              Diese betreffen Zahlungs- und Abrechnungsdaten, die ausschließlich bei
+              Apple, Google und RevenueCat verarbeitet und dort gemäß deren
+              Datenschutzrichtlinien gespeichert werden. easli selbst erhält und
+              speichert keine Klartext-Zahlungs- oder Rechnungsdaten.
+            </Text>
           </Section>
 
-          <Section title="6. Ihre Rechte (Art. 15–21 DSGVO)">
+          <Section title="6. Keine KI-Trainingsnutzung">
+            <Text style={styles.body}>
+              Ihre Briefe, Fragen und Antwortentwürfe werden
+              <Text style={styles.bold}> nicht zum Training </Text>
+              von KI-Modellen verwendet — weder durch uns noch durch unsere
+              Auftragsverarbeiter.
+            </Text>
+            <Bullet>
+              <Text style={styles.body}>
+                <Text style={styles.bold}>Mistral AI</Text> (Paris, EU) verarbeitet Ihre
+                Daten ausschließlich zur Beantwortung der jeweiligen Anfrage und
+                garantiert vertraglich, dass API-Anfragen
+                {' '}<Text style={styles.bold}>nicht</Text> zur Verbesserung oder zum
+                Training von Modellen genutzt werden
+                (<Text style={styles.italic}>Mistral AI Data Processing Addendum</Text>).
+              </Text>
+            </Bullet>
+            <Bullet>
+              <Text style={styles.body}>
+                <Text style={styles.bold}>easli</Text> analysiert keine Inhalte, erstellt
+                keine Nutzerprofile und verkauft keine Daten an Dritte.
+              </Text>
+            </Bullet>
+            <Bullet>
+              <Text style={styles.body}>
+                Analysen werden pro Gerät gespeichert und sind ausschließlich über Ihre
+                anonyme Geräte-ID abrufbar. Keine Verknüpfung mit E-Mail, Name oder
+                sonstigen Identifikatoren.
+              </Text>
+            </Bullet>
+          </Section>
+
+          <Section title="7. Ihre Rechte (Art. 15–21 DSGVO)">
             <Text style={styles.body}>
               Sie haben das Recht auf Auskunft (Art. 15), Berichtigung (Art. 16), Löschung
               (Art. 17), Einschränkung (Art. 18), Datenübertragbarkeit (Art. 20) und
@@ -183,15 +224,29 @@ export default function PrivacyPublicScreen() {
             </Text>
           </Section>
 
-          <Section title="7. Beschwerderecht">
+          <Section title="8. Beschwerderecht">
             <Text style={styles.body}>
-              Sie haben das Recht, sich bei einer Aufsichtsbehörde zu beschweren, z. B.
-              dem Bundesbeauftragten für den Datenschutz und die Informationsfreiheit
-              (BfDI) oder bei der für Sie zuständigen Landesdatenschutzbehörde.
+              Sie haben das Recht, sich bei einer Aufsichtsbehörde zu beschweren. Für
+              easli ist die zuständige Aufsichtsbehörde:
+            </Text>
+            <Text style={styles.body}>
+              <Text style={styles.bold}>
+                Der Hessische Beauftragte für Datenschutz und Informationsfreiheit (HBDI)
+              </Text>
+              {'\n'}Gustav-Stresemann-Ring 1{'\n'}
+              65189 Wiesbaden{'\n'}
+              Telefon: +49 611 1408-0{'\n'}
+              E-Mail: poststelle@datenschutz.hessen.de{'\n'}
+              Web: www.datenschutz.hessen.de
+            </Text>
+            <Text style={styles.body}>
+              Alternativ können Sie sich an die für Ihren Wohnsitz zuständige
+              Landesdatenschutzbehörde oder an den Bundesbeauftragten für den
+              Datenschutz und die Informationsfreiheit (BfDI) wenden.
             </Text>
           </Section>
 
-          <Section title="8. Sicherheit">
+          <Section title="9. Sicherheit">
             <Text style={styles.body}>
               Übertragungen erfolgen ausschließlich verschlüsselt (TLS). API-Schlüssel,
               Briefinhalte und IP-Adressen werden nicht in Klartext geloggt. Logs enthalten
@@ -200,7 +255,7 @@ export default function PrivacyPublicScreen() {
             </Text>
           </Section>
 
-          <Section title="9. Änderungen dieser Erklärung">
+          <Section title="10. Änderungen dieser Erklärung">
             <Text style={styles.body}>
               Wir können diese Erklärung anpassen, sofern technische oder rechtliche
               Änderungen das erforderlich machen. Die jeweils aktuelle Fassung ist über
@@ -288,6 +343,25 @@ export default function PrivacyPublicScreen() {
               <Text style={styles.bold}> 90 days</Text>. You can also delete them yourself
               any time via Settings → Delete my data.
             </Text>
+            <Text style={styles.body}>
+              <Text style={styles.bold}>Statutory retention (billing data):</Text> German
+              tax and commercial law (§ 147 AO, § 257 HGB) require invoices and
+              payment records to be kept for up to
+              <Text style={styles.bold}> 10 years</Text>. These records are stored by
+              Apple, Google and RevenueCat under their own privacy policies. easli
+              itself neither receives nor stores payment data.
+            </Text>
+          </Section>
+
+          <Section title="No AI training">
+            <Text style={styles.body}>
+              Your letters, questions and reply drafts are
+              <Text style={styles.bold}> not used to train </Text>
+              AI models — neither by us nor by our processors. Mistral AI contractually
+              guarantees that API requests are not used for model training or
+              improvement (Mistral AI Data Processing Addendum). easli does not build
+              user profiles and does not sell data to third parties.
+            </Text>
           </Section>
 
           <Section title="Your rights">
@@ -296,6 +370,18 @@ export default function PrivacyPublicScreen() {
               available directly in the app (Settings → Export / Delete) or by email at
               kontakt@klarpost.app. You may also lodge a complaint with the
               competent data protection authority.
+            </Text>
+          </Section>
+
+          <Section title="Supervisory authority">
+            <Text style={styles.body}>
+              <Text style={styles.bold}>
+                Hessian Commissioner for Data Protection and Freedom of Information (HBDI)
+              </Text>
+              {'\n'}Gustav-Stresemann-Ring 1, 65189 Wiesbaden, Germany{'\n'}
+              Phone: +49 611 1408-0{'\n'}
+              Email: poststelle@datenschutz.hessen.de{'\n'}
+              Web: www.datenschutz.hessen.de
             </Text>
           </Section>
 
@@ -402,6 +488,9 @@ const styles = StyleSheet.create({
   },
   bold: {
     fontWeight: fontWeight.bold,
+  },
+  italic: {
+    fontStyle: 'italic',
   },
   bullet: {
     flexDirection: 'row',

@@ -118,6 +118,63 @@ LANGUAGES = {
     "zh": "Chinese Simplified (简体中文)",
 }
 
+# Phase EU-1: the full set of Explanation-Languages the AI is allowed to
+# write analyses, translations and chat answers in. Superset of LANGUAGES
+# (which is kept around for back-compat with 7-language UI chrome hints).
+#
+# Keys are ISO-639-1 codes (or `zh-Hans` for simplified Chinese, mirroring
+# the frontend `languages.ts` registry). Values are Mistral-friendly
+# human-readable labels — always in the form "English name (Native name)"
+# so the LLM writes in the right tongue AND the user recognises it.
+#
+# Must stay in lockstep with `/app/frontend/src/languages.ts` — any code
+# added there MUST be added here too, otherwise the frontend will send a
+# code the backend rejects and the user sees a 400.
+EXPLANATION_LANGUAGES = {
+    # First-class UI-translated (same labels as LANGUAGES).
+    "de_simple": "Simple German (Einfaches Deutsch / Leichte Sprache)",
+    "en": "English",
+    "es": "Spanish (Español)",
+    "vi": "Vietnamese (Tiếng Việt)",
+    "tr": "Turkish (Türkçe)",
+    "ru": "Russian (Русский)",
+    "zh": "Chinese Simplified (简体中文)",
+    # Alias for the explicit "simplified" subtag — some frontends send this.
+    "zh-Hans": "Chinese Simplified (简体中文)",
+    # German (non-simple) — for the Phase 4 picker where a user explicitly
+    # chose "Deutsch" rather than "Einfaches Deutsch".
+    "de": "German (Deutsch)",
+    # EU-1 expansion — covers every EU / EEA + major migrant language.
+    "fr": "French (Français)",
+    "it": "Italian (Italiano)",
+    "pt": "Portuguese (Português)",
+    "nl": "Dutch (Nederlands)",
+    "pl": "Polish (Polski)",
+    "ro": "Romanian (Română)",
+    "cs": "Czech (Čeština)",
+    "hu": "Hungarian (Magyar)",
+    "el": "Greek (Ελληνικά)",
+    "bg": "Bulgarian (Български)",
+    "hr": "Croatian (Hrvatski)",
+    "sr": "Serbian (Српски / Srpski)",
+    "sq": "Albanian (Shqip)",
+    "uk": "Ukrainian (Українська)",
+    "ar": "Arabic (العربية)",
+    "fa": "Persian / Farsi (فارسی)",
+    "ur": "Urdu (اردو)",
+    "hi": "Hindi (हिन्दी)",
+}
+
+
+def resolve_explanation_label(code: str) -> str:
+    """Return the Mistral-friendly label for an explanation language code.
+    Safe for any input — unknown codes fall back to English. Callers MUST
+    still reject unsupported codes upstream (400 BAD REQUEST); this helper
+    is only a last-line safety net for prompt building."""
+    if not code:
+        return "English"
+    return EXPLANATION_LANGUAGES.get(code) or LANGUAGES.get(code) or "English"
+
 
 class Deadline(BaseModel):
     date: str = ""
@@ -1996,13 +2053,13 @@ async def translate_analysis_endpoint(analysis_id: str, req: TranslateRequest):
     id + target code + cache hit/miss). Never the source text, translations,
     sender, or amounts.
     """
-    if req.target_language not in LANGUAGES:
+    if req.target_language not in EXPLANATION_LANGUAGES:
         raise HTTPException(status_code=400, detail="Unsupported target language")
     if not req.device_id:
         raise HTTPException(status_code=400, detail="device_id is required")
 
     target_code = req.target_language
-    target_label = LANGUAGES[target_code]
+    target_label = EXPLANATION_LANGUAGES[target_code]
 
     doc = await db.analyses.find_one(
         {"id": analysis_id, "device_id": req.device_id},
@@ -2420,32 +2477,40 @@ async def chat_endpoint(analysis_id: str, req: ChatRequest):
     history = doc.get("messages", []) or []
     # Resolve which language version to use for both the document context
     # AND the reply. Priority:
-    #   1) explicit req.target_language (user switched language on client)
-    #   2) the analysis record's primary target_language (original)
+    #   1) explicit req.target_language (user's current Explanation-Language
+    #      pref, or the Result-screen language switch). Accepts ANY of the
+    #      25 EU-1 Explanation-Languages since Phase 5.
+    #   2) the analysis record's primary target_language (original).
     # If the user asked for a language we haven't translated yet, we silently
     # fall back to the primary — we'd rather reply in the wrong language than
     # block a chat turn on a missing translation. The frontend calls
     # /translate BEFORE switching the UI so this fallback is rare in practice.
-    override_code = req.target_language if req.target_language in LANGUAGES else None
+    override_code = (
+        req.target_language if req.target_language in EXPLANATION_LANGUAGES else None
+    )
     primary_code = doc.get("target_language") or ""
     translations = doc.get("translations") or {}
     if override_code and override_code != primary_code and override_code in translations:
         target_code = override_code
-        target_label = LANGUAGES[override_code]
+        target_label = EXPLANATION_LANGUAGES[override_code]
         # Swap in the translated result so document_context reflects what
         # the user is currently reading.
         chat_doc = {**doc, "result": translations[override_code]}
     elif override_code and override_code == primary_code:
         target_code = primary_code
-        target_label = doc.get("target_language_label") or LANGUAGES.get(primary_code, "English")
+        target_label = (
+            doc.get("target_language_label")
+            or EXPLANATION_LANGUAGES.get(primary_code)
+            or LANGUAGES.get(primary_code, "English")
+        )
         chat_doc = doc
-    elif override_code and override_code in LANGUAGES:
+    elif override_code and override_code in EXPLANATION_LANGUAGES:
         # Override requested but no cached translation — reply in the override
         # language anyway using the primary-language document context. This
-        # keeps the UX consistent (chat matches what's on screen) without
-        # doing a synchronous translate call inside the chat handler.
+        # keeps the UX consistent (chat matches the user's Explanation pref)
+        # without doing a synchronous translate call inside the chat handler.
         target_code = override_code
-        target_label = LANGUAGES[override_code]
+        target_label = EXPLANATION_LANGUAGES[override_code]
         chat_doc = doc
     else:
         target_code = primary_code
@@ -2507,16 +2572,19 @@ async def root():
 
 @api_router.get("/languages")
 async def get_languages():
-    return [{"code": k, "label": v} for k, v in LANGUAGES.items()]
+    # Since Phase EU-1 this returns the full 25-language Explanation set,
+    # not just the 7 UI-translated legacy ones.
+    return [{"code": k, "label": v} for k, v in EXPLANATION_LANGUAGES.items()]
 
 
 @api_router.post("/analyze")
 async def analyze_document(req: AnalyzeRequest):
-    # Validate language
-    if req.target_language not in LANGUAGES:
+    # Validate language — accepts the full EU-1 Explanation-Language set
+    # (25 codes) since Phase 5. See `EXPLANATION_LANGUAGES` at top.
+    if req.target_language not in EXPLANATION_LANGUAGES:
         raise HTTPException(status_code=400, detail="Unsupported target language")
 
-    target_language_label = LANGUAGES[req.target_language]
+    target_language_label = EXPLANATION_LANGUAGES[req.target_language]
 
     # ----- Entitlement gate (server-side source of truth) -----
     # Computed BEFORE we touch Mistral or burn any tokens, so a paywalled or
