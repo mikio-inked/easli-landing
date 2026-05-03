@@ -145,15 +145,43 @@ export function getAnyLanguage(code?: string | null): LanguageEntry | undefined 
 }
 
 /** Display "Deutsch (German)" or fall back to the raw code. Safe for any
- *  detected code from Mistral, including ones we don't know about. */
+ *  detected code from Mistral, including ones we don't know about. Also
+ *  handles our legacy i18n code quirks (e.g. `de_simple` → `de`,
+ *  `zh` → `zh-Hans`, `ar-*` → `ar`). */
 export function formatLanguageLabel(code?: string | null, fallback = ''): string {
   if (!code) return fallback;
-  const entry = getAnyLanguage(code);
-  if (!entry) return code.toUpperCase();
+  const normalized = normalizeLanguageCode(code);
+  const entry = getAnyLanguage(normalized);
+  if (!entry) return normalized.toUpperCase();
   if (entry.nativeName.toLowerCase() === entry.englishName.toLowerCase()) {
     return entry.nativeName;
   }
   return `${entry.nativeName} (${entry.englishName})`;
+}
+
+/** Collapse app-internal language codes (`de_simple`, `zh`, `nb`, etc.) to
+ *  the registry's canonical codes. Also handles common BCP-47 variants
+ *  like `en-US` → `en`. Case-insensitive. */
+export function normalizeLanguageCode(code: string): string {
+  const c = code.toLowerCase().trim();
+  // App-internal "Einfaches Deutsch" flag we no longer surface to users.
+  if (c === 'de_simple' || c === 'de-simple') return 'de';
+  // Chinese simplified/traditional common variants.
+  if (c === 'zh' || c === 'zh-cn' || c === 'zh_cn' || c === 'zh_hans') return 'zh-Hans';
+  if (c === 'zh-tw' || c === 'zh_tw' || c === 'zh_hant') return 'zh-Hans'; // we only ship Simplified
+  // Norwegian bokmål/nynorsk → generic Norwegian.
+  if (c === 'nb' || c === 'nn' || c === 'nb-no' || c === 'nn-no') return 'no';
+  // Serbian Cyrillic/Latin → generic Serbian.
+  if (c === 'sr-cyrl' || c === 'sr-latn' || c === 'sr_cyrl' || c === 'sr_latn') return 'sr';
+  // BCP-47 country variants we don't need to distinguish (en-US, en-GB,
+  // fr-FR, fr-CA, es-ES, es-MX, etc.) — take the primary subtag.
+  const dash = c.indexOf('-');
+  const underscore = c.indexOf('_');
+  const cut = dash !== -1 ? dash : underscore;
+  if (cut > 0 && c.length > 3 && c !== 'zh-hans') {
+    return c.slice(0, cut);
+  }
+  return c;
 }
 
 /** Country code (ISO 3166-1 alpha-2) → flag emoji.

@@ -1780,7 +1780,7 @@ TRANSLATE / LOCALISE into {new_target_label}:
 - "reply_draft_explanation_translated" — explanation of what reply_draft says
 - "questions_to_ask"
 - "uncertainties"
-- "disclaimer" — one short generic disclaimer stating KlarPost does not provide legal, tax, financial or medical advice
+- "disclaimer" — one short generic disclaimer stating easli does not provide legal, tax, financial or medical advice
 - "scam_reason" — only if scam_warning is true, otherwise leave empty string
 
 TARGET META:
