@@ -44,6 +44,8 @@ jobs:
             --exclude='README.md' \
             --exclude='LICENSE' \
             --exclude='_make_assets.py' \
+            --exclude='og.png' \
+            --exclude='404.html' \
             source/landing/ target/
 
       - name: Commit and push if there are changes
