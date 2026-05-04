@@ -71,6 +71,11 @@
         "appleId": "m.tran@icloud.com",
         "ascAppId": "6765859779",
         "appleTeamId": "PGL9WMXPG7"
+      },
+      "android": {
+        "serviceAccountKeyPath": "./secrets/google-play-service-account.json",
+        "track": "internal",
+        "releaseStatus": "draft"
       }
     }
   }
