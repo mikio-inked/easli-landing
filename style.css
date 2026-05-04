@@ -461,34 +461,12 @@ h1 .underline-wiggle::after {
   display: flex;
   flex-direction: column;
 }
-/* Status bar sits level with Dynamic Island, flanking it */
+/* Status bar hidden — Dynamic Island only at top */
 .phone-status {
-  padding: 16px 24px 6px;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--ink);
-  min-height: 38px;
-}
-.phone-time {
-  padding-left: 4px;
-  letter-spacing: -0.2px;
-}
-.phone-status-icons {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  color: var(--ink);
-}
-.phone-status-icons svg {
-  height: 12px;
-  width: auto;
-  display: block;
+  display: none;
 }
 .phone-app-header {
-  padding: 10px 20px 10px;
+  padding: 56px 20px 12px;
   display: flex;
   align-items: center;
   gap: 10px;
