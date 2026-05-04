@@ -3252,7 +3252,7 @@ const ar: UIStrings = {
 };
 
 
-const STRINGS: Record<UIStringCode, UIStrings> = { en, zh, vi, tr, ru, es, de_simple };
+const STRINGS: Record<UIStringCode, UIStrings> = { en, zh, vi, tr, ru, es, de_simple, fr, it, pl, ar };
 
 // Narrow any LanguageCode (25+ in total) down to one of the 7 UI-translated
 // string bundles. Codes we have no hand-translation for fall back to English
@@ -3417,6 +3417,62 @@ const CATEGORY_LABELS: Record<UIStringCode, Record<CategoryCode, string>> = {
     work: '工作',
     education: '教育',
     other: '其他',
+  },
+  fr: {
+    tax: 'Impôts',
+    insurance: 'Assurance',
+    rent: 'Loyer',
+    bank: 'Banque',
+    health: 'Santé',
+    government: 'Administration',
+    court: 'Justice',
+    utilities: 'Énergie',
+    telecom: 'Téléphone et Internet',
+    work: 'Travail',
+    education: 'Éducation',
+    other: 'Autres',
+  },
+  it: {
+    tax: 'Tasse',
+    insurance: 'Assicurazione',
+    rent: 'Affitto',
+    bank: 'Banca',
+    health: 'Salute',
+    government: 'Pubblica amministrazione',
+    court: 'Giustizia',
+    utilities: 'Utenze',
+    telecom: 'Telefono e Internet',
+    work: 'Lavoro',
+    education: 'Istruzione',
+    other: 'Altro',
+  },
+  pl: {
+    tax: 'Podatki',
+    insurance: 'Ubezpieczenie',
+    rent: 'Czynsz',
+    bank: 'Bank',
+    health: 'Zdrowie',
+    government: 'Urząd',
+    court: 'Sąd',
+    utilities: 'Media',
+    telecom: 'Telefon i internet',
+    work: 'Praca',
+    education: 'Edukacja',
+    other: 'Inne',
+  },
+  ar: {
+    tax: 'الضرائب',
+    insurance: 'التأمين',
+    rent: 'الإيجار',
+    bank: 'البنك',
+    health: 'الصحة',
+    government: 'الجهات الحكومية',
+    court: 'المحكمة',
+    utilities: 'المرافق',
+    telecom: 'الهاتف والإنترنت',
+    work: 'العمل',
+    education: 'التعليم',
+    other: 'أخرى',
   },
 };
 
