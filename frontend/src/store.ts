@@ -195,12 +195,23 @@ export async function revokeConsent(): Promise<void> {
 }
 
 export async function resetAll(): Promise<void> {
+  // IMPORTANT: we intentionally KEEP `KEY_DEVICE` here. The device_id is the
+  // anchor of the paywall quota on the backend (`usage_records`). Wiping it
+  // would let a user reset their free-quota by tapping "Konto löschen",
+  // "Neu einrichten" or uninstalling/reinstalling the app.
+  //
+  // DSGVO Art. 17 is still satisfied because all personal data (analyses,
+  // chat messages, original scans, reminders) have already been deleted
+  // from the backend via DELETE /history/{device_id} before this call.
+  // The bare UUID that remains is pseudonymous and by itself has no
+  // personal data attached to it — a fresh `usage_records` entry is
+  // created lazily on next use with the same zero-data state.
   await AsyncStorage.multiRemove([
     KEY_LANG,
     KEY_APP_LANG_OVERRIDE,
     KEY_REPLY_LANG_MODE,
     KEY_REPLY_LANG_FIXED,
-    KEY_DEVICE,
+    // KEY_DEVICE,  ← removed on purpose, see note above
     KEY_ONBOARDED,
     KEY_CONSENT,
   ]);

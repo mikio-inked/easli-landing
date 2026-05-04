@@ -26,9 +26,9 @@ const RC_PUBLIC_KEY = (Platform.select<string>({
 // Keeping them centralised here means the paywall screen never has magic
 // strings.
 export const PRODUCT_IDS = {
-  singleLetter: 'klarpost_single_letter',
-  plusMonthly: 'klarpost_plus_monthly',
-  plusYearly: 'klarpost_plus_yearly',
+  singleLetter: 'easli_single_letter',
+  plusMonthly: 'easli_plus_monthly',
+  plusYearly: 'easli_plus_yearly',
 } as const;
 
 export const PLUS_ENTITLEMENT_ID = 'plus';
