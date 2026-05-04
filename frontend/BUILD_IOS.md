@@ -1,4 +1,4 @@
-# 📱 KlarPost — iOS Build Guide (eigener Expo-Account)
+# 📱 easli — iOS Build Guide (eigener Expo-Account)
 
 Dieser Guide beschreibt, wie du iOS Builds **direkt über deinen eigenen Expo-Account** machst,
 ohne den Emergent-Cloud-Build-Wrapper (der ein 12-Min-Timeout hatte).
@@ -64,7 +64,7 @@ Wenn du noch keine lokale Kopie hast: über GitHub klonen oder das Projekt aus E
 und in einen Ordner legen.
 
 ```bash
-cd /pfad/zu/deinem/klarpost-projekt/frontend
+cd /pfad/zu/deinem/easli-projekt/frontend
 yarn install         # oder: npm install
 ```
 
@@ -83,7 +83,7 @@ eas init
 ```
 
 Was passiert:
-- EAS fragt: „Create a new project for @dein-username/klarpost?" → **Ja**
+- EAS fragt: „Create a new project for @dein-username/easli?" → **Ja**
 - Es wird automatisch ein Eintrag in `app.json` hinzugefügt:
 
 ```json
@@ -232,4 +232,4 @@ cat frontend/.env
 
 ---
 
-_Stand: April 2026 | KlarPost MVP | Expo SDK 54_
+_Stand: April 2026 | easli MVP | Expo SDK 54_

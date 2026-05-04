@@ -1,5 +1,5 @@
 # ============================================================
-# KlarPost — iOS Build Script (Windows / PowerShell)
+# easli — iOS Build Script (Windows / PowerShell)
 # ============================================================
 # Usage:   .\scripts\build-ios.ps1 [profile]
 # Example: .\scripts\build-ios.ps1 production
@@ -21,7 +21,7 @@ function Write-Color($Text, $Color) {
 }
 
 Write-Color "============================================================" Cyan
-Write-Color "  KlarPost iOS Build (Windows)" Cyan
+Write-Color "  easli iOS Build (Windows)" Cyan
 Write-Color "  Profile: $Profile" Yellow
 Write-Color "============================================================" Cyan
 Write-Host ""
@@ -80,18 +80,19 @@ if ([string]::IsNullOrWhiteSpace($projectId)) {
     }
 }
 
-# Check .env exists and has backend URL
+# Check .env exists and has backend URL (informational only — production
+# profile in eas.json hardcodes EXPO_PUBLIC_BACKEND_URL, so .env is optional).
 if (-not (Test-Path ".env")) {
-    Write-Color "[ERROR] frontend/.env is missing" Red
-    exit 1
+    Write-Color "[WARN] frontend/.env is missing — using hardcoded URL from eas.json" Yellow
+} else {
+    $envContent = Get-Content ".env" -Raw
+    if ($envContent -notmatch "EXPO_PUBLIC_BACKEND_URL") {
+        Write-Color "[WARN] EXPO_PUBLIC_BACKEND_URL not set in .env — using eas.json default" Yellow
+    } else {
+        $backendUrl = (Get-Content ".env" | Where-Object { $_ -match "^EXPO_PUBLIC_BACKEND_URL=" }) -replace "^EXPO_PUBLIC_BACKEND_URL=", ""
+        Write-Color "[OK] Backend URL (from .env): $backendUrl" Green
+    }
 }
-$envContent = Get-Content ".env" -Raw
-if ($envContent -notmatch "EXPO_PUBLIC_BACKEND_URL") {
-    Write-Color "[ERROR] EXPO_PUBLIC_BACKEND_URL is not set in .env" Red
-    exit 1
-}
-$backendUrl = (Get-Content ".env" | Where-Object { $_ -match "^EXPO_PUBLIC_BACKEND_URL=" }) -replace "^EXPO_PUBLIC_BACKEND_URL=", ""
-Write-Color "[OK] Backend URL: $backendUrl" Green
 
 # --- 2. Confirm Build ------------------------------------------
 

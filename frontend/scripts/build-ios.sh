@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ============================================================
-# KlarPost — iOS Build Script
+# easli — iOS Build Script
 # ============================================================
 # Usage:   ./scripts/build-ios.sh [profile]
 # Example: ./scripts/build-ios.sh production
@@ -20,7 +20,7 @@ NC='\033[0m' # No Color
 PROFILE="${1:-production}"
 
 echo -e "${BLUE}============================================================${NC}"
-echo -e "${BLUE}  KlarPost iOS Build${NC}"
+echo -e "${BLUE}  easli iOS Build${NC}"
 echo -e "${BLUE}  Profile: ${YELLOW}${PROFILE}${NC}"
 echo -e "${BLUE}============================================================${NC}"
 echo ""
@@ -59,17 +59,23 @@ if [ -z "$PROJECT_ID" ]; then
   eas init
 fi
 
-# Check .env exists and has backend URL
+# Check .env exists and has backend URL (informational only — production
+# profile in eas.json hardcodes EXPO_PUBLIC_BACKEND_URL, so .env is optional
+# on the developer's local machine).
 if [ ! -f ".env" ]; then
-  echo -e "${RED}❌ Error: frontend/.env is missing${NC}"
-  exit 1
+  echo -e "${YELLOW}⚠️  Warning: frontend/.env is missing.${NC}"
+  echo -e "${YELLOW}   Production builds use the hardcoded URL from eas.json — proceeding.${NC}"
+elif ! grep -q "EXPO_PUBLIC_BACKEND_URL" .env; then
+  echo -e "${YELLOW}⚠️  Warning: EXPO_PUBLIC_BACKEND_URL is not set in .env${NC}"
+  echo -e "${YELLOW}   Production builds use the hardcoded URL from eas.json — proceeding.${NC}"
+else
+  BACKEND_URL=$(grep "EXPO_PUBLIC_BACKEND_URL" .env | cut -d '=' -f2-)
+  echo -e "${GREEN}✅ Backend URL (from .env): ${BACKEND_URL}${NC}"
 fi
-if ! grep -q "EXPO_PUBLIC_BACKEND_URL" .env; then
-  echo -e "${RED}❌ Error: EXPO_PUBLIC_BACKEND_URL is not set in .env${NC}"
-  exit 1
-fi
-BACKEND_URL=$(grep "EXPO_PUBLIC_BACKEND_URL" .env | cut -d '=' -f2-)
-echo -e "${GREEN}✅ Backend URL: ${BACKEND_URL}${NC}"
+
+# Show effective production URL from eas.json for the chosen profile
+EAS_URL=$(node -e "const j=require('./eas.json'); const p=j.build?.['$PROFILE']; console.log(p?.env?.EXPO_PUBLIC_BACKEND_URL || '(not set in eas.json)')" 2>/dev/null || echo "(unknown)")
+echo -e "${GREEN}✅ Profile [$PROFILE] backend URL: ${EAS_URL}${NC}"
 
 # --- 2. Confirm Build ------------------------------------------
 
