@@ -77,6 +77,11 @@ memory/test_credentials.md
 # Mobile development
 android-sdk/
 
+# Expo / Metro caches
+frontend/.metro-cache/
+**/.metro-cache/
+**/.expo/
+
 # Environment and credential files
 .env
 .env.*
@@ -84,7 +89,6 @@ android-sdk/
 *token.json*
 *credentials.json*
 credentials.json
-*.pem
 *.key
 .credentials
 
@@ -92,39 +96,3 @@ credentials.json
 # can resolve EXPO_PUBLIC_BACKEND_URL consistently. Secrets must NOT go
 # in this file; use `eas env:create --environment production` instead.
 !frontend/.env.production
--e 
-# Environment and credential files
-.env
-.env.*
-*.env
-credentials.json
-*.pem
-*.key
-.credentials
--e 
-# Environment and credential files
-.env
-.env.*
-*.env
-credentials.json
-*.pem
-*.key
-.credentials
--e 
-# Environment and credential files
-.env
-.env.*
-*.env
-credentials.json
-*.pem
-*.key
-.credentials
--e 
-# Environment and credential files
-.env
-.env.*
-*.env
-credentials.json
-*.pem
-*.key
-.credentials
