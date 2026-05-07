@@ -262,13 +262,24 @@ export default function ScanScreen() {
           <>
             <View style={styles.frameWrap}>
               <View style={styles.frame}>
-                <Image
-                  source={{
-                    uri: 'https://static.prod-images.emergentagent.com/jobs/1f0c6f21-2efe-4a5b-950e-770baf187f4d/images/0b5b9d6fb4e6a1a07ee423bf490d131ccfc6cfc7932ed41c51e126f29e0135cb.png',
-                  }}
-                  style={styles.frameImage}
-                  resizeMode="contain"
-                />
+                {/* Document outline with a soft scan beam — clean, on-brand,
+                    no external image. Replaces the previous remote 3D camera
+                    clipart that didn't fit the easli design system. */}
+                <View style={styles.frameDocOutline}>
+                  <View style={styles.frameDocLine} />
+                  <View style={[styles.frameDocLine, { width: '70%' }]} />
+                  <View style={[styles.frameDocLine, { width: '85%' }]} />
+                  <View style={[styles.frameDocLine, { width: '60%' }]} />
+                  <View style={[styles.frameDocLine, { width: '78%' }]} />
+                  <View style={styles.frameScanBeam} />
+                </View>
+                <View style={styles.frameCornerTL} />
+                <View style={styles.frameCornerTR} />
+                <View style={styles.frameCornerBL} />
+                <View style={styles.frameCornerBR} />
+                <View style={styles.frameIconBadge}>
+                  <ScanLine color={colors.white} size={28} strokeWidth={2.6} />
+                </View>
               </View>
             </View>
 
@@ -427,16 +438,102 @@ const styles = StyleSheet.create({
   },
   frameWrap: { alignItems: 'center', marginTop: spacing.sm },
   frame: {
-    width: 200,
-    height: 220,
+    width: 220,
+    height: 240,
     borderRadius: radius.lg,
     backgroundColor: colors.surface,
     alignItems: 'center',
     justifyContent: 'center',
     overflow: 'hidden',
+    position: 'relative',
     ...shadows.card,
   },
   frameImage: { width: '100%', height: '100%' },
+  frameDocOutline: {
+    width: 130,
+    height: 170,
+    borderRadius: 10,
+    backgroundColor: colors.white,
+    borderWidth: 1.5,
+    borderColor: colors.border,
+    paddingHorizontal: 14,
+    paddingTop: 22,
+    overflow: 'hidden',
+    position: 'relative',
+  },
+  frameDocLine: {
+    height: 8,
+    borderRadius: 3,
+    backgroundColor: colors.primarySoft,
+    marginBottom: 9,
+    width: '92%',
+  },
+  frameScanBeam: {
+    position: 'absolute',
+    left: 8,
+    right: 8,
+    top: '52%',
+    height: 3,
+    backgroundColor: colors.primary,
+    opacity: 0.85,
+    borderRadius: 2,
+  },
+  frameCornerTL: {
+    position: 'absolute',
+    top: 16,
+    left: 16,
+    width: 22,
+    height: 22,
+    borderTopWidth: 3,
+    borderLeftWidth: 3,
+    borderColor: colors.primary,
+    borderTopLeftRadius: 6,
+  },
+  frameCornerTR: {
+    position: 'absolute',
+    top: 16,
+    right: 16,
+    width: 22,
+    height: 22,
+    borderTopWidth: 3,
+    borderRightWidth: 3,
+    borderColor: colors.primary,
+    borderTopRightRadius: 6,
+  },
+  frameCornerBL: {
+    position: 'absolute',
+    bottom: 16,
+    left: 16,
+    width: 22,
+    height: 22,
+    borderBottomWidth: 3,
+    borderLeftWidth: 3,
+    borderColor: colors.primary,
+    borderBottomLeftRadius: 6,
+  },
+  frameCornerBR: {
+    position: 'absolute',
+    bottom: 16,
+    right: 16,
+    width: 22,
+    height: 22,
+    borderBottomWidth: 3,
+    borderRightWidth: 3,
+    borderColor: colors.primary,
+    borderBottomRightRadius: 6,
+  },
+  frameIconBadge: {
+    position: 'absolute',
+    bottom: 14,
+    right: 14,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...shadows.card,
+  },
 
   introTipCard: {
     flexDirection: 'row',

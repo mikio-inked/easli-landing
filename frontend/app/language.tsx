@@ -19,7 +19,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ArrowLeft, Check } from 'lucide-react-native';
 import { Button } from '../src/ui';
-import { LANGUAGES, LanguageCode, t } from '../src/i18n';
+import { LANGUAGES, LanguageCode, t, hasUIStrings } from '../src/i18n';
 import { EXPLANATION_LANGUAGES, LanguageEntry, normalizeLanguageCode } from '../src/languages';
 import {
   getAppLang,
@@ -162,6 +162,30 @@ export default function LanguageScreen() {
                 <View style={{ flex: 1 }}>
                   <Text style={styles.itemTitle}>{l.nativeName}</Text>
                   <Text style={styles.itemSubtitle}>{l.englishName}</Text>
+                  {mode === 'explanation' ? (
+                    <View
+                      style={[
+                        styles.langBadge,
+                        hasUIStrings(l.code)
+                          ? styles.langBadgeFull
+                          : styles.langBadgeExplainOnly,
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.langBadgeText,
+                          hasUIStrings(l.code)
+                            ? styles.langBadgeFullText
+                            : styles.langBadgeExplainOnlyText,
+                        ]}
+                        numberOfLines={1}
+                      >
+                        {hasUIStrings(l.code)
+                          ? t(chromeLang, 'lang_badge_full_ui')
+                          : t(chromeLang, 'lang_badge_explain_only')}
+                      </Text>
+                    </View>
+                  ) : null}
                 </View>
                 <View
                   style={[
@@ -246,6 +270,32 @@ const styles = StyleSheet.create({
     fontSize: fontSize.sm,
     color: colors.textSecondary,
     marginTop: 2,
+  },
+  langBadge: {
+    alignSelf: 'flex-start',
+    marginTop: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 999,
+    borderWidth: 1,
+  },
+  langBadgeFull: {
+    backgroundColor: '#E8F0FE',
+    borderColor: '#C9DBFC',
+  },
+  langBadgeExplainOnly: {
+    backgroundColor: '#F3F4F6',
+    borderColor: '#E5E7EB',
+  },
+  langBadgeText: {
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  langBadgeFullText: {
+    color: '#1F4FB8',
+  },
+  langBadgeExplainOnlyText: {
+    color: '#6B7280',
   },
   checkChip: {
     width: 28,

@@ -40,7 +40,7 @@ import { setConsent, setLanguage, getLanguage, setOnboarded } from '../src/store
 import { useLargeFontMode } from '../src/largeFontMode';
 import { colors, fontSize, fontWeight, gradient, radius, shadows, spacing } from '../src/theme';
 import { EasliMark, EasliWordmark } from '../src/brand';
-import { LanguageCode, t } from '../src/i18n';
+import { LanguageCode, t, hasUIStrings } from '../src/i18n';
 import { EXPLANATION_LANGUAGES, normalizeLanguageCode } from '../src/languages';
 import { LinearGradient } from 'expo-linear-gradient';
 
@@ -195,6 +195,7 @@ function LanguageStep({ lang, onPick, largeFont, onToggleLargeFont, onContinue }
           {EXPLANATION_LANGUAGES.map((l) => {
             const lcode = l.code.toLowerCase();
             const selected = selectedKey === lcode;
+            const fullUI = hasUIStrings(l.code);
             return (
               <Pressable
                 key={l.code}
@@ -222,6 +223,24 @@ function LanguageStep({ lang, onPick, largeFont, onToggleLargeFont, onContinue }
                       {l.englishName}
                     </Text>
                   ) : null}
+                  <View
+                    style={[
+                      styles.langBadge,
+                      fullUI ? styles.langBadgeFull : styles.langBadgeExplainOnly,
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.langBadgeText,
+                        fullUI ? styles.langBadgeFullText : styles.langBadgeExplainOnlyText,
+                      ]}
+                      numberOfLines={1}
+                    >
+                      {fullUI
+                        ? t(lang, 'lang_badge_full_ui')
+                        : t(lang, 'lang_badge_explain_only')}
+                    </Text>
+                  </View>
                 </View>
                 <View
                   style={[
@@ -679,6 +698,32 @@ const styles = StyleSheet.create({
     fontSize: fontSize.sm,
     color: colors.textSecondary,
     marginTop: 2,
+  },
+  langBadge: {
+    alignSelf: 'flex-start',
+    marginTop: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 999,
+    borderWidth: 1,
+  },
+  langBadgeFull: {
+    backgroundColor: '#E8F0FE',
+    borderColor: '#C9DBFC',
+  },
+  langBadgeExplainOnly: {
+    backgroundColor: '#F3F4F6',
+    borderColor: '#E5E7EB',
+  },
+  langBadgeText: {
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  langBadgeFullText: {
+    color: '#1F4FB8',
+  },
+  langBadgeExplainOnlyText: {
+    color: '#6B7280',
   },
   langRowCheckChip: {
     width: 26,

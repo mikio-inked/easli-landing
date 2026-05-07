@@ -19,9 +19,23 @@ export type LanguageCode =
   | 'hu' | 'el' | 'bg' | 'hr' | 'sr' | 'sq' | 'uk' | 'ar'
   | 'fa' | 'ur' | 'hi' | 'zh-Hans';
 
-// The 7 languages that have full hand-translated UI chrome. Used internally
-// by `t()` and `categoryLabel()` to decide which strings bundle to render.
+// The 11 languages that have full hand-translated UI chrome. Used internally
+// by `t()` and `categoryLabel()` to decide which strings bundle to render,
+// and exported as `UI_STRING_CODES` so the language picker can mark which
+// rows render the entire app UI in that language vs. only the AI explanations.
 type UIStringCode = 'de_simple' | 'en' | 'es' | 'vi' | 'tr' | 'ru' | 'zh' | 'fr' | 'it' | 'pl' | 'ar';
+
+export const UI_STRING_CODES: ReadonlySet<string> = new Set<string>([
+  'de_simple', 'de', 'en', 'es', 'vi', 'tr', 'ru', 'zh', 'fr', 'it', 'pl', 'ar',
+]);
+
+/** True if the given language has hand-translated UI chrome. `de` and `de_simple`
+ *  are aliased — both render the German UI bundle. */
+export function hasUIStrings(code: string | null | undefined): boolean {
+  if (!code) return false;
+  const c = code.toLowerCase();
+  return UI_STRING_CODES.has(c);
+}
 
 export interface Language {
   code: LanguageCode;
@@ -313,7 +327,10 @@ export type UIKey =
   | 'scanner_intro_tip'
   | 'pages_count_one'
   | 'pages_count_other'
-  | 'delete_page_confirm';
+  | 'delete_page_confirm'
+  // ---- Language picker badges ----
+  | 'lang_badge_full_ui'
+  | 'lang_badge_explain_only';
 
 type UIStrings = Record<UIKey, string>;
 
@@ -585,6 +602,8 @@ const en: UIStrings = {
   pages_count_one: '1 page scanned',
   pages_count_other: '{n} pages scanned',
   delete_page_confirm: 'Delete this page?',
+  lang_badge_full_ui: 'App + explanations',
+  lang_badge_explain_only: 'Explanations only · UI in English',
 };
 
 const zh: UIStrings = {
@@ -851,6 +870,8 @@ const zh: UIStrings = {
   pages_count_one: '已扫描 1 页',
   pages_count_other: '已扫描 {n} 页',
   delete_page_confirm: '是否删除此页？',
+  lang_badge_full_ui: 'App + 解释',
+  lang_badge_explain_only: '仅解释 · 界面为英文',
 };
 
 const vi: UIStrings = {
@@ -1119,6 +1140,8 @@ const vi: UIStrings = {
   pages_count_one: 'Đã quét 1 trang',
   pages_count_other: 'Đã quét {n} trang',
   delete_page_confirm: 'Xoá trang này?',
+  lang_badge_full_ui: 'App + giải thích',
+  lang_badge_explain_only: 'Chỉ giải thích · Giao diện tiếng Anh',
 };
 
 const tr: UIStrings = {
@@ -1387,6 +1410,8 @@ const tr: UIStrings = {
   pages_count_one: '1 sayfa tarandı',
   pages_count_other: '{n} sayfa tarandı',
   delete_page_confirm: 'Bu sayfa silinsin mi?',
+  lang_badge_full_ui: 'Uygulama + açıklamalar',
+  lang_badge_explain_only: 'Sadece açıklamalar · Arayüz İngilizce',
 };
 
 const ru: UIStrings = {
@@ -1655,6 +1680,8 @@ const ru: UIStrings = {
   pages_count_one: 'Отсканирована 1 страница',
   pages_count_other: 'Отсканировано {n} страниц',
   delete_page_confirm: 'Удалить эту страницу?',
+  lang_badge_full_ui: 'Приложение + объяснения',
+  lang_badge_explain_only: 'Только объяснения · UI на английском',
 };
 
 const es: UIStrings = {
@@ -1923,6 +1950,8 @@ const es: UIStrings = {
   pages_count_one: '1 página escaneada',
   pages_count_other: '{n} páginas escaneadas',
   delete_page_confirm: '¿Eliminar esta página?',
+  lang_badge_full_ui: 'App + explicaciones',
+  lang_badge_explain_only: 'Solo explicaciones · UI en inglés',
 };
 
 // Simple German — Leichte / Einfache Sprache. Short sentences, common words,
@@ -2193,6 +2222,8 @@ const de_simple: UIStrings = {
   pages_count_one: '1 Seite gescannt',
   pages_count_other: '{n} Seiten gescannt',
   delete_page_confirm: 'Diese Seite löschen?',
+  lang_badge_full_ui: 'App + Erklärungen',
+  lang_badge_explain_only: 'Nur Erklärungen · UI auf Englisch',
 };
 
 const fr: UIStrings = {
@@ -2457,6 +2488,8 @@ const fr: UIStrings = {
   pages_count_one: '1 page scannée',
   pages_count_other: '{n} pages scannées',
   delete_page_confirm: 'Supprimer cette page ?',
+  lang_badge_full_ui: 'App + explications',
+  lang_badge_explain_only: 'Explications seules · UI en anglais',
 };
 
 const it: UIStrings = {
@@ -2721,6 +2754,8 @@ const it: UIStrings = {
   pages_count_one: '1 pagina scansionata',
   pages_count_other: '{n} pagine scansionate',
   delete_page_confirm: 'Eliminare questa pagina?',
+  lang_badge_full_ui: 'App + spiegazioni',
+  lang_badge_explain_only: 'Solo spiegazioni · UI in inglese',
 };
 
 const pl: UIStrings = {
@@ -2985,6 +3020,8 @@ const pl: UIStrings = {
   pages_count_one: 'Zeskanowano 1 stronę',
   pages_count_other: 'Zeskanowano {n} stron',
   delete_page_confirm: 'Usunąć tę stronę?',
+  lang_badge_full_ui: 'Aplikacja + wyjaśnienia',
+  lang_badge_explain_only: 'Tylko wyjaśnienia · Interfejs po angielsku',
 };
 
 const ar: UIStrings = {
@@ -3249,6 +3286,8 @@ const ar: UIStrings = {
   pages_count_one: 'تم مسح صفحة واحدة',
   pages_count_other: 'تم مسح {n} صفحات',
   delete_page_confirm: 'حذف هذه الصفحة؟',
+  lang_badge_full_ui: 'التطبيق + الشروح',
+  lang_badge_explain_only: 'الشروح فقط · الواجهة بالإنجليزية',
 };
 
 
