@@ -1154,3 +1154,111 @@ footer nav a:hover { color: var(--primary); }
     animation-range: entry 0% entry 60%;
   }
 }
+
+/* ====== 12 WORLDS GRID ====== */
+.block-head {
+  text-align: center;
+  margin: 0 auto 48px;
+  max-width: 720px;
+}
+.block-head .eyebrow {
+  margin-bottom: 16px;
+  display: inline-flex;
+}
+.block-head h2 {
+  font-size: clamp(28px, 4vw, 44px);
+  line-height: 1.15;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  margin: 0 0 16px;
+}
+.block-lede {
+  font-size: 17px;
+  line-height: 1.6;
+  color: var(--text-soft, #4a5568);
+  margin: 0;
+}
+
+.worlds-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 16px;
+  max-width: 1100px;
+  margin: 0 auto;
+}
+
+.world-tile {
+  background: #fff;
+  border: 1px solid var(--border, #e6ebf2);
+  border-radius: 16px;
+  padding: 20px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+  position: relative;
+  overflow: hidden;
+}
+.world-tile::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, rgba(31, 111, 235, 0.04) 0%, transparent 100%);
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  pointer-events: none;
+}
+.world-tile:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 24px -8px rgba(15, 37, 64, 0.12);
+  border-color: rgba(31, 111, 235, 0.35);
+}
+.world-tile:hover::before {
+  opacity: 1;
+}
+.world-tile .world-emoji {
+  font-size: 28px;
+  line-height: 1;
+  margin-bottom: 4px;
+}
+.world-tile h3 {
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--text, #0F2540);
+  margin: 0;
+}
+.world-tile p {
+  font-size: 14px;
+  line-height: 1.45;
+  color: var(--text-soft, #4a5568);
+  margin: 0;
+}
+
+/* Special-case the scam-shield tile to stand out */
+.worlds-grid .world-tile:last-child {
+  background: linear-gradient(135deg, #FFF4E5 0%, #FFFFFF 80%);
+  border-color: #F59E0B;
+}
+.worlds-grid .world-tile:last-child h3 {
+  color: #8B5A1C;
+}
+.worlds-grid .world-tile:last-child::before {
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.08) 0%, transparent 100%);
+}
+
+@media (max-width: 540px) {
+  .worlds-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+  }
+  .world-tile {
+    padding: 16px 14px;
+  }
+  .world-tile h3 {
+    font-size: 15px;
+  }
+  .world-tile p {
+    font-size: 13px;
+  }
+}
