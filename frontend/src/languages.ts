@@ -71,7 +71,7 @@ export const SOURCE_LANGUAGES: LanguageEntry[] = [
   { code: 'uk',  nativeName: 'Українська',  englishName: 'Ukrainian',   flag: '🇺🇦' },
   { code: 'ru',  nativeName: 'Русский',     englishName: 'Russian',     flag: '🇷🇺' },
   { code: 'tr',  nativeName: 'Türkçe',      englishName: 'Turkish',     flag: '🇹🇷' },
-  { code: 'ar',  nativeName: 'العربية',     englishName: 'Arabic',      flag: '🌐' },
+  { code: 'ar',  nativeName: 'العربية',     englishName: 'Arabic',      flag: '🇸🇦' },
 ];
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -101,7 +101,7 @@ export const EXPLANATION_LANGUAGES: LanguageEntry[] = [
   { code: 'uk',      nativeName: 'Українська',  englishName: 'Ukrainian',              flag: '🇺🇦' },
   { code: 'ru',      nativeName: 'Русский',     englishName: 'Russian',                flag: '🇷🇺' },
   { code: 'tr',      nativeName: 'Türkçe',      englishName: 'Turkish',                flag: '🇹🇷' },
-  { code: 'ar',      nativeName: 'العربية',     englishName: 'Arabic',                 flag: '🌐' },
+  { code: 'ar',      nativeName: 'العربية',     englishName: 'Arabic',                 flag: '🇸🇦' },
   { code: 'fa',      nativeName: 'فارسی',       englishName: 'Persian (Farsi)',        flag: '🇮🇷' },
   { code: 'ur',      nativeName: 'اردو',        englishName: 'Urdu',                   flag: '🇵🇰' },
   { code: 'hi',      nativeName: 'हिन्दी',       englishName: 'Hindi',                  flag: '🇮🇳' },
