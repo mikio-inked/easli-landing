@@ -1108,7 +1108,7 @@ export default function ResultScreen() {
               <View style={{ marginBottom: spacing.sm }}>
                 <ReadAloudButton
                   text={r.simple_explanation_translated}
-                  lang={lang}
+                  lang={effectiveDisplayLang}
                   testID="read-aloud-explanation"
                 />
               </View>
