@@ -14,37 +14,77 @@ import { LanguageCode, t } from '../i18n';
 import { colors, fontSize, fontWeight, radius, spacing } from '../theme';
 
 // Map our app LanguageCode → BCP-47 locales the system TTS understands.
-// Only covers the 7 UI-translated languages; for Phase EU-1 codes we fall
-// back to a reasonable locale at call-time (see `pickTtsLocale` below).
-const TTS_LOCALES: Partial<Record<LanguageCode, string>> = {
+// Covers every language present in EXPLANATION_LANGUAGES (37 codes) plus
+// some aliases. For unknown codes the resolver below falls back to passing
+// the raw language tag (e.g. "sk") which iOS/Android still try to honour
+// before defaulting to system language.
+const TTS_LOCALES: Partial<Record<LanguageCode | string, string>> = {
+  // UI-supported (11)
   en: 'en-US',
-  de_simple: 'de-DE',
   de: 'de-DE',
+  de_simple: 'de-DE',
   es: 'es-ES',
+  fr: 'fr-FR',
+  it: 'it-IT',
+  pl: 'pl-PL',
   ru: 'ru-RU',
   tr: 'tr-TR',
   vi: 'vi-VN',
   zh: 'zh-CN',
   'zh-Hans': 'zh-CN',
-  fr: 'fr-FR',
-  it: 'it-IT',
+  'zh-Hant': 'zh-TW',
+  ar: 'ar-SA',
+  // Western European
   pt: 'pt-PT',
   nl: 'nl-NL',
-  pl: 'pl-PL',
+  ga: 'ga-IE',
+  mt: 'mt-MT',
+  // Nordic
+  sv: 'sv-SE',
+  da: 'da-DK',
+  no: 'nb-NO',  // Bokmål — most common Norwegian on iOS
+  nb: 'nb-NO',
+  nn: 'nn-NO',
+  fi: 'fi-FI',
+  is: 'is-IS',
+  // Baltic
+  et: 'et-EE',
+  lv: 'lv-LV',
+  lt: 'lt-LT',
+  // Central / Eastern European
   ro: 'ro-RO',
   cs: 'cs-CZ',
+  sk: 'sk-SK',
+  sl: 'sl-SI',
   hu: 'hu-HU',
-  el: 'el-GR',
-  bg: 'bg-BG',
   hr: 'hr-HR',
   sr: 'sr-RS',
+  bs: 'bs-BA',
   sq: 'sq-AL',
+  bg: 'bg-BG',
+  el: 'el-GR',
   uk: 'uk-UA',
-  ar: 'ar-SA',
+  // Middle East / Asian
   fa: 'fa-IR',
   ur: 'ur-PK',
   hi: 'hi-IN',
 };
+
+/** Resolve a TTS locale string for a given language code.
+ *  Falls back to the bare language tag (system TTS will then try its closest
+ *  match), and finally to en-US as a last-ditch default. */
+function resolveTtsLocale(code: string | null | undefined): string {
+  if (!code) return 'en-US';
+  const direct = TTS_LOCALES[code as LanguageCode];
+  if (direct) return direct;
+  // strip region/variant suffixes ("zh-CN" → "zh") for the lookup
+  const base = code.split(/[-_]/)[0];
+  const baseHit = TTS_LOCALES[base as LanguageCode];
+  if (baseHit) return baseHit;
+  // Last resort: hand the raw code to the engine. iOS/Android usually pick
+  // a sane default if the language is installed; otherwise they no-op.
+  return base || 'en-US';
+}
 
 export function ReadAloudButton({
   text,
@@ -80,7 +120,7 @@ export function ReadAloudButton({
       }
       setSpeaking(true);
       Speech.speak(text, {
-        language: TTS_LOCALES[lang] || 'en-US',
+        language: resolveTtsLocale(lang),
         rate: 0.95,
         pitch: 1.0,
         onDone: () => setSpeaking(false),
