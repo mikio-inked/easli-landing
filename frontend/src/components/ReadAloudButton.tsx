@@ -7,8 +7,9 @@
 // (we don't crash).
 
 import { useEffect, useRef, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Alert, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import * as Speech from 'expo-speech';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Pause, Play, Volume2 } from 'lucide-react-native';
 import { LanguageCode, t } from '../i18n';
 import { colors, fontSize, fontWeight, radius, spacing } from '../theme';
@@ -86,6 +87,112 @@ function resolveTtsLocale(code: string | null | undefined): string {
   return base || 'en-US';
 }
 
+/**
+ * Voice quality preference order, highest first.
+ *   - "Premium"  : Apple Neural voices (most human, ~80–200 MB download)
+ *   - "Enhanced" : Apple Compact 2-gen voices (still very natural)
+ *   - "Default"  : Old robot-sounding voices (avoid when possible)
+ *
+ * Android-side, expo-speech doesn't expose a "quality" flag — every voice has
+ * `quality === 'Default'`. We still pick whichever locale-matching voice has
+ * `notInstalled === false` so we don't trigger an inline download prompt.
+ */
+const VOICE_QUALITY_RANK: Record<string, number> = {
+  Premium: 3,
+  Enhanced: 2,
+  Default: 1,
+};
+
+type SpeechVoice = {
+  identifier: string;
+  language: string;
+  quality?: string;
+  name?: string;
+  notInstalled?: boolean;
+};
+
+let cachedVoices: SpeechVoice[] | null = null;
+
+async function getVoices(): Promise<SpeechVoice[]> {
+  if (cachedVoices) return cachedVoices;
+  try {
+    const list = await Speech.getAvailableVoicesAsync();
+    cachedVoices = (list as unknown as SpeechVoice[]) || [];
+  } catch {
+    cachedVoices = [];
+  }
+  return cachedVoices;
+}
+
+/** Pick the best available system voice for the given BCP-47 locale.
+ *  Strategy:
+ *   1. Exact locale match with Premium/Enhanced quality.
+ *   2. Exact locale match with any quality.
+ *   3. Same base language (e.g. de-DE locale → de-AT voice) with Premium/Enhanced.
+ *   4. Same base language, any quality.
+ *   5. null → Speech.speak falls back to the system default voice.
+ */
+async function pickBestVoice(locale: string): Promise<SpeechVoice | null> {
+  const voices = await getVoices();
+  if (!voices.length) return null;
+
+  const norm = (s: string) => s.toLowerCase().replace(/_/g, '-');
+  const target = norm(locale);
+  const targetBase = target.split('-')[0];
+
+  const installed = voices.filter((v) => v.notInstalled !== true);
+
+  const score = (v: SpeechVoice): number => {
+    const lang = norm(v.language || '');
+    const exact = lang === target;
+    const baseMatch = lang.split('-')[0] === targetBase;
+    if (!exact && !baseMatch) return -1;
+    const q = VOICE_QUALITY_RANK[v.quality || 'Default'] ?? 1;
+    // Boost exact-locale matches above base-language matches.
+    return q * 10 + (exact ? 5 : 0);
+  };
+
+  let best: SpeechVoice | null = null;
+  let bestScore = -1;
+  for (const v of installed) {
+    const s = score(v);
+    if (s > bestScore) {
+      bestScore = s;
+      best = v;
+    }
+  }
+  return best;
+}
+
+const VOICE_HINT_KEY = 'easli.voiceHintShown.v1';
+
+/** First time the user taps Read-Aloud and we couldn't find an Enhanced/Premium
+ *  voice on iOS, surface a one-time tip pointing at the OS voice download. */
+async function maybeShowVoiceHint(
+  lang: LanguageCode | null | undefined,
+  picked: SpeechVoice | null,
+): Promise<void> {
+  if (Platform.OS !== 'ios') return;
+  const q = picked?.quality;
+  if (q === 'Enhanced' || q === 'Premium') return;
+
+  try {
+    const seen = await AsyncStorage.getItem(VOICE_HINT_KEY);
+    if (seen) return;
+    await AsyncStorage.setItem(VOICE_HINT_KEY, '1');
+  } catch {
+    return;
+  }
+
+  const title = t(lang || 'en', 'read_aloud_a11y');
+  Alert.alert(
+    title,
+    'Tip: For a more natural-sounding voice, open\nSettings → Accessibility → Spoken Content → Voices,\npick your language and download the "Enhanced" or "Premium" voice.',
+    [{ text: 'OK' }],
+    { cancelable: true },
+  );
+}
+
 export function ReadAloudButton({
   text,
   lang,
@@ -119,8 +226,17 @@ export function ReadAloudButton({
         await Speech.stop();
       }
       setSpeaking(true);
+      const targetLocale = resolveTtsLocale(lang);
+      const bestVoice = await pickBestVoice(targetLocale);
+
+      // First-time tip: if we couldn't find an Enhanced/Premium voice on iOS,
+      // show a friendly one-time hint pointing the user at the OS settings.
+      // (Doesn't block playback — TTS still works with the default voice.)
+      await maybeShowVoiceHint(lang, bestVoice);
+
       Speech.speak(text, {
-        language: resolveTtsLocale(lang),
+        language: targetLocale,
+        voice: bestVoice?.identifier,  // undefined → system default
         rate: 0.95,
         pitch: 1.0,
         onDone: () => setSpeaking(false),
