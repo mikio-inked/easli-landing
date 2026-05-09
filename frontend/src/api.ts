@@ -417,3 +417,42 @@ export async function generateReply(
     reply_explanation?: string;
   }>(res);
 }
+
+
+// ============================================================
+// Redemption codes (hidden Friends & Family flow)
+// ============================================================
+export interface RedeemResult {
+  ok: boolean;
+  tier?: 'lifetime' | 'plus_year' | 'plus_month' | string;
+  message: string;
+  plus_active: boolean;
+  plus_lifetime: boolean;
+  plus_period_end?: string | null;
+}
+
+/** Public endpoint — redeem a Friends & Family code.
+ *
+ *  The backend validates capacity / expiry / active flag and, on success,
+ *  flips the device's `usage_records` doc to `plus_active=true` (plus
+ *  `plus_lifetime=true` for lifetime tier). Re-running with the same
+ *  device_id is idempotent (returns ok=true with message "Already redeemed").
+ *
+ *  Caller MUST refresh the local Usage hook afterwards so the paywall
+ *  badge updates without a full app restart. */
+export async function redeemCode(
+  deviceId: string,
+  code: string,
+): Promise<RedeemResult> {
+  const res = await fetch(`${BASE_URL}/api/redeem`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      device_id: deviceId,
+      code: (code || '').trim(),
+    }),
+  });
+  // The backend returns 200 with { ok: false, message } for "code not found"
+  // type errors — the throw path in jsonOrThrow only fires on 4xx/5xx.
+  return jsonOrThrow<RedeemResult>(res);
+}

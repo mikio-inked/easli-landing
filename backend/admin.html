@@ -1,0 +1,643 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<meta name="robots" content="noindex,nofollow" />
+<title>easli · Admin</title>
+<style>
+  :root {
+    --bg: #0b1220;
+    --panel: #121a2e;
+    --panel-2: #1a2440;
+    --border: #2a3554;
+    --text: #e6eaf5;
+    --muted: #8a93b3;
+    --accent: #1f6feb;
+    --accent-hover: #4187f7;
+    --good: #10b981;
+    --warn: #f59e0b;
+    --danger: #ef4444;
+    --code-bg: #0f1729;
+  }
+  * { box-sizing: border-box }
+  html, body { margin: 0; padding: 0 }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, system-ui, sans-serif;
+    font-size: 14px;
+    line-height: 1.55;
+    min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
+  }
+  a { color: var(--accent); text-decoration: none }
+  a:hover { color: var(--accent-hover) }
+  button, input, select, textarea {
+    font: inherit;
+    color: inherit;
+  }
+  button {
+    background: var(--accent);
+    border: 0;
+    color: #fff;
+    padding: 8px 14px;
+    border-radius: 7px;
+    cursor: pointer;
+    font-weight: 600;
+    transition: background 0.15s;
+  }
+  button:hover { background: var(--accent-hover) }
+  button:disabled { opacity: 0.5; cursor: not-allowed }
+  button.secondary { background: var(--panel-2); border: 1px solid var(--border) }
+  button.secondary:hover { background: var(--border) }
+  button.danger { background: var(--danger) }
+  button.danger:hover { background: #f87171 }
+  button.ghost { background: transparent; border: 1px solid var(--border); color: var(--text) }
+  button.ghost:hover { background: var(--panel-2) }
+  input, select, textarea {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 7px;
+    padding: 9px 12px;
+    width: 100%;
+    color: var(--text);
+  }
+  input:focus, select:focus, textarea:focus {
+    outline: 0;
+    border-color: var(--accent);
+  }
+  label { display: block; margin-bottom: 4px; color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: 0.4px }
+  .container { max-width: 1240px; margin: 0 auto; padding: 24px }
+  header.topbar {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 16px 24px; border-bottom: 1px solid var(--border);
+    background: var(--panel);
+  }
+  header.topbar .brand { font-size: 18px; font-weight: 700 }
+  header.topbar .brand .badge { font-size: 11px; padding: 2px 8px; border-radius: 99px; background: var(--accent); margin-left: 8px; vertical-align: middle }
+  nav.tabs { display: flex; gap: 4px; padding: 0 24px; border-bottom: 1px solid var(--border); background: var(--panel) }
+  nav.tabs button {
+    background: transparent; color: var(--muted); border-radius: 0;
+    border-bottom: 2px solid transparent; padding: 12px 16px; font-weight: 600;
+  }
+  nav.tabs button.active { color: var(--text); border-bottom-color: var(--accent) }
+  nav.tabs button:hover { color: var(--text) }
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 20px;
+    margin-bottom: 18px;
+  }
+  .panel h2 { margin: 0 0 14px; font-size: 17px }
+  .grid { display: grid; gap: 16px }
+  .grid-4 { grid-template-columns: repeat(4, 1fr) }
+  .grid-3 { grid-template-columns: repeat(3, 1fr) }
+  .grid-2 { grid-template-columns: repeat(2, 1fr) }
+  @media (max-width: 760px) {
+    .grid-4, .grid-3, .grid-2 { grid-template-columns: 1fr }
+  }
+  .stat {
+    background: var(--panel-2); padding: 16px; border-radius: 9px;
+    border: 1px solid var(--border);
+  }
+  .stat .num { font-size: 28px; font-weight: 700; color: var(--text) }
+  .stat .lbl { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.4px }
+  table { width: 100%; border-collapse: collapse; font-size: 13px }
+  th, td { padding: 10px 12px; text-align: left; border-bottom: 1px solid var(--border) }
+  th { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.4px; font-weight: 600 }
+  td.mono { font-family: ui-monospace, SF Mono, Menlo, Consolas, monospace; font-size: 12px }
+  td .pill { display: inline-block; padding: 2px 8px; border-radius: 99px; font-size: 11px; font-weight: 600 }
+  .pill.good { background: rgba(16,185,129,0.15); color: var(--good) }
+  .pill.warn { background: rgba(245,158,11,0.15); color: var(--warn) }
+  .pill.muted { background: var(--panel-2); color: var(--muted) }
+  .pill.danger { background: rgba(239,68,68,0.15); color: var(--danger) }
+  .toast {
+    position: fixed; right: 18px; top: 18px; z-index: 99;
+    background: var(--panel-2); border: 1px solid var(--border);
+    padding: 10px 16px; border-radius: 8px; box-shadow: 0 6px 20px rgba(0,0,0,0.4);
+    max-width: 360px;
+  }
+  .toast.error { border-color: var(--danger); color: var(--danger) }
+  .toast.ok { border-color: var(--good); color: var(--good) }
+  .center-card {
+    max-width: 420px; margin: 80px auto; background: var(--panel);
+    border: 1px solid var(--border); border-radius: 12px; padding: 32px;
+  }
+  .center-card h1 { margin: 0 0 8px; font-size: 22px }
+  .center-card .sub { color: var(--muted); margin-bottom: 24px }
+  .row { display: flex; gap: 12px; align-items: end }
+  .row > * { flex: 1 }
+  .row > button { flex: 0 0 auto }
+  .empty { text-align: center; color: var(--muted); padding: 40px 20px }
+  code { font-family: ui-monospace, SF Mono, Menlo, monospace; background: var(--code-bg); padding: 2px 6px; border-radius: 4px; font-size: 12px }
+  .copy-btn { background: transparent; border: 0; color: var(--accent); cursor: pointer; font-size: 12px; padding: 0 6px }
+  .copy-btn:hover { color: var(--accent-hover); background: transparent }
+  .actions { display: flex; gap: 6px; flex-wrap: wrap }
+  .small { font-size: 12px; color: var(--muted) }
+  .hidden { display: none !important }
+  .spinner { display: inline-block; width: 14px; height: 14px; border: 2px solid var(--muted); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.7s linear infinite; vertical-align: middle }
+  @keyframes spin { to { transform: rotate(360deg) } }
+  .filter-bar { display: flex; gap: 10px; margin-bottom: 14px }
+  .filter-bar > * { flex: 1 }
+  .filter-bar > button { flex: 0 0 auto }
+</style>
+</head>
+<body>
+
+<!-- ========== Toast container ========== -->
+<div id="toast-host"></div>
+
+<!-- ========== Login / Setup screen ========== -->
+<div id="auth-screen" class="hidden">
+  <div class="center-card">
+    <h1 id="auth-title">easli admin</h1>
+    <p class="sub" id="auth-sub">Loading…</p>
+
+    <form id="auth-form" onsubmit="return false">
+      <label for="auth-pwd">Password</label>
+      <input type="password" id="auth-pwd" autofocus autocomplete="current-password" />
+      <div id="auth-pwd2-wrap" class="hidden" style="margin-top:12px">
+        <label for="auth-pwd2">Confirm password</label>
+        <input type="password" id="auth-pwd2" autocomplete="new-password" />
+      </div>
+      <div style="margin-top: 18px">
+        <button id="auth-submit" type="submit" style="width:100%">Continue</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ========== Authenticated UI ========== -->
+<div id="app-screen" class="hidden">
+  <header class="topbar">
+    <div class="brand">easli admin <span class="badge">v1</span></div>
+    <div>
+      <span class="small" id="session-info"></span>
+      <button class="ghost" id="logout-btn" style="margin-left:12px">Sign out</button>
+    </div>
+  </header>
+
+  <nav class="tabs">
+    <button data-tab="dashboard" class="active">Dashboard</button>
+    <button data-tab="users">Users</button>
+    <button data-tab="codes">Redemption Codes</button>
+  </nav>
+
+  <main class="container">
+
+    <!-- ========== DASHBOARD ========== -->
+    <section data-pane="dashboard">
+      <div class="grid grid-4">
+        <div class="stat"><div class="num" id="stat-total-users">…</div><div class="lbl">Total users</div></div>
+        <div class="stat"><div class="num" id="stat-active-today">…</div><div class="lbl">Active today</div></div>
+        <div class="stat"><div class="num" id="stat-active-week">…</div><div class="lbl">Active 7-day</div></div>
+        <div class="stat"><div class="num" id="stat-plus-active">…</div><div class="lbl">Plus active</div></div>
+      </div>
+      <div style="height: 16px"></div>
+      <div class="grid grid-4">
+        <div class="stat"><div class="num" id="stat-total-analyses">…</div><div class="lbl">Total analyses</div></div>
+        <div class="stat"><div class="num" id="stat-analyses-today">…</div><div class="lbl">Analyses today</div></div>
+        <div class="stat"><div class="num" id="stat-analyses-week">…</div><div class="lbl">Analyses 7-day</div></div>
+        <div class="stat"><div class="num" id="stat-lifetime">…</div><div class="lbl">Lifetime users</div></div>
+      </div>
+
+      <div style="height: 24px"></div>
+
+      <div class="grid grid-2">
+        <div class="panel">
+          <h2>Top languages</h2>
+          <table>
+            <thead><tr><th>Language</th><th style="text-align:right">Count</th></tr></thead>
+            <tbody id="top-languages-body"></tbody>
+          </table>
+        </div>
+        <div class="panel">
+          <h2>Top countries</h2>
+          <table>
+            <thead><tr><th>Country</th><th style="text-align:right">Count</th></tr></thead>
+            <tbody id="top-countries-body"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========== USERS ========== -->
+    <section data-pane="users" class="hidden">
+      <div class="panel">
+        <div class="filter-bar">
+          <input id="users-search" placeholder="Search by device_id (substring)…" />
+          <button id="users-search-btn">Search</button>
+        </div>
+        <div id="users-list-wrap">
+          <div class="empty">Loading…</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========== CODES ========== -->
+    <section data-pane="codes" class="hidden">
+      <div class="panel">
+        <h2>Generate new code</h2>
+        <div class="grid grid-3" style="margin-bottom: 14px">
+          <div>
+            <label>Tier</label>
+            <select id="new-code-tier">
+              <option value="lifetime">Lifetime (forever)</option>
+              <option value="plus_year">Plus 1 year</option>
+              <option value="plus_month">Plus 1 month</option>
+            </select>
+          </div>
+          <div>
+            <label>Max uses</label>
+            <input type="number" id="new-code-uses" value="1" min="1" max="10000" />
+          </div>
+          <div>
+            <label>Custom code (optional)</label>
+            <input type="text" id="new-code-custom" placeholder="EASLI-FAMILY-2026" maxlength="40" />
+          </div>
+        </div>
+        <div class="grid grid-2" style="margin-bottom:14px">
+          <div>
+            <label>Note (internal, e.g. "Mom's code")</label>
+            <input id="new-code-note" />
+          </div>
+          <div>
+            <label>Expires at (optional, ISO date)</label>
+            <input id="new-code-exp" placeholder="2027-12-31" />
+          </div>
+        </div>
+        <button id="create-code-btn">Generate &amp; copy to clipboard</button>
+      </div>
+
+      <div class="panel">
+        <h2 style="display:flex; justify-content:space-between; align-items:center">
+          Existing codes
+          <button class="ghost" id="reload-codes">Reload</button>
+        </h2>
+        <div id="codes-list-wrap"><div class="empty">Loading…</div></div>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<script>
+//==========================================================================
+// State + helpers
+//==========================================================================
+const TOKEN_KEY = "easli.adminToken";
+const TOKEN_EXP_KEY = "easli.adminTokenExp";
+
+function getToken() { return localStorage.getItem(TOKEN_KEY) }
+function setToken(t, exp) {
+  if (t) { localStorage.setItem(TOKEN_KEY, t); localStorage.setItem(TOKEN_EXP_KEY, exp || ""); }
+  else   { localStorage.removeItem(TOKEN_KEY); localStorage.removeItem(TOKEN_EXP_KEY); }
+}
+function isTokenExpired() {
+  const exp = localStorage.getItem(TOKEN_EXP_KEY);
+  if (!exp) return true;
+  return new Date(exp).getTime() < Date.now();
+}
+
+async function api(path, opts = {}) {
+  const headers = Object.assign(
+    { "Content-Type": "application/json" },
+    opts.headers || {},
+  );
+  const tok = getToken();
+  if (tok && opts.auth !== false) headers["Authorization"] = "Bearer " + tok;
+  const res = await fetch(path, { ...opts, headers });
+  let body = null;
+  try { body = await res.json(); } catch (_) { /* noop */ }
+  if (!res.ok) {
+    const msg = (body && (body.detail || body.message)) || ("HTTP " + res.status);
+    if (res.status === 401) {
+      setToken(null);
+      showAuthScreen();
+    }
+    throw new Error(msg);
+  }
+  return body;
+}
+
+function toast(msg, kind = "ok") {
+  const el = document.createElement("div");
+  el.className = "toast " + kind;
+  el.textContent = msg;
+  document.getElementById("toast-host").appendChild(el);
+  setTimeout(() => el.remove(), 4500);
+}
+
+function fmt(n) { return new Intl.NumberFormat().format(n) }
+
+//==========================================================================
+// Auth flow — Setup vs Login
+//==========================================================================
+async function showAuthScreen() {
+  document.getElementById("app-screen").classList.add("hidden");
+  document.getElementById("auth-screen").classList.remove("hidden");
+
+  const status = await api("/api/admin/setup-status", { auth: false });
+  const isSetup = !!status.setup_completed;
+  const sub = document.getElementById("auth-sub");
+  const pwd2 = document.getElementById("auth-pwd2-wrap");
+  const submit = document.getElementById("auth-submit");
+
+  if (!isSetup) {
+    document.getElementById("auth-title").textContent = "Welcome — first-time setup";
+    sub.textContent = "Choose a strong master password (at least 8 chars). You'll use this to log in.";
+    pwd2.classList.remove("hidden");
+    submit.textContent = "Set password";
+  } else {
+    document.getElementById("auth-title").textContent = "easli admin";
+    sub.textContent = "Enter master password to continue.";
+    pwd2.classList.add("hidden");
+    submit.textContent = "Log in";
+  }
+
+  document.getElementById("auth-form").onsubmit = async (e) => {
+    e.preventDefault();
+    submit.disabled = true;
+    try {
+      const pwd = document.getElementById("auth-pwd").value;
+      if (!isSetup) {
+        const pwd2v = document.getElementById("auth-pwd2").value;
+        if (pwd !== pwd2v) { toast("Passwords don't match", "error"); return; }
+        if (pwd.length < 8) { toast("Min 8 characters", "error"); return; }
+        const r = await api("/api/admin/setup", { method: "POST", body: JSON.stringify({ password: pwd }), auth: false });
+        setToken(r.token, r.expires_at);
+        toast("Admin password set", "ok");
+      } else {
+        const r = await api("/api/admin/login", { method: "POST", body: JSON.stringify({ password: pwd }), auth: false });
+        setToken(r.token, r.expires_at);
+        toast("Welcome back", "ok");
+      }
+      bootApp();
+    } catch (err) {
+      toast(err.message, "error");
+    } finally {
+      submit.disabled = false;
+    }
+  };
+}
+
+//==========================================================================
+// Tab management
+//==========================================================================
+function switchTab(name) {
+  document.querySelectorAll("nav.tabs button").forEach(b => {
+    b.classList.toggle("active", b.dataset.tab === name);
+  });
+  document.querySelectorAll("section[data-pane]").forEach(s => {
+    s.classList.toggle("hidden", s.dataset.pane !== name);
+  });
+  if (name === "dashboard") loadDashboard();
+  if (name === "users") loadUsers();
+  if (name === "codes") loadCodes();
+}
+
+document.querySelectorAll("nav.tabs button").forEach(b => {
+  b.addEventListener("click", () => switchTab(b.dataset.tab));
+});
+
+document.getElementById("logout-btn").addEventListener("click", () => {
+  setToken(null);
+  showAuthScreen();
+});
+
+//==========================================================================
+// Dashboard
+//==========================================================================
+async function loadDashboard() {
+  try {
+    const d = await api("/api/admin/dashboard");
+    document.getElementById("stat-total-users").textContent = fmt(d.total_users);
+    document.getElementById("stat-active-today").textContent = fmt(d.active_today);
+    document.getElementById("stat-active-week").textContent = fmt(d.active_week);
+    document.getElementById("stat-plus-active").textContent = fmt(d.plus_users_active);
+    document.getElementById("stat-total-analyses").textContent = fmt(d.total_analyses);
+    document.getElementById("stat-analyses-today").textContent = fmt(d.analyses_today);
+    document.getElementById("stat-analyses-week").textContent = fmt(d.analyses_week);
+    document.getElementById("stat-lifetime").textContent = fmt(d.lifetime_users);
+
+    const lb = document.getElementById("top-languages-body");
+    lb.innerHTML = "";
+    (d.top_languages || []).forEach(l => {
+      const tr = document.createElement("tr");
+      tr.innerHTML = `<td>${escape(l.language)}</td><td style="text-align:right">${fmt(l.count)}</td>`;
+      lb.appendChild(tr);
+    });
+    if (!(d.top_languages || []).length) lb.innerHTML = `<tr><td colspan="2" class="empty">No data yet</td></tr>`;
+
+    const cb = document.getElementById("top-countries-body");
+    cb.innerHTML = "";
+    (d.top_countries || []).forEach(c => {
+      const tr = document.createElement("tr");
+      tr.innerHTML = `<td>${escape(c.country)}</td><td style="text-align:right">${fmt(c.count)}</td>`;
+      cb.appendChild(tr);
+    });
+    if (!(d.top_countries || []).length) cb.innerHTML = `<tr><td colspan="2" class="empty">No data yet</td></tr>`;
+  } catch (e) {
+    toast("Failed to load dashboard: " + e.message, "error");
+  }
+}
+
+//==========================================================================
+// Users
+//==========================================================================
+async function loadUsers() {
+  const wrap = document.getElementById("users-list-wrap");
+  wrap.innerHTML = `<div class="empty"><span class="spinner"></span> Loading…</div>`;
+  try {
+    const q = document.getElementById("users-search").value.trim();
+    const data = await api("/api/admin/users?limit=100" + (q ? "&q=" + encodeURIComponent(q) : ""));
+    if (!data.items.length) { wrap.innerHTML = `<div class="empty">No users found</div>`; return; }
+    let html = `<table>
+      <thead><tr>
+        <th>Device ID</th><th>Status</th><th>Free used</th><th>Plus used (mo)</th><th>Updated</th><th></th>
+      </tr></thead><tbody>`;
+    for (const u of data.items) {
+      const isLifetime = !!u.plus_lifetime;
+      const isPlus = !!u.plus_active;
+      const pill = isLifetime
+        ? `<span class="pill good">Lifetime</span>`
+        : isPlus
+        ? `<span class="pill good">Plus</span>`
+        : `<span class="pill muted">Free</span>`;
+      const updated = u.updated_at ? u.updated_at.slice(0, 19).replace("T", " ") : "-";
+      html += `<tr>
+        <td class="mono">${escape(u.device_id)} <button class="copy-btn" onclick="copyText('${escape(u.device_id)}')">copy</button></td>
+        <td>${pill}</td>
+        <td>${u.free_analyses_used || 0} / 3</td>
+        <td>${u.plus_monthly_analyses_used || 0} / 20</td>
+        <td class="small">${updated}</td>
+        <td class="actions">
+          ${isLifetime
+              ? `<button class="ghost" onclick="revokeLifetime('${escape(u.device_id)}')">Revoke</button>`
+              : `<button class="secondary" onclick="grantLifetime('${escape(u.device_id)}')">Grant Lifetime</button>`}
+        </td>
+      </tr>`;
+    }
+    html += "</tbody></table>";
+    html += `<div class="small" style="margin-top:8px">Showing ${data.items.length} of ${data.total}</div>`;
+    wrap.innerHTML = html;
+  } catch (e) {
+    wrap.innerHTML = `<div class="empty">Error: ${escape(e.message)}</div>`;
+  }
+}
+
+async function grantLifetime(deviceId) {
+  const note = prompt("Note (optional, e.g. 'Mom'):", "");
+  if (note === null) return;
+  try {
+    await api("/api/admin/users/grant-lifetime", {
+      method: "POST",
+      body: JSON.stringify({ device_id: deviceId, note }),
+    });
+    toast("Lifetime granted ✓", "ok");
+    loadUsers();
+  } catch (e) { toast(e.message, "error"); }
+}
+
+async function revokeLifetime(deviceId) {
+  if (!confirm("Revoke Lifetime for this device?")) return;
+  try {
+    await api("/api/admin/users/revoke-lifetime", {
+      method: "POST",
+      body: JSON.stringify({ device_id: deviceId, note: "Revoked from admin panel" }),
+    });
+    toast("Revoked", "ok");
+    loadUsers();
+  } catch (e) { toast(e.message, "error"); }
+}
+
+document.getElementById("users-search-btn").addEventListener("click", loadUsers);
+document.getElementById("users-search").addEventListener("keydown", (e) => {
+  if (e.key === "Enter") loadUsers();
+});
+
+//==========================================================================
+// Codes
+//==========================================================================
+async function loadCodes() {
+  const wrap = document.getElementById("codes-list-wrap");
+  wrap.innerHTML = `<div class="empty"><span class="spinner"></span> Loading…</div>`;
+  try {
+    const data = await api("/api/admin/codes");
+    if (!data.items.length) {
+      wrap.innerHTML = `<div class="empty">No codes yet — generate one above</div>`;
+      return;
+    }
+    let html = `<table>
+      <thead><tr>
+        <th>Code</th><th>Tier</th><th>Uses</th><th>Note</th><th>Status</th><th></th>
+      </tr></thead><tbody>`;
+    for (const c of data.items) {
+      const status = !c.active
+        ? `<span class="pill danger">Revoked</span>`
+        : c.uses >= c.max_uses
+        ? `<span class="pill warn">Used up</span>`
+        : `<span class="pill good">Active</span>`;
+      html += `<tr>
+        <td class="mono">${escape(c.code)} <button class="copy-btn" onclick="copyText('${escape(c.code)}')">copy</button></td>
+        <td>${escape(c.tier)}</td>
+        <td>${c.uses} / ${c.max_uses}</td>
+        <td class="small">${escape(c.note || "-")}</td>
+        <td>${status}</td>
+        <td class="actions">
+          ${c.active
+              ? `<button class="ghost" onclick="deactivateCode('${escape(c.code)}')">Revoke</button>`
+              : `<button class="ghost" onclick="reactivateCode('${escape(c.code)}')">Reactivate</button>`}
+        </td>
+      </tr>`;
+    }
+    html += "</tbody></table>";
+    wrap.innerHTML = html;
+  } catch (e) {
+    wrap.innerHTML = `<div class="empty">Error: ${escape(e.message)}</div>`;
+  }
+}
+
+document.getElementById("reload-codes").addEventListener("click", loadCodes);
+
+document.getElementById("create-code-btn").addEventListener("click", async () => {
+  const tier = document.getElementById("new-code-tier").value;
+  const max_uses = parseInt(document.getElementById("new-code-uses").value, 10) || 1;
+  const custom_code = document.getElementById("new-code-custom").value.trim() || null;
+  const note = document.getElementById("new-code-note").value.trim() || "";
+  const expires_at = document.getElementById("new-code-exp").value.trim() || null;
+  try {
+    const c = await api("/api/admin/codes", {
+      method: "POST",
+      body: JSON.stringify({ tier, max_uses, custom_code, note, expires_at }),
+    });
+    await copyText(c.code);
+    toast("Created & copied: " + c.code, "ok");
+    document.getElementById("new-code-custom").value = "";
+    document.getElementById("new-code-note").value = "";
+    document.getElementById("new-code-exp").value = "";
+    loadCodes();
+  } catch (e) { toast(e.message, "error"); }
+});
+
+async function deactivateCode(code) {
+  if (!confirm("Revoke code " + code + "?")) return;
+  try {
+    await api("/api/admin/codes/" + encodeURIComponent(code), { method: "DELETE" });
+    toast("Revoked", "ok");
+    loadCodes();
+  } catch (e) { toast(e.message, "error"); }
+}
+
+async function reactivateCode(code) {
+  try {
+    await api("/api/admin/codes/" + encodeURIComponent(code) + "/reactivate", { method: "POST" });
+    toast("Reactivated", "ok");
+    loadCodes();
+  } catch (e) { toast(e.message, "error"); }
+}
+
+//==========================================================================
+// Utils
+//==========================================================================
+function escape(s) {
+  if (s === null || s === undefined) return "";
+  return String(s).replace(/[&<>"']/g, c => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+  }[c]));
+}
+
+async function copyText(t) {
+  try {
+    await navigator.clipboard.writeText(t);
+  } catch (_) {
+    // noop on older browsers
+  }
+}
+
+//==========================================================================
+// Boot
+//==========================================================================
+function bootApp() {
+  document.getElementById("auth-screen").classList.add("hidden");
+  document.getElementById("app-screen").classList.remove("hidden");
+  const exp = localStorage.getItem(TOKEN_EXP_KEY);
+  if (exp) {
+    document.getElementById("session-info").textContent = "Session until " + exp.slice(0, 19).replace("T", " ");
+  }
+  switchTab("dashboard");
+}
+
+(async function init() {
+  if (getToken() && !isTokenExpired()) {
+    bootApp();
+  } else {
+    setToken(null);
+    showAuthScreen();
+  }
+})();
+</script>
+</body>
+</html>

@@ -3186,6 +3186,13 @@ async def dev_simulate(device_id: str, scenario: str):
 # Include the router in the main app
 app.include_router(api_router)
 
+# ==================== ADMIN + REDEMPTION ====================
+# Loaded from a separate module to keep server.py manageable.
+# Mounts: GET /admin (HTML UI) + /api/admin/* (auth-gated) + /api/redeem (public)
+from admin import make_admin_router  # noqa: E402
+
+app.include_router(make_admin_router(db))
+
 
 # Diagnostic request-logger middleware — added because we observed a class
 # of failures where iOS clients reported 429 errors that have no

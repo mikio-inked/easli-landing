@@ -11,6 +11,7 @@ import {
   StyleSheet,
   Switch,
   Text,
+  TextInput,
   View,
 } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
@@ -34,7 +35,7 @@ import {
   Trash2,
   Type,
 } from 'lucide-react-native';
-import { deleteAllAnalyses, exportMyData } from '../src/api';
+import { deleteAllAnalyses, exportMyData, redeemCode } from '../src/api';
 import {
   ensureDeviceId,
   getAppLang,
@@ -87,6 +88,9 @@ export default function SettingsScreen() {
   // OTA Debug Block — hidden Easter egg: tap version text 5x to reveal
   const [versionTapCount, setVersionTapCount] = useState(0);
   const showOtaDebug = versionTapCount >= 5;
+  // Friends & Family redemption — appears after 7 taps. Two-stage hide
+  // keeps the OTA debug discoverable for QA but the redeem flow extra-hidden.
+  const showRedeem = versionTapCount >= 7;
   const onTapVersion = useCallback(() => {
     setVersionTapCount((n) => n + 1);
   }, []);
@@ -589,6 +593,14 @@ export default function SettingsScreen() {
 
         {/* OTA Update Debug Block — hidden, reveal by tapping version 5 times */}
         {showOtaDebug && <OtaDebugBlock />}
+
+        {/* Friends & Family Redeem — hidden, reveal by tapping version 7 times */}
+        {showRedeem && (
+          <RedeemBlock
+            deviceId={deviceId}
+            onSuccess={() => refreshUsage()}
+          />
+        )}
       </ScrollView>
     </SafeAreaView>
   );
@@ -758,6 +770,129 @@ function DebugRow({ label, value }: { label: string; value: string }) {
     </View>
   );
 }
+
+/**
+ * Friends & Family redemption block — hidden behind 7 taps on the version
+ * label. The user enters a code given to them by the admin (e.g.
+ * "EASLI-FAMILY-2026") which calls /api/redeem and unlocks lifetime/plus
+ * for THIS device. Server-side state is the source of truth — the local
+ * usage hook automatically reflects the new entitlement after refresh.
+ */
+function RedeemBlock({
+  deviceId,
+  onSuccess,
+}: {
+  deviceId: string | null;
+  onSuccess: () => void;
+}) {
+  const [code, setCode] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [feedback, setFeedback] = useState<{ kind: 'ok' | 'err' | null; msg: string }>({
+    kind: null,
+    msg: '',
+  });
+
+  const onRedeem = useCallback(async () => {
+    if (!deviceId) {
+      setFeedback({ kind: 'err', msg: 'Device not ready, try again in a sec.' });
+      return;
+    }
+    const trimmed = code.trim();
+    if (!trimmed || trimmed.length < 6) {
+      setFeedback({ kind: 'err', msg: 'Code is too short.' });
+      return;
+    }
+    setBusy(true);
+    setFeedback({ kind: null, msg: '' });
+    try {
+      const res = await redeemCode(deviceId, trimmed);
+      if (!res.ok) {
+        setFeedback({ kind: 'err', msg: res.message || 'Code could not be redeemed.' });
+      } else {
+        const tierLabel =
+          res.tier === 'lifetime' ? 'Lifetime' : res.tier === 'plus_year' ? 'Plus 1 year' : 'Plus 1 month';
+        setFeedback({ kind: 'ok', msg: `${tierLabel} aktiviert ✓ ${res.message}` });
+        setCode('');
+        onSuccess();
+      }
+    } catch (e: any) {
+      setFeedback({ kind: 'err', msg: e?.message || 'Network error' });
+    } finally {
+      setBusy(false);
+    }
+  }, [code, deviceId, onSuccess]);
+
+  return (
+    <View style={otaStyles.card}>
+      <Text style={otaStyles.title}>Friends &amp; Family Code</Text>
+      <Text style={redeemStyles.subtitle}>
+        Hast du einen Code? Tippe ihn hier ein, um Pro-Funktionen freizuschalten.
+      </Text>
+      <TextInput
+        value={code}
+        onChangeText={(t) => setCode(t.toUpperCase())}
+        placeholder="EASLI-XXXX-XXXX"
+        autoCapitalize="characters"
+        autoCorrect={false}
+        spellCheck={false}
+        editable={!busy}
+        maxLength={40}
+        style={redeemStyles.input}
+        placeholderTextColor={colors.textSecondary}
+      />
+      <Pressable
+        style={[otaStyles.btn, otaStyles.btnPrimary, busy && otaStyles.btnDisabled]}
+        onPress={onRedeem}
+        disabled={busy}
+      >
+        <Text style={[otaStyles.btnText, otaStyles.btnTextPrimary]}>
+          {busy ? 'Wird eingelöst…' : 'Code einlösen'}
+        </Text>
+      </Pressable>
+      {feedback.kind && (
+        <Text
+          style={[
+            redeemStyles.feedback,
+            feedback.kind === 'ok' ? redeemStyles.feedbackOk : redeemStyles.feedbackErr,
+          ]}
+        >
+          {feedback.msg}
+        </Text>
+      )}
+    </View>
+  );
+}
+
+const redeemStyles = StyleSheet.create({
+  subtitle: {
+    fontSize: fontSize.xs,
+    color: colors.textSecondary,
+    marginBottom: spacing.sm,
+    lineHeight: 18,
+  },
+  input: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.sm,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 10,
+    fontSize: fontSize.base,
+    fontWeight: fontWeight.medium,
+    color: colors.textPrimary,
+    backgroundColor: colors.background,
+    fontFamily: Platform.select({ ios: 'Menlo', android: 'monospace' }),
+    letterSpacing: 1.2,
+    marginBottom: spacing.sm,
+  },
+  feedback: {
+    marginTop: spacing.sm,
+    fontSize: fontSize.xs,
+    fontWeight: fontWeight.medium,
+    textAlign: 'center',
+  },
+  feedbackOk: { color: colors.green.text },
+  feedbackErr: { color: colors.red.text },
+});
 
 const otaStyles = StyleSheet.create({
   card: {
