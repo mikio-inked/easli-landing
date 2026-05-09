@@ -314,10 +314,12 @@ def make_admin_router(db: AsyncIOMotorDatabase, limiter=None) -> APIRouter:
 
         # ---- Brute-force lockout ----
         # After 5 consecutive failed logins, lock the account for 15 minutes.
-        # The counter resets on success. Stored in MongoDB so a server
-        # restart can't bypass it.
-        # Now-timestamp + lockout check (atomic counter increment is below
-        # in the wrong-password branch).
+        # Counter increment is atomic ($inc) to avoid the parallel-attempt
+        # race condition. The lockout response is intentionally a generic
+        # 401 ("Invalid password") instead of a 429-with-timer, so the
+        # caller can't distinguish lockout from regular failure (which
+        # would otherwise leak timing info to credential-stuffing bots).
+        # The legitimate admin sees the lockout via DB / dashboard.
         now_ts = datetime.now(timezone.utc)
         lockout_until_str = cfg.get("lockout_until")
         if lockout_until_str:
@@ -326,13 +328,10 @@ def make_admin_router(db: AsyncIOMotorDatabase, limiter=None) -> APIRouter:
                     lockout_until_str.replace("Z", "+00:00")
                 )
                 if lockout_until > now_ts:
-                    remaining_min = int(
-                        (lockout_until - now_ts).total_seconds() / 60
-                    ) + 1
-                    logger.warning("admin_login_locked_out remaining_min=%s", remaining_min)
+                    logger.warning("admin_login_locked_out")
+                    # Same body as a wrong-password attempt — no info leak.
                     raise HTTPException(
-                        status_code=429,
-                        detail=f"Too many failed attempts. Try again in {remaining_min} min.",
+                        status_code=401, detail="Invalid password"
                     )
             except (ValueError, TypeError):
                 pass
