@@ -54,7 +54,9 @@
       },
       "env": {
         "EXPO_PUBLIC_BACKEND_URL": "https://api.easli.app",
-        "EXPO_PUBLIC_REVENUECAT_IOS_PUBLIC_KEY": "appl_gozYkJeluGOxAevBxvDnAtSkyeV"
+        "EXPO_PUBLIC_REVENUECAT_IOS_PUBLIC_KEY": "appl_gozYkJeluGOxAevBxvDnAtSkyeV",
+        "EXPO_PUBLIC_SENTRY_DSN": "https://46812a1275af13c8b2a2f56a279bfdeb@o4511361553334272.ingest.de.sentry.io/4511361559560272",
+        "EXPO_PUBLIC_SENTRY_ENV": "production"
       }
     },
     "production-apk": {
