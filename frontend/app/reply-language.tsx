@@ -22,6 +22,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { ArrowLeft, Check, Globe2, RefreshCw } from 'lucide-react-native';
 import { Button } from '../src/ui';
 import { LanguageCode, t } from '../src/i18n';
+import { ts } from '../src/i18n_screens';
 import { REPLY_LANGUAGES } from '../src/languages';
 import { getAppLang, useReplyLangPref } from '../src/store';
 import { colors, fontSize, fontWeight, radius, spacing } from '../src/theme';
@@ -45,16 +46,12 @@ export default function ReplyLanguageScreen() {
 
   const germanChrome = chromeLang === 'de_simple';
 
-  const title = germanChrome ? 'Antwortsprache' : 'Reply language';
-  const autoLabel = germanChrome ? 'Automatisch (Absender-Sprache)' : 'Automatic (match sender)';
-  const autoSub = germanChrome
-    ? 'Antworte in der Sprache des Briefes. Erkannt wird sie beim Scan.'
-    : 'Reply in the same language the letter is written in. Detected automatically.';
-  const fixedLabel = germanChrome ? 'Immer in fester Sprache' : 'Always in a fixed language';
-  const fixedSub = germanChrome
-    ? 'Antworte immer in der gewählten Sprache, unabhängig vom Absender.'
-    : 'Always draft replies in your pinned language, regardless of the sender.';
-  const pickLabel = germanChrome ? 'Antwortsprache wählen' : 'Pick reply language';
+  const title = ts(chromeLang, 'reply_language_title');
+  const autoLabel = ts(chromeLang, 'reply_language_auto_label');
+  const autoSub = ts(chromeLang, 'reply_language_auto_sub');
+  const fixedLabel = ts(chromeLang, 'reply_language_fixed_label');
+  const fixedSub = ts(chromeLang, 'reply_language_fixed_sub');
+  const pickLabel = ts(chromeLang, 'reply_language_pick');
   const saveLabel = t(chromeLang, 'continue');
 
   const dirty = useMemo(

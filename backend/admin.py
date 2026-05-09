@@ -392,64 +392,82 @@ def make_admin_router(db: AsyncIOMotorDatabase, limiter=None) -> APIRouter:
 
     @router.get("/api/admin/dashboard", response_model=DashboardStats)
     async def dashboard(_: str = Depends(require_admin)) -> DashboardStats:
+        """One Dashboard load = 2 round-trips (down from 10 in v1.0.0).
+
+        Each Mongo aggregation uses `$facet` to compute multiple shaped
+        results in a single pipeline. On Atlas (~150 ms p50 round-trip)
+        this drops the dashboard from ~1.5 s to ~300 ms.
+
+        Both aggregations run in parallel via `asyncio.gather`."""
+        import asyncio  # local import: keeps top-level imports tidy
+
         now = datetime.now(timezone.utc)
-        today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
-        week_start = today_start - timedelta(days=7)
+        today_start = now.replace(hour=0, minute=0, second=0, microsecond=0).isoformat()
+        week_start = (now - timedelta(days=7)).replace(
+            hour=0, minute=0, second=0, microsecond=0
+        ).isoformat()
 
-        total_users = await db.usage_records.count_documents({})
-        active_today = await db.usage_records.count_documents(
-            {"updated_at": {"$gte": today_start.isoformat()}}
-        )
-        active_week = await db.usage_records.count_documents(
-            {"updated_at": {"$gte": week_start.isoformat()}}
-        )
-        total_analyses = await db.analyses.count_documents({})
-        analyses_today = await db.analyses.count_documents(
-            {"created_at": {"$gte": today_start.isoformat()}}
-        )
-        analyses_week = await db.analyses.count_documents(
-            {"created_at": {"$gte": week_start.isoformat()}}
-        )
-        plus_users_active = await db.usage_records.count_documents({"plus_active": True})
-        lifetime_users = await db.usage_records.count_documents({"plus_lifetime": True})
-
-        # Top languages
-        top_lang_cursor = db.analyses.aggregate(
-            [
-                {"$match": {"target_language": {"$exists": True, "$ne": ""}}},
-                {"$group": {"_id": "$target_language", "n": {"$sum": 1}}},
-                {"$sort": {"n": -1}},
-                {"$limit": 5},
-            ]
-        )
-        top_languages = [
-            {"language": d["_id"], "count": d["n"]} async for d in top_lang_cursor
+        users_pipeline = [
+            {"$facet": {
+                "total":         [{"$count": "n"}],
+                "active_today":  [{"$match": {"updated_at": {"$gte": today_start}}}, {"$count": "n"}],
+                "active_week":   [{"$match": {"updated_at": {"$gte": week_start}}}, {"$count": "n"}],
+                "plus_active":   [{"$match": {"plus_active": True}}, {"$count": "n"}],
+                "lifetime":      [{"$match": {"plus_lifetime": True}}, {"$count": "n"}],
+            }}
+        ]
+        analyses_pipeline = [
+            {"$facet": {
+                "total":         [{"$count": "n"}],
+                "today":         [{"$match": {"created_at": {"$gte": today_start}}}, {"$count": "n"}],
+                "week":          [{"$match": {"created_at": {"$gte": week_start}}}, {"$count": "n"}],
+                "top_lang": [
+                    {"$match": {"target_language": {"$exists": True, "$ne": ""}}},
+                    {"$group": {"_id": "$target_language", "n": {"$sum": 1}}},
+                    {"$sort": {"n": -1}},
+                    {"$limit": 5},
+                ],
+                "top_country": [
+                    {"$match": {"detected_country_code": {"$exists": True, "$nin": ["", None]}}},
+                    {"$group": {"_id": "$detected_country_code", "n": {"$sum": 1}}},
+                    {"$sort": {"n": -1}},
+                    {"$limit": 5},
+                ],
+            }}
         ]
 
-        # Top detected countries
-        top_country_cursor = db.analyses.aggregate(
-            [
-                {"$match": {"detected_country_code": {"$exists": True, "$nin": ["", None]}}},
-                {"$group": {"_id": "$detected_country_code", "n": {"$sum": 1}}},
-                {"$sort": {"n": -1}},
-                {"$limit": 5},
-            ]
+        users_res, analyses_res = await asyncio.gather(
+            db.usage_records.aggregate(users_pipeline).to_list(1),
+            db.analyses.aggregate(analyses_pipeline).to_list(1),
         )
-        top_countries = [
-            {"country": d["_id"], "count": d["n"]} async for d in top_country_cursor
-        ]
+
+        def _facet_count(facet_result: list, key: str) -> int:
+            """Pull a $count value from a $facet bucket, defaulting to 0."""
+            if not facet_result:
+                return 0
+            bucket = (facet_result[0] or {}).get(key) or []
+            return int((bucket[0] or {}).get("n", 0)) if bucket else 0
+
+        u = users_res[0] if users_res else {}
+        a = analyses_res[0] if analyses_res else {}
 
         return DashboardStats(
-            total_users=total_users,
-            active_today=active_today,
-            active_week=active_week,
-            total_analyses=total_analyses,
-            analyses_today=analyses_today,
-            analyses_week=analyses_week,
-            plus_users_active=plus_users_active,
-            lifetime_users=lifetime_users,
-            top_languages=top_languages,
-            top_countries=top_countries,
+            total_users=_facet_count([u], "total"),
+            active_today=_facet_count([u], "active_today"),
+            active_week=_facet_count([u], "active_week"),
+            total_analyses=_facet_count([a], "total"),
+            analyses_today=_facet_count([a], "today"),
+            analyses_week=_facet_count([a], "week"),
+            plus_users_active=_facet_count([u], "plus_active"),
+            lifetime_users=_facet_count([u], "lifetime"),
+            top_languages=[
+                {"language": d["_id"], "count": d["n"]}
+                for d in (a.get("top_lang") or [])
+            ],
+            top_countries=[
+                {"country": d["_id"], "count": d["n"]}
+                for d in (a.get("top_country") or [])
+            ],
         )
 
     # =====================================================================

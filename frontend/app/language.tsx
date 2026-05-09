@@ -20,6 +20,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { ArrowLeft, Check } from 'lucide-react-native';
 import { Button } from '../src/ui';
 import { LANGUAGES, LanguageCode, t, hasUIStrings } from '../src/i18n';
+import { ts } from '../src/i18n_screens';
 import { EXPLANATION_LANGUAGES, LanguageEntry, normalizeLanguageCode } from '../src/languages';
 import {
   getAppLang,
@@ -114,16 +115,12 @@ export default function LanguageScreen() {
 
   // Copy for the title/subtitle. App-mode uses a Settings-specific caption
   // to explain that this is the UI language, distinct from the AI
-  // explanation language. Hardcoded English with a German variant — a full
-  // i18n matrix for this sub-screen isn't worth 14×2 new keys.
-  const germanChrome = chromeLang === 'de_simple';
+  // explanation language. Translations live in `src/i18n_screens.ts`.
   const title = pickerMode === 'app'
-    ? (germanChrome ? 'App-Sprache' : 'App language')
+    ? ts(chromeLang, 'app_language_title')
     : t(chromeLang, 'choose_language');
   const subtitle = pickerMode === 'app'
-    ? (germanChrome
-        ? 'Sprache der Menüs, Buttons und Fehlermeldungen.'
-        : 'The language of menus, buttons and error messages.')
+    ? ts(chromeLang, 'app_language_subtitle')
     : t(chromeLang, 'choose_language_subtitle');
 
   return (

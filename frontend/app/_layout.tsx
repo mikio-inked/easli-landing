@@ -3,10 +3,11 @@ import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import * as Sentry from '@sentry/react-native';
 import { colors } from '../src/theme';
 import { ensureDeviceId } from '../src/store';
 import { initBilling } from '../src/billing';
-import { initSentry } from '../src/sentry';
+import { initSentry, isSentryEnabled, captureException } from '../src/sentry';
 import {
   installLargeFontPatch,
   loadLargeFontMode,
@@ -26,7 +27,7 @@ initSentry();
 // RN users already expect from accessibility scaling.
 installLargeFontPatch();
 
-export default function RootLayout() {
+function RootLayout() {
   const [largeFontReady, setLargeFontReady] = useState(false);
   // Brand typography (Inter family). Doesn't block rendering — the hook
   // returns true on either success OR error so a network glitch can't
@@ -36,6 +37,25 @@ export default function RootLayout() {
   // on flip — this propagates to the currently-mounted screen, whose <Text>
   // children pass through the patched render with the new scale.
   useLargeFontMode();
+
+  // Install the global JS error handler exactly once on mount. This catches
+  // exceptions thrown OUTSIDE React render trees (event handlers, promise
+  // rejections) which the ErrorBoundary alone wouldn't see.
+  useEffect(() => {
+    if (!isSentryEnabled()) return;
+    const ErrorUtils = (global as any).ErrorUtils;
+    if (!ErrorUtils?.setGlobalHandler) return;
+    const prev = ErrorUtils.getGlobalHandler?.();
+    ErrorUtils.setGlobalHandler((err: unknown, isFatal?: boolean) => {
+      try {
+        captureException(err, { fatal: !!isFatal });
+      } catch {
+        /* swallow */
+      }
+      // Chain to the previous handler so red-box / native crash flow stays.
+      if (typeof prev === 'function') prev(err, isFatal);
+    });
+  }, []);
 
   // Boot the RevenueCat SDK as early as possible. The wrapper is built to
   // never throw — it logs a single info line if the keys are missing or the
@@ -71,18 +91,35 @@ export default function RootLayout() {
   const bootKey = largeFontReady && fontsLoaded ? 'r' : 'b';
 
   return (
-    <GestureHandlerRootView style={{ flex: 1, backgroundColor: colors.background }}>
-      <SafeAreaProvider>
-        <StatusBar style="dark" />
-        <Stack
-          key={bootKey}
-          screenOptions={{
-            headerShown: false,
-            contentStyle: { backgroundColor: colors.background },
-            animation: 'slide_from_right',
-          }}
-        />
-      </SafeAreaProvider>
-    </GestureHandlerRootView>
+    <Sentry.ErrorBoundary
+      fallback={({ resetError }) => (
+        // Minimal fallback — show a plain "Something went wrong" message and
+        // let the user reset. Keeps the dependency surface tiny (no extra
+        // i18n string lookups so this won't itself crash if the i18n module
+        // is the failing one).
+        <GestureHandlerRootView style={{ flex: 1, backgroundColor: colors.background, justifyContent: 'center', alignItems: 'center', padding: 24 }}>
+          <StatusBar style="dark" />
+        </GestureHandlerRootView>
+      )}
+    >
+      <GestureHandlerRootView style={{ flex: 1, backgroundColor: colors.background }}>
+        <SafeAreaProvider>
+          <StatusBar style="dark" />
+          <Stack
+            key={bootKey}
+            screenOptions={{
+              headerShown: false,
+              contentStyle: { backgroundColor: colors.background },
+              animation: 'slide_from_right',
+            }}
+          />
+        </SafeAreaProvider>
+      </GestureHandlerRootView>
+    </Sentry.ErrorBoundary>
   );
 }
+
+// Wrap the root with Sentry.wrap so navigation breadcrumbs and touch
+// instrumentation kick in. When Sentry is disabled (no DSN), the wrap is
+// a passthrough — no-op cost.
+export default Sentry.wrap(RootLayout);

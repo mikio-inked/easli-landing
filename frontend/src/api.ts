@@ -1,6 +1,7 @@
 // API client for the easli backend.
 
 import { LanguageCode } from './i18n';
+import { captureException } from './sentry';
 
 const BASE_URL = process.env.EXPO_PUBLIC_BACKEND_URL || '';
 
@@ -123,7 +124,15 @@ async function jsonOrThrow<T>(res: Response): Promise<T> {
   }
   if (!res.ok) {
     const msg = (body && body.detail) || (typeof body === 'string' ? body : `HTTP ${res.status}`);
-    throw new Error(typeof msg === 'string' ? msg : JSON.stringify(msg));
+    const err = new Error(typeof msg === 'string' ? msg : JSON.stringify(msg));
+    // Report 5xx and unexpected 4xx (excluding the user-facing 401/402/403
+    // which are part of normal flow, and 429 which is rate-limit feedback).
+    // We strip the URL via the Sentry beforeBreadcrumb hook already; this
+    // adds the HTTP status as a tag for fast triage in the dashboard.
+    if (res.status >= 500 || (res.status >= 400 && ![401, 402, 403, 404, 422, 429].includes(res.status))) {
+      captureException(err, { httpStatus: res.status, url: res.url.split('?')[0] });
+    }
+    throw err;
   }
   return body as T;
 }
