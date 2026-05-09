@@ -2,7 +2,7 @@
   "expo": {
     "name": "easli",
     "slug": "easli",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "easli",
@@ -18,7 +18,7 @@
       "checkAutomatically": "ON_LOAD"
     },
     "ios": {
-      "supportsTablet": true,
+      "supportsTablet": false,
       "bundleIdentifier": "com.easli.app",
       "privacyManifests": {
         "NSPrivacyTracking": false,
