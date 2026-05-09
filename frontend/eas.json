@@ -53,7 +53,8 @@
         "disabled": true
       },
       "env": {
-        "EXPO_PUBLIC_BACKEND_URL": "https://api.easli.app"
+        "EXPO_PUBLIC_BACKEND_URL": "https://api.easli.app",
+        "EXPO_PUBLIC_REVENUECAT_IOS_PUBLIC_KEY": "appl_gozYkJeluGOxAevBxvDnAtSkyeV"
       }
     },
     "production-apk": {
