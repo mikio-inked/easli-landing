@@ -316,8 +316,9 @@ def make_admin_router(db: AsyncIOMotorDatabase, limiter=None) -> APIRouter:
         # After 5 consecutive failed logins, lock the account for 15 minutes.
         # The counter resets on success. Stored in MongoDB so a server
         # restart can't bypass it.
+        # Now-timestamp + lockout check (atomic counter increment is below
+        # in the wrong-password branch).
         now_ts = datetime.now(timezone.utc)
-        failed = int(cfg.get("failed_login_attempts") or 0)
         lockout_until_str = cfg.get("lockout_until")
         if lockout_until_str:
             try:
@@ -337,17 +338,31 @@ def make_admin_router(db: AsyncIOMotorDatabase, limiter=None) -> APIRouter:
                 pass
 
         if not _verify_password(req.password, cfg.get("password_hash") or ""):
-            new_failed = failed + 1
-            update: dict = {"failed_login_attempts": new_failed}
+            # Atomic increment — prevents the read-modify-write race where N
+            # parallel wrong-login attempts only bump the counter by 1.
+            updated = await db.admin_config.find_one_and_update(
+                {"_id": ADMIN_CONFIG_ID},
+                {"$inc": {"failed_login_attempts": 1}},
+                return_document=True,
+            )
+            new_failed = int((updated or {}).get("failed_login_attempts") or 1)
             if new_failed >= 5:
                 lockout_end = now_ts + timedelta(minutes=15)
-                update["lockout_until"] = lockout_end.isoformat()
-                update["failed_login_attempts"] = 0  # reset counter on lockout
+                # Reset counter so a single 5-strike triggers exactly one
+                # lockout window; while still inside the lockout, the early
+                # check at the top of this handler returns 429 without
+                # touching the counter again.
+                await db.admin_config.update_one(
+                    {"_id": ADMIN_CONFIG_ID},
+                    {"$set": {
+                        "lockout_until": lockout_end.isoformat(),
+                        "failed_login_attempts": 0,
+                    }},
+                )
                 logger.warning("admin_login_lockout_triggered")
-            await db.admin_config.update_one(
-                {"_id": ADMIN_CONFIG_ID}, {"$set": update}
-            )
             logger.warning("admin_login_failed attempt=%s", new_failed)
+            # Generic message — don't leak the lockout-or-not state to the
+            # caller (info-leak vector for credential stuffing).
             raise HTTPException(status_code=401, detail="Invalid password")
 
         jwt_secret = cfg.get("jwt_secret") or ""

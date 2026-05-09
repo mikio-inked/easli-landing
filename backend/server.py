@@ -37,6 +37,14 @@ if _sentry_dsn:
             environment=os.environ.get("SENTRY_ENV", "production"),
             release=os.environ.get("SENTRY_RELEASE") or None,
             send_default_pii=False,  # privacy-first, never send IPs/headers
+            # CRITICAL — never attach local-variable values to stack frames.
+            # Without this, sentry_sdk would helpfully include `req.image_base64`
+            # (the user's letter as Base64!), OCR text, draft replies and so on
+            # whenever an exception bubbles up from /api/analyze. That would
+            # break our DSGVO posture entirely.
+            include_local_variables=False,
+            # Reduce breadcrumb noise + memory footprint.
+            max_breadcrumbs=30,
             integrations=[
                 LoggingIntegration(level=logging.INFO, event_level=logging.ERROR),
             ],
@@ -151,9 +159,9 @@ app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 # Configurable per-endpoint limits (override via env in Railway).
+# NOTE: /api/redeem and /api/admin/login limits are read directly inside
+# admin.py via the same env vars (RATE_LIMIT_REDEEM, RATE_LIMIT_ADMIN_LOGIN).
 RL_ANALYZE = os.environ.get("RATE_LIMIT_ANALYZE", "30/minute")
-RL_REDEEM = os.environ.get("RATE_LIMIT_REDEEM", "10/minute")
-RL_ADMIN_LOGIN = os.environ.get("RATE_LIMIT_ADMIN_LOGIN", "20/hour")
 
 # Create a router with the /api prefix
 api_router = APIRouter(prefix="/api")

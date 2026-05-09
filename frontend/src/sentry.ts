@@ -8,8 +8,22 @@
 // only — no IPs, no fingerprints. Aligns with our "anonymous device-id
 // only" privacy stance.
 import * as Sentry from '@sentry/react-native';
+import Constants from 'expo-constants';
 
 let _enabled = false;
+
+function _detectRelease(): string | undefined {
+  // Prefer explicit env override (set in eas.json for prod builds).
+  const fromEnv = (process.env.EXPO_PUBLIC_APP_VERSION || '').trim();
+  if (fromEnv) return `easli@${fromEnv}`;
+  // Fall back to app.json version + iOS buildNumber / Android versionCode.
+  const v = Constants.expoConfig?.version;
+  if (!v) return undefined;
+  const ios = Constants.expoConfig?.ios?.buildNumber;
+  const android = (Constants.expoConfig?.android as any)?.versionCode;
+  const build = ios || android;
+  return build ? `easli@${v}+${build}` : `easli@${v}`;
+}
 
 export function initSentry(): void {
   const dsn = (process.env.EXPO_PUBLIC_SENTRY_DSN || '').trim();
@@ -22,7 +36,9 @@ export function initSentry(): void {
     Sentry.init({
       dsn,
       // Send only 10% of transactions to keep the free tier quota happy.
-      tracesSampleRate: 0.1,
+      tracesSampleRate: parseFloat(
+        process.env.EXPO_PUBLIC_SENTRY_TRACES_SAMPLE_RATE || '0.1',
+      ),
       // Don't ship stack traces for breadcrumbs — only for explicit captures.
       attachStacktrace: false,
       // Privacy: never send PII. Sentry's default already excludes IPs but
@@ -31,7 +47,8 @@ export function initSentry(): void {
       environment:
         process.env.EXPO_PUBLIC_SENTRY_ENV ||
         (__DEV__ ? 'development' : 'production'),
-      release: process.env.EXPO_PUBLIC_APP_VERSION || undefined,
+      release: _detectRelease(),
+      maxBreadcrumbs: 30,
       // Strip the URL query string from breadcrumbs in case any device_id
       // ever leaks via fetch breadcrumb. Defensive belt-and-suspenders.
       beforeBreadcrumb: (crumb) => {
@@ -43,6 +60,22 @@ export function initSentry(): void {
           }
         }
         return crumb;
+      },
+      // Strip device_id-like long hex strings from breadcrumb messages so
+      // an accidental console.log doesn't leak the anonymous identifier.
+      beforeSend: (event) => {
+        if (event.breadcrumbs) {
+          event.breadcrumbs = event.breadcrumbs.map((b) => {
+            if (typeof b.message === 'string') {
+              b.message = b.message.replace(
+                /\b[a-f0-9]{16,}\b/gi,
+                '[redacted]',
+              );
+            }
+            return b;
+          });
+        }
+        return event;
       },
     });
     _enabled = true;
