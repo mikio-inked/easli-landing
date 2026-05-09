@@ -1,102 +1,194 @@
-# KlarPost — Product Requirements Document (MVP)
+# easli — Product Requirements Document (v1.0)
 
 ## Vision
-KlarPost helps people in Germany understand important German documents by
-translating and explaining them clearly in their selected language. Designed
-for immigrants, expats, seniors, and family members supporting relatives with
-German paperwork.
+**easli** helps people across Europe understand official, administrative,
+and everyday paperwork in their own language. Designed for migrants, expats,
+seniors, and anyone who struggles with bureaucratic letters in any
+European language.
 
-Tagline: **"Understand German letters before they become a problem."**
+**Tagline:** *„Beherrsche deinen Papierkram. In jeder Sprache. In ganz Europa."*  
+*(EN: "Master your paperwork. In any language. Across Europe.")*
+
+**Brand:**
+- Name: `easli` (always lowercase)
+- Bundle-ID: `com.easli.app` (iOS + Android)
+- Domain: `easli.app` (landing) · `api.easli.app` (backend)
+- Apple App-ID: `6765859779` · Apple Team-ID: `PGL9WMXPG7`
+- Owner: Martin Tran (`m.tran@icloud.com`, GitHub `mikio-inked`)
 
 ## Stack
-- **Frontend**: React Native + Expo (SDK 54, Expo Router file-based routing), TypeScript
-- **Backend**: FastAPI + Motor (async MongoDB)
-- **AI**: **Mistral AI 🇫🇷 (European AI provider, EU data residency by default)** — `mistral-large-2512` (Mistral Large 3) for both vision OCR + analysis (`/api/analyze`) AND document chat (`/api/analyses/{id}/chat`). Native `mistralai==1.9.11` SDK. Model IDs are pinned via env vars (`MISTRAL_VISION_MODEL` / `MISTRAL_ANALYSIS_MODEL` / `MISTRAL_CHAT_MODEL`) so swapping is trivial. (Migrated from OpenAI GPT-5.2 / Emergent LLM key for full EU residency; pixtral-large-latest replaced before its Feb 27 2026 deprecation.)
-- **Storage**: MongoDB (analysis results only — original images / PDFs are never persisted)
-- **Auth**: Anonymous device-id (AsyncStorage) — placeholder for full auth later
-- **Consent**: Active opt-in stored as `klarpost.consent_v1` in AsyncStorage; recorded at the end of onboarding and re-checked before every Scan/Upload (legacy users get a one-shot Alert)
-- **DSGVO surfaces**: `GET /api/export?device_id=...` (Art. 15) + `DELETE /api/history/{device_id}` (Art. 17), both wired to the Settings screen
+- **Frontend**: React Native + Expo SDK 54, Expo Router (file-based), TypeScript
+- **Backend**: FastAPI + Motor (async MongoDB Atlas), hosted on Railway
+- **AI**: **Mistral AI 🇫🇷** (`mistral-large-2512` for OCR + analysis + chat,
+  `mistral-ocr-latest` for fast OCR pre-stage). Native `mistralai==1.9.11` SDK.
+  Model IDs are pinned via env vars (`MISTRAL_VISION_MODEL` /
+  `MISTRAL_ANALYSIS_MODEL` / `MISTRAL_CHAT_MODEL`) so swapping is trivial.
+  EU-hosted, no training on API data.
+- **Storage**: MongoDB Atlas. Original images / PDFs are NEVER persisted.
+  Analyses auto-delete after 90 days via TTL index.
+- **Payments**: RevenueCat (`react-native-purchases` v10) wrapping Apple
+  StoreKit + Google Play Billing. iOS public SDK key is hard-coded in
+  `eas.json` (publicly safe by RC's design). Android key still pending.
+- **Auth**: Anonymous device-id only (AsyncStorage). No email, no login.
+- **TTS**: System voices via `expo-speech`. Quality ranking (Premium >
+  Enhanced > Default). 40 BCP-47 locales mapped. One-time iOS hint pointing
+  at *Settings → Accessibility → Spoken Content → Voices* if no premium
+  voice is installed.
+- **Notifications**: `expo-notifications`. Local reminders for deadlines.
+  Android needs `POST_NOTIFICATIONS` (declared in `app.json`).
 
-## Source language → Target languages
-Source is always German. Target languages (with native script):
-- 简体中文 (Chinese Simplified, `zh`)
-- Tiếng Việt (Vietnamese, `vi`)
-- Türkçe (Turkish, `tr`)
-- Русский (Russian, `ru`)
-- English (`en`)
-- Español (Spanish, `es`)
+## Languages
 
-## Screens
-1. **Onboarding** — 3 paged steps with illustrations, privacy reassurance, disclaimer
-2. **Language picker** — single-tap selection, native script
-3. **Home** — two large CTAs (Scan / Upload), recent analyses, language chip, history & settings
-4. **Scan** — tips + iPhone camera launcher (or library fallback)
-5. **Upload** — PDF or image picker with file-type validation
-6. **Analyzing** — calm, sequential progress states (Reading → Extracting → Translating → Checking deadlines)
-7. **Result** — stacked cards: Risk level, Summary, What this means, What to do next, Deadlines, Sender, German reply draft, Reply explanation, Questions, Uncertainties, Disclaimer
-8. **History** — list of stored analyses with delete swipes
-9. **Settings** — change language, delete all analyses, delete account, privacy, disclaimer, support
+### UI-Chrome (11 hand-translated languages)
+`de`, `de_simple`, `en`, `es`, `fr`, `it`, `pl`, `ar`, `tr`, `ru`, `vi`, `zh`
 
-## Backend API
-All routes prefixed with `/api`.
+`UI_STRING_CODES` in `frontend/src/i18n.ts` is the source of truth.
+Falls back to English if a code isn't in this set.
+
+### Explanation Languages (25 — what the AI writes analyses in)
+DE/EN/ES/VI/TR/RU/ZH (UI-translated) + FR/IT/PT/NL/PL/RO/CS/HU/EL/BG/HR/SR/SQ/UK/AR/FA/UR/HI.
+
+`EXPLANATION_LANGUAGES` in `backend/server.py` is the source of truth.
+Frontend mirrors this in `frontend/src/languages.ts`. **Both must stay in
+sync** — adding a code requires changes in both files.
+
+### Reply Languages (32 — for generated reply drafts)
+Same set as Explanation + auto-detect (defaults to source-document language).
+
+## Source Languages
+**Detected automatically.** No fixed source — letters can be in any European
+language and the AI auto-detects it via `source_language_code`. This is the
+key Phase EU-1 win over the old "always German source" model.
+
+## Screens (Expo Router file structure)
+```
+app/
+├── index.tsx           # Entry → onboarding or home
+├── onboarding.tsx      # 3-step intro + consent
+├── language.tsx        # 11 UI / 25 explanation language picker
+├── home.tsx            # Two CTAs (Scan / Upload), recent analyses
+├── scan.tsx            # Native scanner launcher
+├── camera.tsx          # In-app camera fallback
+├── upload.tsx          # PDF / image picker
+├── analyzing.tsx       # Sequential progress states
+├── result.tsx          # Risk hero + action pyramid + accordion details
+├── chat.tsx            # Free-form Q&A about a document
+├── reply-language.tsx  # Pick reply-draft language (auto / fixed)
+├── history.tsx         # All past analyses with category filter
+├── reminder.tsx        # Set deadline notification
+├── original.tsx        # View saved original image (opt-in)
+├── storage.tsx         # Manage stored originals
+├── paywall.tsx         # RevenueCat offerings + purchase
+├── privacy.tsx         # In-app privacy summary
+└── legal/              # Imprint, contact, full privacy policy
+```
+
+## Backend API (all routes prefixed `/api`)
 
 | Method | Path | Purpose |
 |---|---|---|
-| GET | `/api/` | Health check |
-| GET | `/api/languages` | List supported target languages |
-| POST | `/api/analyze` | Analyze a base64 image or PDF in target language |
-| GET | `/api/analyses?device_id=` | List analyses for a device |
-| GET | `/api/analyses/{id}?device_id=` | Get one analysis |
-| DELETE | `/api/analyses/{id}?device_id=` | Delete one analysis |
-| DELETE | `/api/analyses?device_id=` | Delete all analyses for a device |
+| GET    | `/api/`                                           | Health |
+| GET    | `/api/languages`                                  | List 7 legacy + 25 explanation languages |
+| GET    | `/api/paywall/config`                             | Paywall mode + product IDs |
+| GET    | `/api/usage/{device_id}`                          | Public usage view |
+| POST   | `/api/analyze`                                    | OCR + analyze a base64 image / multi-page PDF |
+| POST   | `/api/analyses/{id}/translate`                    | Re-render an analysis in a new explanation lang |
+| POST   | `/api/analyses/{id}/generate-reply`               | Intent-based reply draft |
+| POST   | `/api/analyses/{id}/chat`                         | Document Q&A |
+| GET    | `/api/analyses/{id}/messages`                     | List chat messages |
+| DELETE | `/api/analyses/{id}/messages`                     | Clear chat |
+| GET    | `/api/analyses?device_id=`                        | List analyses |
+| GET    | `/api/analyses/{id}?device_id=`                   | Get one analysis |
+| DELETE | `/api/analyses/{id}?device_id=`                   | Delete one |
+| DELETE | `/api/analyses?device_id=`                        | Delete all (legacy) |
+| DELETE | `/api/history/{device_id}`                        | Delete all + chat (current) |
+| GET    | `/api/export?device_id=`                          | DSGVO Art. 15 — full data export |
+| POST   | `/api/revenuecat/webhook`                         | Server-side IAP reconciliation (opt-in auth) |
+| POST   | `/api/dev/usage/reset` *(dev-only)*               | Reset usage record |
+| POST   | `/api/dev/usage/simulate` *(dev-only)*            | Simulate paywall scenarios |
 
-### `POST /api/analyze` request
-```json
-{
-  "device_id": "string",
-  "target_language": "zh|vi|tr|ru|en|es",
-  "file_base64": "base64 string",
-  "mime_type": "image/jpeg|image/png|image/webp|image/heic|application/pdf"
-}
-```
-PDFs are converted to a PNG image (first page) on the server using PyMuPDF
-before sending to GPT-5.2.
+**Pending (Q1 2026):**
+- `POST /api/redeem` — redemption codes (Friends & Family lifetime).
+- `POST /api/admin/login` + admin endpoints — code generation, user management.
 
-### Response
-Structured `AnalysisRecord` with the AI result conforming to the schema in the
-problem statement (document_type, sender, summary_translated,
-simple_explanation_translated, key_points, deadlines[], required_actions[],
-risk_level, risk_reason, german_reply_draft,
-reply_draft_explanation_translated, questions_to_ask, uncertainties,
-disclaimer).
+## Paywall
 
-## Risk levels
-- **green** — informational only
-- **yellow** — may need action
-- **red** — deadline / payment / legal / urgent
+**Modes** (`PAYWALL_MODE` env var): `disabled` | `soft` | `hard`.
+- `disabled`: no limits, no paywall.
+- `soft` (current): 3 free analyses + 10 extra for testers, then upsell.
+- `hard` (post-launch): 3 free, then mandatory paywall.
 
-## Privacy & data handling
-- Original images and PDFs are **never** persisted server-side. They are
-  decoded, sent to the model, and discarded.
-- Only the structured analysis result + metadata (device id, language,
-  timestamp) is stored in MongoDB.
-- Users can delete individual analyses, all analyses, or fully reset (delete
-  account → wipes local AsyncStorage and remote data).
-- API keys live in backend `.env` only (`EMERGENT_LLM_KEY`).
+**Products** (RevenueCat IDs identical across stores):
+| Product ID | Type | Price (€) | Entitlement |
+|---|---|---|---|
+| `easli_single_letter` | Consumable | 1.49 | `plus` (one-shot) |
+| `easli_plus_monthly`  | Subscription | 4.99 | `plus` |
+| `easli_plus_yearly`   | Subscription | 39.99 | `plus` |
 
-## Safety rules enforced in the prompt
+**Soft caps for Plus:**
+- 20 analyses/month (`PLUS_MONTHLY_ANALYSES`)
+- 5 chat questions per document
+- 20 total chat questions per testing window
+
+## Privacy & DSGVO
+- Original images / PDFs decoded → sent to Mistral → discarded. Never stored.
+- Only the structured analysis result + `device_id` + `language` + `timestamp`
+  are persisted. TTL index deletes them after 90 days (`ANALYSIS_TTL_DAYS`).
+- DSGVO endpoints: `/export` (Art. 15) + `/history` DELETE (Art. 17), wired
+  to Settings → "Daten exportieren" / "Alle Daten löschen".
+- All API keys live in backend `.env` only. **Never in client / git.**
+- Mistral API: EU-hosted (Paris), no training on customer data (per their
+  default API policy).
+- No tracking, no analytics SDK, no advertising IDs. iOS Privacy Manifest
+  declares `NSPrivacyTracking: false` and proper API-usage reasons.
+
+## Safety prompts
 The system prompt explicitly forbids the model from:
 - Diagnosing medical conditions or recommending treatment
 - Telling the user whether they must or must not pay
 - Providing legal/tax/financial/medical advice
-The model must:
-- Mark uncertainties clearly
-- Recommend contacting the sender or a qualified advisor for important matters
-- Always include a closing disclaimer
+- Inventing missing data (deadlines, country, sender)
 
-## Future / non-MVP
-- Full email/password or Emergent Google auth (architecture is ready)
-- Payments (Stripe with Emergent test key) for premium analyses / multi-page docs
-- Optional storage of original document (off by default)
-- Push notifications for upcoming deadlines
-- Multi-page PDF analysis (currently first page only)
+It must:
+- Mark uncertainties clearly in `uncertainties[]`
+- Recommend contacting the sender or a qualified advisor for serious matters
+- Flag scams/phishing only when ≥1 strong red flag is present (`scam_warning`)
+- Populate `safety_disclaimer` for HIGH-risk docs (court / debt / immigration / eviction / termination)
+- Always include a closing `disclaimer`
+
+## Risk levels
+- `green`: informational only
+- `yellow`: may need action
+- `red`: deadline / payment / legal / urgent
+
+## Categories (12)
+`tax`, `insurance`, `rent`, `bank`, `health`, `government`, `court`,
+`utilities`, `telecom`, `work`, `education`, `other`
+
+## Roadmap
+
+### Done (v1.0)
+- Multi-source-language detection (Phase EU-1)
+- 11 UI / 25 explanation languages
+- Reply Assistant with intent picker (Phase R5)
+- Document chat (`/api/analyses/{id}/chat`)
+- Reminders for deadlines
+- TestFlight live, App Store assets ready
+- Privacy Manifest, EU-hosted AI, full DSGVO surface
+- Landing page (DE/EN/FR/ES/IT/PL) + 55 store screenshots
+
+### In progress (Q1 2026)
+- Admin panel (web at `api.easli.app/admin`)
+- Redemption codes (Friends & Family lifetime)
+- RevenueCat Apple wire-up + sandbox test
+- Sentry error tracking
+- Rate limiting on `/api/analyze` (slowapi)
+
+### Backlog
+- Calendar integration (`expo-calendar`) for deadlines
+- Drag-to-reorder pages in scanner preview
+- OpenAI / Azure-OpenAI TTS as Pro feature (DSGVO trade-off TBD)
+- Landing page → 11 languages parity
+- Modular split of `server.py` (3.3k LoC) and `result.tsx` (2.2k LoC)
+- Mistral API key rotation (P1 security)
+- GitHub Actions CI/CD

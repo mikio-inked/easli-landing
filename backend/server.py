@@ -93,7 +93,7 @@ DEV_TOOLS_ENABLED = os.environ.get('DEV_TOOLS_ENABLED', '0').strip() == '1' or P
 # return 404.
 
 # Create the main app without a prefix
-app = FastAPI(title="KlarPost API")
+app = FastAPI(title="easli API")
 
 # Create a router with the /api prefix
 api_router = APIRouter(prefix="/api")
@@ -1359,7 +1359,7 @@ async def analyze_from_ocr_text(
 
     if not result.disclaimer:
         result.disclaimer = (
-            "KlarPost provides general information only and does not give legal, tax, financial, or medical advice. "
+            "easli provides general information only and does not give legal, tax, financial, or medical advice. "
             "Please verify with the sender or a qualified professional."
         )
     return result
@@ -1518,7 +1518,7 @@ def _evaluate_entitlement(rec: UsageRecord) -> EntitlementDecision:
     """
     usage_view = _to_usage_response(rec)
 
-    # 1. Active KlarPost Plus with quota left → consume from the monthly bucket
+    # 1. Active easli Plus with quota left → consume from the monthly bucket
     if _plus_currently_active(rec) and rec.plus_monthly_analyses_used < PLUS_MONTHLY_ANALYSES:
         return EntitlementDecision(allowed=True, source='plus', usage=usage_view)
 
@@ -1542,7 +1542,7 @@ def _evaluate_entitlement(rec: UsageRecord) -> EntitlementDecision:
         return EntitlementDecision(
             allowed=False,
             reason='test_limit_reached',
-            message='Dein Testkontingent ist erreicht. Danke fürs Testen von KlarPost.',
+            message='Dein Testkontingent ist erreicht. Danke fürs Testen von easli.',
             usage=usage_view,
         )
 
@@ -1550,7 +1550,7 @@ def _evaluate_entitlement(rec: UsageRecord) -> EntitlementDecision:
     return EntitlementDecision(
         allowed=False,
         reason='payment_required',
-        message='Bitte wähle eine Option im KlarPost-Shop, um fortzufahren.',
+        message='Bitte wähle eine Option im easli-Shop, um fortzufahren.',
         usage=usage_view,
     )
 
@@ -1667,7 +1667,7 @@ def build_chat_system_prompt(record: dict, target_language_label: str, target_la
             "- Active voice, concrete nouns, address the user with 'Sie'.\n"
             "- Briefly explain rare formal terms in parentheses."
         )
-    return f"""You are KlarPost's document assistant. You help ONE user understand ONE specific letter or document. The full structured analysis of that document is provided below.
+    return f"""You are easli's document assistant. You help ONE user understand ONE specific letter or document. The full structured analysis of that document is provided below.
 
 CRITICAL SCOPE — refuse anything outside it:
 1. You may ONLY discuss THIS document and the immediate context around it (e.g. what a specific term in this letter means, what the deadline implies, how to phrase a polite reply to THIS sender, what document types like this typically look like in Germany, what to ask the sender, how to find a counseling center for THIS kind of issue).
@@ -1809,7 +1809,7 @@ def build_translation_system_prompt(
             "'Versicherte'), give a one-clause explanation in parentheses.\n"
             "- Use short bullet points where it helps clarity.\n"
         )
-    return f"""You are KlarPost's translator. You receive a structured JSON analysis of a document in {current_target_label}. Your job is to produce the SAME analysis object with the natural-language fields rewritten in {new_target_label}.
+    return f"""You are easli's translator. You receive a structured JSON analysis of a document in {current_target_label}. Your job is to produce the SAME analysis object with the natural-language fields rewritten in {new_target_label}.
 
 PRESERVE EXACTLY (do NOT translate, do NOT modify):
 - "sender" — proper name / organisation as given
@@ -2030,7 +2030,7 @@ async def translate_analysis_with_mistral(
 
     if not result.disclaimer:
         result.disclaimer = (
-            "KlarPost provides general information only and does not give legal, tax, financial, or medical advice. "
+            "easli provides general information only and does not give legal, tax, financial, or medical advice. "
             "Please verify with the sender or a qualified professional."
         )
     return result
@@ -2128,7 +2128,7 @@ async def translate_analysis_endpoint(analysis_id: str, req: TranslateRequest):
                 "error": "translation_limit_reached",
                 "message": (
                     "Du hast das Limit für Sprachwechsel bei diesem Dokument erreicht. "
-                    "Mit KlarPost Plus kannst du mehr Sprachen freischalten."
+                    "Mit easli Plus kannst du mehr Sprachen freischalten."
                 ),
                 "scope": "per_document",
                 "usage": _to_usage_response(usage_rec).dict(),
@@ -2522,7 +2522,7 @@ async def chat_endpoint(analysis_id: str, req: ChatRequest):
             status_code=429 if PAYWALL_MODE == 'soft' else 402,
             content={
                 "error": "test_limit_reached" if PAYWALL_MODE == 'soft' else "payment_required",
-                "message": "Dein Frage-Kontingent ist erreicht. Mit KlarPost Plus stellst du mehr Fragen.",
+                "message": "Dein Frage-Kontingent ist erreicht. Mit easli Plus stellst du mehr Fragen.",
                 "scope": "total",
                 "usage": _to_usage_response(usage_rec).dict(),
             },
@@ -2621,7 +2621,7 @@ async def clear_messages(analysis_id: str, device_id: str):
 
 @api_router.get("/")
 async def root():
-    return {"app": "KlarPost", "status": "ok"}
+    return {"app": "easli", "status": "ok"}
 
 
 @api_router.get("/languages")
@@ -2935,7 +2935,7 @@ async def export_my_data(device_id: str):
         records.append(doc)
     usage_doc = await db.usage_records.find_one({"device_id": device_id}, {"_id": 0}) or {}
     return {
-        "app": "KlarPost",
+        "app": "easli",
         "device_id": device_id,
         "exported_at": datetime.now(timezone.utc).isoformat(),
         "data_residency": "EU (Mistral AI, Paris)",
@@ -2971,9 +2971,9 @@ async def get_paywall_config():
         "max_total_chat_questions_per_tester": MAX_TOTAL_CHAT_QUESTIONS_PER_TESTER,
         "plus_monthly_analyses": PLUS_MONTHLY_ANALYSES,
         "products": {
-            "single_letter": "klarpost_single_letter",
-            "plus_monthly": "klarpost_plus_monthly",
-            "plus_yearly": "klarpost_plus_yearly",
+            "single_letter": "easli_single_letter",
+            "plus_monthly": "easli_plus_monthly",
+            "plus_yearly": "easli_plus_yearly",
         },
         "entitlements": {"plus": "plus"},
     }
@@ -3260,7 +3260,7 @@ async def safe_validation_exception_handler(request: Request, exc: RequestValida
 
 
 @app.on_event("startup")
-async def klarpost_startup():
+async def easli_startup():
     """Bootstrap MongoDB indexes on every backend start. Idempotent."""
     # 1. TTL on analyses for storage minimisation (DSGVO Art. 5(1)(e)).
     if ANALYSIS_TTL_DAYS > 0:
