@@ -21,10 +21,13 @@ Privacy: never logs passwords, JWT secret, or full code values. Only
 prefix + last 4 chars of any code-related log line.
 """
 
-from __future__ import annotations
+# Note: NO `from __future__ import annotations` here — it would turn our
+# Pydantic models into forward references that Body(...) defaults can't
+# resolve, breaking FastAPI's request-body inspection.
 
 import secrets
 import string
+import os
 import logging
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -32,7 +35,7 @@ from typing import Optional, List, Literal
 
 import bcrypt
 import jwt
-from fastapi import APIRouter, HTTPException, Header, Depends, Request
+from fastapi import APIRouter, HTTPException, Header, Depends, Request, Body
 from fastapi.responses import HTMLResponse, FileResponse
 from pydantic import BaseModel, Field
 from motor.motor_asyncio import AsyncIOMotorDatabase
@@ -168,15 +171,33 @@ def _verify_password(plain: str, hashed: str) -> bool:
 # ---- Admin Router Factory ----------------------------------------------
 
 
-def make_admin_router(db: AsyncIOMotorDatabase) -> APIRouter:
+def make_admin_router(db: AsyncIOMotorDatabase, limiter=None) -> APIRouter:
     """Build the /api/admin + /api/redeem routes wired to the given DB.
 
     Kept as a factory because server.py owns the Mongo client; we accept the
     db handle here and avoid re-creating one. Returns a single router that
     server.py can include with `app.include_router(...)`.
+
+    `limiter` (slowapi.Limiter, optional) — if provided, applies per-route
+    rate limits to /api/redeem and /api/admin/login. None = limits disabled.
     """
 
     router = APIRouter()
+
+    # Lightweight wrapper so calling code stays clean even when no limiter
+    # is configured (e.g. unit tests). Preserves the inner function's
+    # signature with functools.wraps so FastAPI's body-inspection still
+    # detects Pydantic models as JSON bodies (otherwise they'd be parsed
+    # as query params and 422 would fire).
+    import functools
+
+    def _maybe_limit(rule: str):
+        def _decorator(fn):
+            if limiter is None:
+                return fn
+            wrapped = limiter.limit(rule)(fn)
+            return functools.wraps(fn)(wrapped)
+        return _decorator
 
     # ---- Setup state cache (read once on startup, refreshed on writes) --
     # We keep a tiny in-memory mirror so the JWT secret doesn't hit the DB
@@ -282,24 +303,71 @@ def make_admin_router(db: AsyncIOMotorDatabase) -> APIRouter:
         return _issue_token(jwt_secret)
 
     @router.post("/api/admin/login", response_model=TokenResponse)
-    async def login(req: LoginRequest) -> TokenResponse:
+    @_maybe_limit(os.environ.get("RATE_LIMIT_ADMIN_LOGIN", "20/hour"))
+    async def login(
+        request: Request,
+        req: LoginRequest = Body(...),
+    ) -> TokenResponse:
         cfg = await db.admin_config.find_one({"_id": ADMIN_CONFIG_ID})
         if not cfg or not cfg.get("setup_completed"):
             raise HTTPException(status_code=409, detail="Admin not configured")
+
+        # ---- Brute-force lockout ----
+        # After 5 consecutive failed logins, lock the account for 15 minutes.
+        # The counter resets on success. Stored in MongoDB so a server
+        # restart can't bypass it.
+        now_ts = datetime.now(timezone.utc)
+        failed = int(cfg.get("failed_login_attempts") or 0)
+        lockout_until_str = cfg.get("lockout_until")
+        if lockout_until_str:
+            try:
+                lockout_until = datetime.fromisoformat(
+                    lockout_until_str.replace("Z", "+00:00")
+                )
+                if lockout_until > now_ts:
+                    remaining_min = int(
+                        (lockout_until - now_ts).total_seconds() / 60
+                    ) + 1
+                    logger.warning("admin_login_locked_out remaining_min=%s", remaining_min)
+                    raise HTTPException(
+                        status_code=429,
+                        detail=f"Too many failed attempts. Try again in {remaining_min} min.",
+                    )
+            except (ValueError, TypeError):
+                pass
+
         if not _verify_password(req.password, cfg.get("password_hash") or ""):
-            logger.warning("admin_login_failed")
+            new_failed = failed + 1
+            update: dict = {"failed_login_attempts": new_failed}
+            if new_failed >= 5:
+                lockout_end = now_ts + timedelta(minutes=15)
+                update["lockout_until"] = lockout_end.isoformat()
+                update["failed_login_attempts"] = 0  # reset counter on lockout
+                logger.warning("admin_login_lockout_triggered")
+            await db.admin_config.update_one(
+                {"_id": ADMIN_CONFIG_ID}, {"$set": update}
+            )
+            logger.warning("admin_login_failed attempt=%s", new_failed)
             raise HTTPException(status_code=401, detail="Invalid password")
+
         jwt_secret = cfg.get("jwt_secret") or ""
         if not jwt_secret:
-            # Should never happen post-setup, but recreate defensively.
             jwt_secret = secrets.token_urlsafe(48)
             await db.admin_config.update_one(
                 {"_id": ADMIN_CONFIG_ID}, {"$set": {"jwt_secret": jwt_secret}}
             )
         state["jwt_secret"] = jwt_secret
         state["loaded"] = True
+        # Reset lockout state on successful login.
         await db.admin_config.update_one(
-            {"_id": ADMIN_CONFIG_ID}, {"$set": {"last_login_at": _now_iso()}}
+            {"_id": ADMIN_CONFIG_ID},
+            {
+                "$set": {
+                    "last_login_at": _now_iso(),
+                    "failed_login_attempts": 0,
+                    "lockout_until": None,
+                }
+            },
         )
         logger.info("admin_login_ok")
         return _issue_token(jwt_secret)
@@ -526,7 +594,11 @@ def make_admin_router(db: AsyncIOMotorDatabase) -> APIRouter:
     # =====================================================================
 
     @router.post("/api/redeem", response_model=RedeemResponse)
-    async def redeem_code(req: RedeemRequest):
+    @_maybe_limit(os.environ.get("RATE_LIMIT_REDEEM", "10/minute"))
+    async def redeem_code(
+        request: Request,
+        req: RedeemRequest = Body(...),
+    ):
         if not req.device_id or not req.code:
             raise HTTPException(status_code=400, detail="device_id and code required")
         norm = _normalize_code(req.code)

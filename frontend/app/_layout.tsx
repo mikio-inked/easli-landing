@@ -6,12 +6,18 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { colors } from '../src/theme';
 import { ensureDeviceId } from '../src/store';
 import { initBilling } from '../src/billing';
+import { initSentry } from '../src/sentry';
 import {
   installLargeFontPatch,
   loadLargeFontMode,
   useLargeFontMode,
 } from '../src/largeFontMode';
 import { useEasliFonts } from '../src/fontLoader';
+
+// Initialize Sentry as the very first side-effect — before any other code
+// can crash. No-op when EXPO_PUBLIC_SENTRY_DSN is unset, so dev builds are
+// silent.
+initSentry();
 
 // Install the Text/TextInput render override at module import time, BEFORE
 // any <Text> can render. Loading the persisted flag is async; until it

@@ -18,6 +18,34 @@ from typing import List, Optional, Literal, Tuple, Any
 import uuid
 from datetime import datetime, timedelta, timezone
 
+# ==================== Optional Sentry ====================
+# Activated automatically when SENTRY_DSN env var is set. Uses the Logging
+# + FastAPI integrations so that all Python exceptions and any logger.error
+# call bubble up to Sentry. Designed to be a zero-cost no-op when DSN is
+# blank — perfect for local dev / CI.
+_sentry_dsn = os.environ.get("SENTRY_DSN", "").strip()
+if _sentry_dsn:
+    try:
+        import sentry_sdk
+        from sentry_sdk.integrations.logging import LoggingIntegration
+
+        sentry_sdk.init(
+            dsn=_sentry_dsn,
+            traces_sample_rate=float(
+                os.environ.get("SENTRY_TRACES_SAMPLE_RATE", "0.1")
+            ),
+            environment=os.environ.get("SENTRY_ENV", "production"),
+            release=os.environ.get("SENTRY_RELEASE") or None,
+            send_default_pii=False,  # privacy-first, never send IPs/headers
+            integrations=[
+                LoggingIntegration(level=logging.INFO, event_level=logging.ERROR),
+            ],
+        )
+    except Exception as _e:  # noqa: BLE001
+        # Never let a misconfigured Sentry crash the boot.
+        logging.getLogger(__name__).warning("sentry_init_failed err=%s", _e)
+
+
 import fitz  # PyMuPDF
 from mistralai import Mistral
 
@@ -94,6 +122,38 @@ DEV_TOOLS_ENABLED = os.environ.get('DEV_TOOLS_ENABLED', '0').strip() == '1' or P
 
 # Create the main app without a prefix
 app = FastAPI(title="easli API")
+
+# ==================== Rate Limiter (slowapi) ====================
+# IP-based throttling on expensive routes (/api/analyze, /api/redeem,
+# /api/admin/login). Tunable via env. Defaults are conservative for a
+# bootstrapping app — bump them after launch traffic is observed.
+from slowapi import Limiter, _rate_limit_exceeded_handler  # noqa: E402
+from slowapi.errors import RateLimitExceeded  # noqa: E402
+from slowapi.util import get_remote_address  # noqa: E402
+
+def _client_ip(request: Request) -> str:
+    """Prefer the right-most public IP from X-Forwarded-For (Railway sets
+    this), fall back to the direct peer address."""
+    fwd = request.headers.get("x-forwarded-for") or ""
+    if fwd:
+        # Railway / Cloudflare style: "client, proxy1, proxy2"
+        first = fwd.split(",")[0].strip()
+        if first:
+            return first
+    return get_remote_address(request)
+
+limiter = Limiter(
+    key_func=_client_ip,
+    default_limits=[],
+    storage_uri="memory://",  # in-process (per worker); fine for 1-3 workers
+)
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+# Configurable per-endpoint limits (override via env in Railway).
+RL_ANALYZE = os.environ.get("RATE_LIMIT_ANALYZE", "30/minute")
+RL_REDEEM = os.environ.get("RATE_LIMIT_REDEEM", "10/minute")
+RL_ADMIN_LOGIN = os.environ.get("RATE_LIMIT_ADMIN_LOGIN", "20/hour")
 
 # Create a router with the /api prefix
 api_router = APIRouter(prefix="/api")
@@ -2632,7 +2692,8 @@ async def get_languages():
 
 
 @api_router.post("/analyze")
-async def analyze_document(req: AnalyzeRequest):
+@limiter.limit(RL_ANALYZE)
+async def analyze_document(request: Request, req: AnalyzeRequest):
     # Validate language — accepts the full EU-1 Explanation-Language set
     # (25 codes) since Phase 5. See `EXPLANATION_LANGUAGES` at top.
     if req.target_language not in EXPLANATION_LANGUAGES:
@@ -3191,7 +3252,7 @@ app.include_router(api_router)
 # Mounts: GET /admin (HTML UI) + /api/admin/* (auth-gated) + /api/redeem (public)
 from admin import make_admin_router  # noqa: E402
 
-app.include_router(make_admin_router(db))
+app.include_router(make_admin_router(db, limiter=limiter))
 
 
 # Diagnostic request-logger middleware — added because we observed a class
@@ -3236,10 +3297,26 @@ async def diag_request_logger(request: Request, call_next):
         raise
 
 
+# CORS — restrict to first-party origins. Override via ALLOWED_ORIGINS env
+# (comma-separated) for dev/staging.
+_default_origins = [
+    "https://easli.app",
+    "https://www.easli.app",
+    "https://api.easli.app",
+    "http://localhost:3000",
+    "http://localhost:8081",
+]
+_origins_env = os.environ.get("ALLOWED_ORIGINS", "").strip()
+_allowed_origins = (
+    [o.strip() for o in _origins_env.split(",") if o.strip()]
+    if _origins_env
+    else _default_origins
+)
+
 app.add_middleware(
     CORSMiddleware,
     allow_credentials=True,
-    allow_origins=["*"],
+    allow_origins=_allowed_origins,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -3315,6 +3392,24 @@ async def easli_startup():
     try:
         await db.analyses.create_index([("device_id", 1), ("created_at", -1)], name="device_created_idx")
         await db.usage_records.create_index("device_id", unique=True, name="device_unique_idx")
+        # Phase D — analytics indices for the admin dashboard aggregations.
+        # Sparse + background: zero impact on existing writes, only docs that
+        # have the field get indexed.
+        await db.analyses.create_index(
+            "target_language",
+            name="target_language_idx",
+            sparse=True,
+            background=True,
+        )
+        await db.analyses.create_index(
+            "detected_country_code",
+            name="detected_country_idx",
+            sparse=True,
+            background=True,
+        )
+        await db.redemption_codes.create_index(
+            "code", unique=True, name="code_unique_idx"
+        )
     except Exception as e:
         logger.warning("index_setup_failed error_type=%s", type(e).__name__)
 

@@ -1,7 +1,7 @@
 // /legal/impressum — German legal disclosure required by § 5 TMG.
 //
-// IMPORTANT: All entity-specific values are placeholders ([TODO ...]).
-// Replace before publishing on the App Store / Play Store / public web.
+// IMPORTANT: Real-world entity values are filled below (Anbieter, Kontakt etc.).
+// Update the postal address only if it changes.
 //
 // Layout: bilingual (German first because the legal source language is
 // German for the German market, then a short English translation summary).

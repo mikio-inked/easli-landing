@@ -4,7 +4,7 @@
 // links to.
 //
 // Bilingual: German first (binding for the German market) + English summary.
-// All operator-specific values use [TODO] placeholders.
+// All operator-specific values are filled below (anchor: Verantwortliche Stelle).
 
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
