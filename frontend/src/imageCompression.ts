@@ -70,17 +70,23 @@ export async function compressPageForUpload(
 
     if (!result.base64) {
       // Defensive: shouldn't happen because we asked for base64.
-      console.log(
-        `[compress] page=${pageIndex} no_base64_in_result — passing original through`,
-      );
+      if (__DEV__) {
+        // eslint-disable-next-line no-console
+        console.log(
+          `[compress] page=${pageIndex} no_base64_in_result — passing original through`,
+        );
+      }
       return page;
     }
 
     const sizeAfter = estimateBinaryBytes(result.base64);
     // Privacy: log only sizes, NEVER the base64 itself.
-    console.log(
-      `[compress] page=${pageIndex} before=${sizeBefore}B after=${sizeAfter}B ratio=${(sizeAfter / sizeBefore).toFixed(2)}`,
-    );
+    if (__DEV__) {
+      // eslint-disable-next-line no-console
+      console.log(
+        `[compress] page=${pageIndex} before=${sizeBefore}B after=${sizeAfter}B ratio=${(sizeAfter / sizeBefore).toFixed(2)}`,
+      );
+    }
 
     return {
       base64: result.base64,

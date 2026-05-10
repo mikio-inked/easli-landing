@@ -77,188 +77,22 @@ import {
   formatLanguageLabel,
   getAnyLanguage,
 } from '../src/languages';
+import {
+  MainAction,
+  daysUntil,
+  deadlineKeyFor,
+  formatRelativeDays,
+  hasImportantUncertainty,
+  pickMainAction,
+  replyRequired,
+  tokenSearch,
+  tryParseDeadlineDate,
+} from '../src/result/helpers';
+import { Accordion, SectionRow, riskMeta } from '../src/result/components';
 
 // Enable LayoutAnimation on Android (iOS supports it natively).
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
-}
-
-function riskMeta(level: 'green' | 'yellow' | 'red', lang: LanguageCode) {
-  if (level === 'green') {
-    return {
-      label: t(lang, 'risk_green'),
-      icon: <Info color={colors.green.text} size={26} strokeWidth={2.4} />,
-      palette: colors.green,
-    };
-  }
-  if (level === 'yellow') {
-    return {
-      label: t(lang, 'risk_yellow'),
-      icon: <AlertTriangle color={colors.yellow.text} size={26} strokeWidth={2.4} />,
-      palette: colors.yellow,
-    };
-  }
-  return {
-    label: t(lang, 'risk_red'),
-    icon: <ShieldAlert color={colors.red.text} size={26} strokeWidth={2.4} />,
-    palette: colors.red,
-  };
-}
-
-function deadlineKeyFor(idx: number, d: { date: string; description: string }): string {
-  return `${idx}|${(d.date || '').trim()}|${(d.description || '').slice(0, 40).trim()}`;
-}
-
-function tryParseDeadlineDate(raw: string): Date | null {
-  if (!raw) return null;
-  const s = raw.trim();
-  // ISO first
-  const iso = new Date(s);
-  if (!isNaN(iso.getTime()) && /\d{4}/.test(s)) return iso;
-  // German DD.MM.YYYY
-  const dm = s.match(/^(\d{1,2})[.\/-](\d{1,2})[.\/-](\d{2,4})$/);
-  if (dm) {
-    const day = parseInt(dm[1], 10);
-    const mon = parseInt(dm[2], 10) - 1;
-    let yr = parseInt(dm[3], 10);
-    if (yr < 100) yr += 2000;
-    const d = new Date(yr, mon, day, 9, 0, 0, 0);
-    if (!isNaN(d.getTime())) return d;
-  }
-  return null;
-}
-
-// Days from now to the given date. Returns 0 for today, negative for past.
-function daysUntil(d: Date): number {
-  const now = new Date();
-  const a = new Date(d.getFullYear(), d.getMonth(), d.getDate());
-  const b = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  return Math.round((a.getTime() - b.getTime()) / 86400000);
-}
-
-// Build a calm, language-aware "in N days / tomorrow / overdue" label.
-function formatRelativeDays(days: number, lang: LanguageCode): string {
-  if (days === 0) return t(lang, 'today_label');
-  if (days === 1) return t(lang, 'in_one_day');
-  if (days > 0) return t(lang, 'in_n_days').replace('{n}', String(days));
-  return t(lang, 'days_overdue').replace('{n}', String(Math.abs(days)));
-}
-
-// Pick the SINGLE most-important thing to surface in the Main Action card.
-// Heuristic:
-//   1) The soonest non-past deadline (with parseable date) wins.
-//   2) Else the first high-urgency required action.
-//   3) Else the first required action.
-//   4) Else null → don't render the card.
-type MainAction =
-  | {
-      kind: 'deadline';
-      date: Date;
-      raw: string;
-      description: string;
-      days: number;
-      requiresResponse: boolean;
-    }
-  | { kind: 'action'; action: string; reason?: string; urgency?: string }
-  | null;
-
-const REPLY_TOKENS = [
-  // EN
-  'reply', 'respond', 'response', 'answer', 'submit', 'confirm', 'object',
-  'objection', 'contact', 'send back', 'return',
-  // DE
-  'antwort', 'rückantwort', 'rückmeld', 'antworten', 'einreich', 'bestätig',
-  'widerspruch', 'einspruch', 'kontakt', 'zurücksend', 'rücksend',
-  // ES
-  'respond', 'contest', 'envia', 'confirm',
-  // RU
-  'отвеч', 'ответ', 'подтверд', 'возраж',
-  // TR
-  'yanıtla', 'cevap', 'itiraz', 'onayla',
-  // VI
-  'trả lời', 'phản hồi', 'xác nhận', 'phản đối',
-  // ZH
-  '回复', '回答', '确认', '反对',
-];
-
-function tokenSearch(haystack: string, needles: string[]): boolean {
-  const h = haystack.toLowerCase();
-  return needles.some((n) => h.includes(n));
-}
-
-function replyRequired(r: any): boolean {
-  const fields = [
-    ...(r.required_actions || []).map((a: any) => `${a.action || ''} ${a.reason || ''}`),
-    r.simple_explanation_translated || '',
-    r.summary_translated || '',
-  ];
-  if (tokenSearch(fields.join(' '), REPLY_TOKENS)) return true;
-  // If there's a reply draft and a deadline, we treat that as "reply needed".
-  if ((r as any).reply_draft && (r.deadlines || []).length > 0) return true;
-  if (r.german_reply_draft && (r.deadlines || []).length > 0) return true;
-  return false;
-}
-
-function pickMainAction(r: any): MainAction {
-  const deadlines = (r.deadlines || []) as Array<{ date: string; description: string }>;
-  // 1) soonest non-past deadline
-  const dated = deadlines
-    .map((d) => ({ d, parsed: tryParseDeadlineDate(d.date || '') }))
-    .filter((x) => !!x.parsed && x.parsed!.getTime() >= Date.now() - 86400000) // include today
-    .sort((a, b) => a.parsed!.getTime() - b.parsed!.getTime());
-  if (dated.length > 0) {
-    const top = dated[0];
-    return {
-      kind: 'deadline',
-      date: top.parsed!,
-      raw: top.d.date,
-      description: top.d.description || '',
-      days: daysUntil(top.parsed!),
-      requiresResponse: replyRequired(r),
-    };
-  }
-  // 2) highest urgency action
-  const acts = (r.required_actions || []) as Array<{
-    action: string;
-    urgency?: string;
-    reason?: string;
-  }>;
-  const high = acts.find((a) => a.urgency === 'high');
-  if (high) {
-    return { kind: 'action', action: high.action, reason: high.reason, urgency: 'high' };
-  }
-  if (acts.length > 0) {
-    const a = acts[0];
-    return { kind: 'action', action: a.action, reason: a.reason, urgency: a.urgency };
-  }
-  return null;
-}
-
-function hasImportantUncertainty(r: any): boolean {
-  // "Important" = anything that mentions money, dates, payment, sender,
-  // legal/medical/tax. We're generous here so the user errs on the side of
-  // double-checking. If there are no uncertainties at all, this returns
-  // false and the section stays hidden.
-  const un = (r.uncertainties || []) as string[];
-  if (un.length === 0) return false;
-  const importantHints = [
-    // EN
-    'date', 'amount', 'pay', 'paid', 'iban', 'sender', 'identity',
-    'legal', 'medical', 'tax',
-    // DE
-    'datum', 'betrag', 'zahl', 'absender', 'recht', 'medizin', 'steuer',
-    // ES
-    'fecha', 'monto', 'pago', 'remitente',
-    // RU
-    'дата', 'сумм', 'плат', 'отправит',
-    // TR
-    'tarih', 'tutar', 'ödem', 'gönder',
-    // VI
-    'ngày', 'số tiền', 'thanh toán', 'người gửi',
-    // ZH
-    '日期', '金额', '付款', '发件人',
-  ];
-  return un.some((u) => tokenSearch(u, importantHints));
 }
 
 export default function ResultScreen() {
@@ -1436,74 +1270,6 @@ export default function ResultScreen() {
 }
 
 
-function SectionRow({ icon, title }: { icon: React.ReactNode; title: string }) {
-  return (
-    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-      <View style={styles.sectionIcon}>{icon}</View>
-      <SectionTitle>{title}</SectionTitle>
-    </View>
-  );
-}
-
-// Accordion: collapsible card. Header is fully tappable (44pt min target).
-// Animated chevron rotates on toggle for clear affordance.
-function Accordion({
-  id,
-  title,
-  icon,
-  open,
-  onToggle,
-  testID,
-  children,
-}: {
-  id: string;
-  title: string;
-  icon: React.ReactNode;
-  open: boolean;
-  onToggle: (id: string, currentlyOpen: boolean) => void;
-  testID?: string;
-  children: React.ReactNode;
-}) {
-  const rotation = useRef(new Animated.Value(open ? 1 : 0)).current;
-
-  useEffect(() => {
-    Animated.timing(rotation, {
-      toValue: open ? 1 : 0,
-      duration: 220,
-      easing: Easing.out(Easing.ease),
-      useNativeDriver: true,
-    }).start();
-  }, [open, rotation]);
-
-  const rotateInterpolate = rotation.interpolate({
-    inputRange: [0, 1],
-    outputRange: ['0deg', '180deg'],
-  });
-
-  return (
-    <View style={styles.accordionCard} testID={testID}>
-      <Pressable
-        onPress={() => onToggle(id, open)}
-        style={({ pressed }) => [styles.accordionHeader, pressed && { opacity: 0.7 }]}
-        hitSlop={4}
-        testID={testID ? `${testID}-header` : undefined}
-        accessibilityRole="button"
-        accessibilityState={{ expanded: open }}
-        accessibilityLabel={title}
-      >
-        <View style={styles.sectionIcon}>{icon}</View>
-        <Text style={styles.accordionTitle} numberOfLines={2}>
-          {title}
-        </Text>
-        <Animated.View style={{ transform: [{ rotate: rotateInterpolate }] }}>
-          <ChevronDown color={colors.textSecondary} size={22} strokeWidth={2.4} />
-        </Animated.View>
-      </Pressable>
-      {open ? <View style={styles.accordionBody}>{children}</View> : null}
-    </View>
-  );
-}
-
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.background },
   header: {
@@ -1956,49 +1722,11 @@ const styles = StyleSheet.create({
     color: colors.white,
   },
 
-  // ---- Detail Accordions ----
-  accordionCard: {
-    backgroundColor: colors.surface,
-    borderRadius: radius.xxl,
-    borderWidth: 1,
-    borderColor: colors.borderLight,
-    overflow: 'hidden',
-    ...shadows.card,
-  },
-  accordionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
-    minHeight: 56, // ≥44pt touch target
-  },
-  accordionTitle: {
-    flex: 1,
-    color: colors.textPrimary,
-    fontSize: fontSize.lg,
-    fontWeight: fontWeight.bold,
-    letterSpacing: -0.2,
-  },
-  accordionBody: {
-    paddingHorizontal: spacing.lg,
-    paddingBottom: spacing.lg,
-    gap: spacing.md,
-  },
-
   // ---- Shared content styles ----
   body: {
     color: colors.textPrimary,
     fontSize: fontSize.lg,
     lineHeight: 26,
-  },
-  sectionIcon: {
-    width: 30,
-    height: 30,
-    borderRadius: radius.sm,
-    backgroundColor: colors.primarySoft,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   bullet: {
     flexDirection: 'row',
