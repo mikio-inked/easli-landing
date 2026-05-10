@@ -1,577 +1,542 @@
 #!/usr/bin/env python3
-"""KlarPost backend regression — 2-stage OCR+Analysis pipeline validation.
+"""Phase B refactor regression test for easli backend.
 
-Covers:
-  1. POST /api/analyze with 1/2/4 page synthetic JPEGs (AnalysisResult schema + usage)
-  2. /app/backend/_test_retry.py still passes
-  3. Existing endpoints (/, /languages, /paywall/config, /usage/{device_id})
-  4. POST /api/analyses/{id}/chat ChatMessage shape
-  5. DELETE /api/history/{device_id} cleanup
-  6. Privacy log audit (ocr_page_ok present; no PII leakage)
-  7. Graceful failure on unreadable input (1x1 white PNG)
-  8. Idempotency — duplicate idempotency_key consumed once
+Targets the public preview backend URL read from /app/frontend/.env
+(EXPO_PUBLIC_BACKEND_URL). All API calls hit ${BASE}/api/...
 
-NEVER logs raw base64 payloads (truncated to 20 chars + length).
+Runs the 13-step plan from the review request.
 """
-from __future__ import annotations
-
-import base64
-import io
-import json
 import os
 import re
-import subprocess
 import sys
 import time
+import json
 import uuid
-from datetime import datetime, timezone
-from pathlib import Path
-from typing import Any, Dict, List, Tuple
+import base64
+import io
+import subprocess
+from typing import Tuple
 
 import requests
 from PIL import Image, ImageDraw, ImageFont
 
 
-def _load_frontend_env() -> str:
-    env_path = Path("/app/frontend/.env")
-    for line in env_path.read_text().splitlines():
-        if line.startswith("EXPO_PUBLIC_BACKEND_URL="):
-            return line.split("=", 1)[1].strip().strip('"').strip("'")
+# ---- Resolve BASE URL from /app/frontend/.env -------------------------------
+def _read_base_url() -> str:
+    env_path = "/app/frontend/.env"
+    with open(env_path) as fh:
+        for ln in fh:
+            ln = ln.strip()
+            if ln.startswith("EXPO_PUBLIC_BACKEND_URL="):
+                v = ln.split("=", 1)[1].strip().strip('"').strip("'")
+                return v.rstrip("/")
     raise RuntimeError("EXPO_PUBLIC_BACKEND_URL not found in /app/frontend/.env")
 
 
-BASE_URL = _load_frontend_env().rstrip("/") + "/api"
-TIMEOUT_ANALYZE = 90
-TIMEOUT_SHORT = 30
-
-PII_TOKENS = [
-    "Sehr geehrte",
-    "Frau Muster",
-    "123,45",
-    "28.02.2026",
-    "Telekom AG",
-    "ueberweisen",
-    "überweisen",
-    "DE89",
-    "NG12",
-]
+BASE = _read_base_url()
+API = f"{BASE}/api"
+DEVICE_ID = "qa-phaseB-001"
+print(f"BASE={BASE}")
+print(f"DEVICE_ID={DEVICE_ID}")
 
 
-class Results:
-    def __init__(self):
-        self.passed: List[str] = []
-        self.failed: List[Tuple[str, str]] = []
-
-    def ok(self, name: str):
-        self.passed.append(name)
-        print(f"  PASS: {name}")
-
-    def fail(self, name: str, detail: str):
-        self.failed.append((name, detail))
-        print(f"  FAIL: {name} -- {detail}")
-
-    def summary(self):
-        total = len(self.passed) + len(self.failed)
-        print(f"\n{'=' * 70}")
-        print(f"Total: {total}   Passed: {len(self.passed)}   Failed: {len(self.failed)}")
-        if self.failed:
-            print("\nFAILURES:")
-            for name, detail in self.failed:
-                print(f"  - {name}")
-                print(f"      {detail}")
-        print("=" * 70)
-
-
-results = Results()
-
-
-def _trunc_b64(s: str) -> str:
-    if len(s) <= 45:
-        return s
-    return f"{s[:20]}...{s[-20:]} (len={len(s)})"
-
-
-def _safe_body(resp: requests.Response) -> str:
-    try:
-        body = resp.json()
-    except Exception:
-        return resp.text[:400]
-
-    def _scrub(o: Any) -> Any:
-        if isinstance(o, dict):
-            return {k: (_trunc_b64(v) if isinstance(v, str) and len(v) > 200 else _scrub(v)) for k, v in o.items()}
-        if isinstance(o, list):
-            return [_scrub(x) for x in o]
-        if isinstance(o, str) and len(o) > 200:
-            return _trunc_b64(o)
-        return o
-
-    return json.dumps(_scrub(body))[:1500]
-
-
-GERMAN_LETTER_TEXT = [
-    "Telekom AG",
-    "Landgrabenweg 151",
-    "53227 Bonn",
+# ---- Synthetic German letter rendered to PNG --------------------------------
+LETTER_LINES = [
+    "Finanzamt Berlin-Mitte",
+    "Hauptstrasse 12",
+    "10115 Berlin",
     "",
-    "Sehr geehrte Frau Muster,",
+    "Sehr geehrter Herr Mustermann,",
     "",
-    "vielen Dank fuer Ihre Bestellung. Wir moechten Sie",
-    "darauf hinweisen, dass der Rechnungsbetrag in Hoehe",
-    "von 123,45 EUR bis zum 28.02.2026 auf unser Konto",
-    "zu ueberweisen ist.",
+    "Steuernummer 27/466/78910",
+    "Aktenzeichen: FA-2026-DE-0001",
     "",
-    "Bitte verwenden Sie als Verwendungszweck Ihre",
-    "Kundennummer 9876543210.",
+    "Bitte zahlen Sie 482,50 EUR bis spaetestens 30.07.2026",
+    "auf das folgende Konto:",
+    "IBAN: DE89 3704 0044 0532 0130 00",
+    "Verwendungszweck: Einkommensteuer 2025",
     "",
-    "Bei Fragen erreichen Sie unseren Kundenservice",
-    "unter der Nummer 0800 33 01000.",
+    "Bei Rueckfragen wenden Sie sich bitte an Frau Schulz",
+    "Telefon: 030 1234567",
     "",
     "Mit freundlichen Gruessen",
-    "Ihre Telekom AG",
+    "Finanzamt Berlin-Mitte",
 ]
 
 
-def build_page_jpeg(page_idx: int = 0, total_pages: int = 1) -> str:
-    img = Image.new("RGB", (1280, 1800), "white")
+def _render_letter_png() -> str:
+    img = Image.new("RGB", (800, 1000), "white")
     draw = ImageDraw.Draw(img)
     try:
-        font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 36)
-        small = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 28)
+        font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 22)
     except Exception:
         font = ImageFont.load_default()
-        small = font
-
-    y = 80
-    if total_pages > 1:
-        draw.text((80, 40), f"Seite {page_idx + 1} von {total_pages}", fill="black", font=small)
-        y = 110
-
-    for line in GERMAN_LETTER_TEXT:
-        draw.text((80, y), line, fill="black", font=font)
-        y += 54
-
-    if total_pages > 1:
-        draw.text((80, y + 60), f"Referenz Seite {page_idx + 1}: AK-{1000 + page_idx}", fill="black", font=small)
-
-    buf = io.BytesIO()
-    img.save(buf, format="JPEG", quality=88)
-    return base64.b64encode(buf.getvalue()).decode("utf-8")
-
-
-def build_tiny_white_png() -> str:
-    img = Image.new("RGB", (1, 1), "white")
+    y = 40
+    for line in LETTER_LINES:
+        draw.text((40, y), line, fill="black", font=font)
+        y += 36
     buf = io.BytesIO()
     img.save(buf, format="PNG")
-    return base64.b64encode(buf.getvalue()).decode("utf-8")
+    return base64.b64encode(buf.getvalue()).decode("ascii")
 
 
-LOG_FILES = [
-    "/var/log/supervisor/backend.err.log",
-    "/var/log/supervisor/backend.out.log",
-]
+# ---- Helpers ----------------------------------------------------------------
+results = []
+DE_ID = None
+ORIG_REPLY_DRAFT_EN = None
 
 
-def _snapshot_log_sizes() -> Dict[str, int]:
-    sizes = {}
-    for p in LOG_FILES:
-        try:
-            sizes[p] = os.path.getsize(p)
-        except FileNotFoundError:
-            sizes[p] = 0
-    return sizes
+def record(step, status, latency_ms=None, note=""):
+    line = f"[{status}] step{step}"
+    if latency_ms is not None:
+        line += f" ({latency_ms:.0f}ms)"
+    if note:
+        line += f" — {note}"
+    print(line)
+    results.append((step, status, latency_ms, note))
 
 
-def _read_logs_since(start_sizes: Dict[str, int]) -> str:
-    out = []
-    for p in LOG_FILES:
-        try:
-            start = start_sizes.get(p, 0)
-            size_now = os.path.getsize(p)
-            with open(p, "rb") as f:
-                f.seek(start)
-                out.append(f.read(max(0, size_now - start)).decode("utf-8", errors="replace"))
-        except FileNotFoundError:
-            continue
-    return "\n".join(out)
+def post(path, **kw):
+    t0 = time.time()
+    r = requests.post(f"{API}{path}", timeout=120, **kw)
+    return r, (time.time() - t0) * 1000.0
 
 
-created_analysis_id_for_chat: str = ""
-device_for_cleanup: str = ""
+def get(path, **kw):
+    t0 = time.time()
+    r = requests.get(f"{API}{path}", timeout=60, **kw)
+    return r, (time.time() - t0) * 1000.0
 
 
-def test_existing_smoke():
-    print("\n[1] Smoke -- GET /api/")
-    try:
-        r = requests.get(f"{BASE_URL}/", timeout=TIMEOUT_SHORT)
-        assert r.status_code == 200, f"status={r.status_code} body={_safe_body(r)}"
-        body = r.json()
-        assert body.get("app") == "KlarPost" and body.get("status") == "ok", f"body={body}"
-        results.ok("GET /api/ returns {app:'KlarPost', status:'ok'}")
-    except Exception as e:
-        results.fail("GET /api/", str(e))
-
-    print("\n[2] Smoke -- GET /api/languages")
-    try:
-        r = requests.get(f"{BASE_URL}/languages", timeout=TIMEOUT_SHORT)
-        assert r.status_code == 200, f"status={r.status_code}"
-        langs = r.json()
-        assert isinstance(langs, list), f"not a list: {type(langs)}"
-        assert len(langs) == 7, f"expected 7 languages, got {len(langs)}"
-        results.ok(f"GET /api/languages returns list of 7 items ({[l['code'] for l in langs]})")
-    except Exception as e:
-        results.fail("GET /api/languages", str(e))
-
-    print("\n[3] Smoke -- GET /api/paywall/config")
-    try:
-        r = requests.get(f"{BASE_URL}/paywall/config", timeout=TIMEOUT_SHORT)
-        assert r.status_code == 200, f"status={r.status_code} body={_safe_body(r)}"
-        body = r.json()
-        assert "paywall_mode" in body, f"paywall_mode missing from {list(body.keys())}"
-        results.ok(f"GET /api/paywall/config dict with paywall_mode={body.get('paywall_mode')!r}")
-    except Exception as e:
-        results.fail("GET /api/paywall/config", str(e))
+def delete_(path, **kw):
+    t0 = time.time()
+    r = requests.delete(f"{API}{path}", timeout=60, **kw)
+    return r, (time.time() - t0) * 1000.0
 
 
-def test_usage_endpoint(device_id: str):
-    print(f"\n[4] Smoke -- GET /api/usage/{device_id[:16]}...")
-    try:
-        r = requests.get(f"{BASE_URL}/usage/{device_id}", timeout=TIMEOUT_SHORT)
-        assert r.status_code == 200, f"status={r.status_code} body={_safe_body(r)}"
-        body = r.json()
-        assert "free_analyses_used" in body, f"free_analyses_used missing: {list(body.keys())}"
-        assert "free_analyses_total" in body, f"free_analyses_total missing: {list(body.keys())}"
-        results.ok(f"GET /api/usage/... has free_analyses_used={body['free_analyses_used']}, total={body['free_analyses_total']}")
-        return body
-    except Exception as e:
-        results.fail("GET /api/usage/{device_id}", str(e))
-        return None
+# ---- Step 1: Import smoke ---------------------------------------------------
+def step1_import():
+    proc = subprocess.run(
+        ["python3", "-c",
+         "import server, prompts, models, languages, admin; "
+         "print('OK', len(languages.EXPLANATION_LANGUAGES), 'langs')"],
+        cwd="/app/backend",
+        capture_output=True, text=True, timeout=30,
+    )
+    out = (proc.stdout or "").strip()
+    err = (proc.stderr or "").strip()
+    if proc.returncode == 0 and "OK 27 langs" in out:
+        record(1, "PASS", note=f"stdout='{out}'")
+        return True
+    record(1, "FAIL", note=f"rc={proc.returncode} stdout='{out}' stderr='{err}'")
+    return False
 
 
-def _assert_analysis_result_schema(body: Dict[str, Any], label: str) -> bool:
-    if "usage" not in body:
-        results.fail(f"{label} -- top-level 'usage' field", f"missing. keys={list(body.keys())}")
+# ---- Step 2: GET /api/ ------------------------------------------------------
+def step2_root():
+    r, ms = get("/")
+    if r.status_code != 200:
+        record(2, "FAIL", ms, f"status={r.status_code} body={r.text[:200]}")
         return False
-    result = body.get("result")
-    if not isinstance(result, dict):
-        results.fail(f"{label} -- result field", f"not a dict. body_keys={list(body.keys())}")
-        return False
+    body = r.json()
+    if body.get("app") == "easli" and body.get("status") == "ok":
+        record(2, "PASS", ms, f"body={body}")
+        return True
+    record(2, "FAIL", ms, f"body={body}")
+    return False
 
-    required = [
-        "document_type", "sender", "summary_translated",
-        "deadlines", "category", "risk_level",
-        "scam_warning", "disclaimer",
-    ]
-    missing = [k for k in required if k not in result]
-    if missing:
-        results.fail(f"{label} -- result schema", f"missing keys: {missing}. present={list(result.keys())}")
-        return False
 
-    if not isinstance(result["deadlines"], list):
-        results.fail(f"{label} -- deadlines is list", f"type={type(result['deadlines']).__name__}")
+# ---- Step 3: GET /api/languages ---------------------------------------------
+def step3_languages():
+    r, ms = get("/languages")
+    if r.status_code != 200:
+        record(3, "FAIL", ms, f"status={r.status_code}")
         return False
-    if not isinstance(result["scam_warning"], bool):
-        results.fail(f"{label} -- scam_warning is bool", f"type={type(result['scam_warning']).__name__}")
+    body = r.json()
+    if not isinstance(body, list) or len(body) < 27:
+        record(3, "FAIL", ms, f"len={len(body) if isinstance(body, list) else 'N/A'}")
         return False
-    valid_risk = ("green", "yellow", "red")
-    if result["risk_level"] not in valid_risk:
-        results.fail(f"{label} -- risk_level literal", f"value={result['risk_level']!r}")
+    codes = {item.get("code"): item.get("label") for item in body if isinstance(item, dict)}
+    required = ["de_simple", "en", "fr", "it", "pl", "ar", "hi", "zh-Hans", "vi", "tr", "ru"]
+    missing = [c for c in required if c not in codes]
+    bad_shape = [item for item in body if not (isinstance(item, dict) and "code" in item and "label" in item)]
+    if missing or bad_shape:
+        record(3, "FAIL", ms, f"missing={missing} bad_shape_count={len(bad_shape)}")
         return False
-
-    results.ok(f"{label} -- AnalysisResult schema complete (risk={result['risk_level']}, category={result['category']}, scam={result['scam_warning']}, deadlines={len(result['deadlines'])})")
+    record(3, "PASS", ms,
+           f"len={len(body)} all 11 required codes present")
     return True
 
 
-def test_analyze_multipage():
-    global created_analysis_id_for_chat, device_for_cleanup
-
-    device_id = f"qa-ocr-pipeline-{uuid.uuid4()}"
-    device_for_cleanup = device_id
-
-    for n_pages in (1, 2, 4):
-        print(f"\n[5.{n_pages}] POST /api/analyze with {n_pages} page(s) -- device={device_id[:24]}...")
-        pages = [
-            {"file_base64": build_page_jpeg(i, n_pages), "mime_type": "image/jpeg"}
-            for i in range(n_pages)
-        ]
-        payload = {
-            "device_id": device_id,
-            "target_language": "en",
-            "idempotency_key": f"qa-ocr-{n_pages}p-{uuid.uuid4()}",
-            "pages": pages,
-        }
-        print(f"      payload: device_id={device_id[:24]}..., target_language=en, pages=[{n_pages} x ~{len(pages[0]['file_base64']) // 1024}KB JPEG]")
-
-        t0 = time.time()
-        try:
-            r = requests.post(f"{BASE_URL}/analyze", json=payload, timeout=TIMEOUT_ANALYZE)
-        except requests.Timeout:
-            results.fail(f"POST /api/analyze {n_pages}-page -- HTTP call", f"timeout after {TIMEOUT_ANALYZE}s")
-            continue
-        except Exception as e:
-            results.fail(f"POST /api/analyze {n_pages}-page -- HTTP call", f"{type(e).__name__}: {e}")
-            continue
-        elapsed = time.time() - t0
-
-        if r.status_code != 200:
-            results.fail(
-                f"POST /api/analyze {n_pages}-page -- status",
-                f"got {r.status_code} in {elapsed:.1f}s. body={_safe_body(r)}",
-            )
-            continue
-        if elapsed > 60:
-            results.fail(f"POST /api/analyze {n_pages}-page -- <60s latency", f"took {elapsed:.1f}s")
-        else:
-            results.ok(f"POST /api/analyze {n_pages}-page -> 200 in {elapsed:.1f}s (under 60s budget)")
-
-        body = r.json()
-        _assert_analysis_result_schema(body, f"/api/analyze {n_pages}-page")
-
-        if n_pages == 1:
-            created_analysis_id_for_chat = body.get("id", "")
-            if not created_analysis_id_for_chat:
-                results.fail("analyze -- envelope.id for chat follow-up", f"no id in body: {list(body.keys())}")
-
-        usage = body.get("usage", {})
-        print(f"      usage after {n_pages}-page: free_used={usage.get('free_analyses_used')}, soft_used={usage.get('soft_extra_used')}")
-
-
-def test_chat_endpoint():
-    print(f"\n[6] POST /api/analyses/{{id}}/chat -- Was ist die Frist?")
-    if not created_analysis_id_for_chat:
-        results.fail("chat -- prerequisite", "no analysis id from step 5.1; skipping chat test")
-        return
-    payload = {"device_id": device_for_cleanup, "message": "Was ist die Frist?"}
-    try:
-        t0 = time.time()
-        r = requests.post(
-            f"{BASE_URL}/analyses/{created_analysis_id_for_chat}/chat",
-            json=payload, timeout=TIMEOUT_ANALYZE,
-        )
-        elapsed = time.time() - t0
-        if r.status_code != 200:
-            results.fail("chat -- status", f"got {r.status_code} in {elapsed:.1f}s. body={_safe_body(r)}")
-            return
-        body = r.json()
-        required = ["role", "content", "off_topic", "created_at"]
-        missing = [k for k in required if k not in body]
-        if missing:
-            results.fail("chat -- ChatMessage shape", f"missing={missing}. present={list(body.keys())}")
-            return
-        if body["role"] != "assistant":
-            results.fail("chat -- role", f"expected 'assistant', got {body['role']!r}")
-            return
-        if not isinstance(body["content"], str) or not body["content"].strip():
-            results.fail("chat -- content populated", f"content={body.get('content')!r}")
-            return
-        results.ok(f"POST /api/analyses/{{id}}/chat -> 200 in {elapsed:.1f}s, role=assistant, content={len(body['content'])} chars, off_topic={body['off_topic']}")
-    except Exception as e:
-        results.fail("chat", f"{type(e).__name__}: {e}")
-
-
-def test_graceful_unreadable():
-    print("\n[7] Graceful failure -- 1x1 white PNG")
-    device = f"qa-unreadable-{uuid.uuid4()}"
+# ---- Step 4: POST /api/analyze (target_language=en) -------------------------
+def step4_analyze_en(b64):
+    global DE_ID, ORIG_REPLY_DRAFT_EN
     payload = {
-        "device_id": device,
+        "device_id": DEVICE_ID,
         "target_language": "en",
-        "idempotency_key": f"qa-unread-{uuid.uuid4()}",
-        "pages": [{"file_base64": build_tiny_white_png(), "mime_type": "image/png"}],
+        "file_base64": b64,
+        "mime_type": "image/png",
+        "idempotency_key": str(uuid.uuid4()),
     }
-    try:
-        t0 = time.time()
-        r = requests.post(f"{BASE_URL}/analyze", json=payload, timeout=TIMEOUT_ANALYZE)
-        elapsed = time.time() - t0
-        if r.status_code == 502:
-            results.fail("unreadable input -- NOT 502", f"got 502 in {elapsed:.1f}s. body={_safe_body(r)}")
-            return
-        if r.status_code == 422:
-            body = _safe_body(r)
-            results.ok(f"unreadable input -> 422 (clean) in {elapsed:.1f}s -- {body[:160]}")
-            return
-        if r.status_code == 200:
-            body = r.json()
-            result = body.get("result", {}) or {}
-            uncertainties = result.get("uncertainties", [])
-            results.ok(f"unreadable input -> 200 in {elapsed:.1f}s with {len(uncertainties)} uncertainties (acceptable per spec)")
-            try:
-                requests.delete(f"{BASE_URL}/history/{device}", timeout=TIMEOUT_SHORT)
-            except Exception:
-                pass
-            return
-        body = _safe_body(r)
-        if 400 <= r.status_code < 500:
-            results.ok(f"unreadable input -> {r.status_code} in {elapsed:.1f}s (non-502, acceptable) -- {body[:160]}")
-        else:
-            results.fail(f"unreadable input -- status {r.status_code}", body[:200])
-    except Exception as e:
-        results.fail("unreadable input", f"{type(e).__name__}: {e}")
+    r, ms = post("/analyze", json=payload)
+    if r.status_code != 200:
+        record(4, "FAIL", ms, f"status={r.status_code} body={r.text[:400]}")
+        return False
+    if ms > 60000:
+        record(4, "FAIL", ms, f"latency >60s")
+        return False
+    env = r.json()
+    DE_ID = env.get("id")
+    res = env.get("result") or {}
+    src = res.get("source_language_code")
+    country = res.get("detected_country_code", "")
+    summary = res.get("summary_translated") or ""
+    reply = res.get("reply_draft") or ""
+    cat = res.get("category")
+    scam = res.get("scam_warning")
+    tlang = res.get("target_language")
+
+    fails = []
+    if src != "de":
+        fails.append(f"source_language_code={src!r} (expected 'de')")
+    if country not in ("DE", ""):
+        fails.append(f"detected_country_code={country!r}")
+    if len(summary) < 40:
+        fails.append(f"summary_translated len={len(summary)} <40")
+    if not reply:
+        fails.append("reply_draft empty")
+    if not cat:
+        fails.append("category missing")
+    if scam is not False:
+        fails.append(f"scam_warning={scam!r} (expected False)")
+    if tlang != "English":
+        fails.append(f"target_language={tlang!r} (expected 'English')")
+
+    if fails:
+        record(4, "FAIL", ms, f"DE_ID={DE_ID} issues={fails}")
+        return False
+    ORIG_REPLY_DRAFT_EN = reply
+    record(4, "PASS", ms,
+           f"DE_ID={DE_ID} src=de country={country!r} summary_len={len(summary)} "
+           f"reply_len={len(reply)} category={cat!r} scam={scam} tlang={tlang!r}")
+    return True
 
 
-def test_idempotency():
-    print("\n[8] Idempotency -- same analyze request twice")
-    device = f"qa-idemp-{uuid.uuid4()}"
-    idemp_key = f"qa-idemp-key-{uuid.uuid4()}"
-    page = build_page_jpeg(0, 1)
+# ---- Step 5: POST /api/analyze (target_language=pl) -------------------------
+def step5_analyze_pl(b64):
     payload = {
-        "device_id": device,
-        "target_language": "en",
-        "idempotency_key": idemp_key,
-        "pages": [{"file_base64": page, "mime_type": "image/jpeg"}],
+        "device_id": DEVICE_ID,
+        "target_language": "pl",
+        "file_base64": b64,
+        "mime_type": "image/png",
+        "idempotency_key": str(uuid.uuid4()),
     }
-    print(f"      device={device[:24]}..., idempotency_key={idemp_key[:18]}...")
-    try:
-        t0 = time.time()
-        r1 = requests.post(f"{BASE_URL}/analyze", json=payload, timeout=TIMEOUT_ANALYZE)
-        t1 = time.time()
-        if r1.status_code != 200:
-            results.fail("idempotency -- first call status", f"got {r1.status_code}. body={_safe_body(r1)}")
-            return
-        body1 = r1.json()
-        usage1 = body1.get("usage", {})
-        used1 = usage1.get("free_analyses_used", -1)
+    r, ms = post("/analyze", json=payload)
+    if r.status_code != 200:
+        record(5, "FAIL", ms, f"status={r.status_code} body={r.text[:400]}")
+        return False
+    env = r.json()
+    res = env.get("result") or {}
+    tlang = res.get("target_language")
+    summary = res.get("summary_translated") or ""
+    reply = res.get("reply_draft") or ""
+    src = res.get("source_language_code")
 
-        r2 = requests.post(f"{BASE_URL}/analyze", json=payload, timeout=TIMEOUT_ANALYZE)
-        t2 = time.time()
-        if r2.status_code != 200:
-            results.fail("idempotency -- second call status", f"got {r2.status_code}. body={_safe_body(r2)}")
-            return
-        body2 = r2.json()
-        usage2 = body2.get("usage", {})
-        used2 = usage2.get("free_analyses_used", -1)
+    fails = []
+    if tlang != "Polish (Polski)":
+        fails.append(f"target_language={tlang!r}")
+    polish_diacritics = re.compile(r"[ąćęłńóśźż]", re.IGNORECASE)
+    if not polish_diacritics.search(summary):
+        fails.append(f"no Polish diacritics in summary; sample='{summary[:80]}'")
+    has_umlaut = bool(re.search(r"[äöüÄÖÜß]", reply))
+    has_german_polite = (
+        ("sehr geehrte" in reply.lower())
+        or ("freundliche" in reply.lower())
+        or ("freundlichen" in reply.lower())
+        or ("mit freundlichen" in reply.lower())
+    )
+    if not (has_umlaut or has_german_polite):
+        fails.append(f"reply_draft not in German; sample='{reply[:120]}'")
+    if src != "de":
+        fails.append(f"source_language_code={src!r}")
 
-        results.ok(f"idempotency -- both calls 200 (t1={t1-t0:.1f}s, t2={t2-t1:.1f}s)")
-        if used1 == 1 and used2 == 1:
-            results.ok(f"idempotency -- free_analyses_used incremented by exactly 1 (1st={used1}, 2nd={used2})")
-        else:
-            results.fail(
-                "idempotency -- usage increment",
-                f"expected 1 and 1, got 1st={used1} 2nd={used2}. Full usage2={usage2}",
-            )
-
-        try:
-            requests.delete(f"{BASE_URL}/history/{device}", timeout=TIMEOUT_SHORT)
-        except Exception:
-            pass
-
-    except Exception as e:
-        results.fail("idempotency", f"{type(e).__name__}: {e}")
-
-
-def test_cleanup_delete_history():
-    print(f"\n[9] Cleanup -- DELETE /api/history/{device_for_cleanup[:24]}...")
-    if not device_for_cleanup:
-        results.fail("cleanup -- no device", "device_for_cleanup is empty")
-        return
-    try:
-        r = requests.delete(f"{BASE_URL}/history/{device_for_cleanup}", timeout=TIMEOUT_SHORT)
-        if r.status_code != 200:
-            results.fail("DELETE /api/history/{device} -- status", f"got {r.status_code}. body={_safe_body(r)}")
-            return
-        body = r.json()
-        if "deleted_analyses" not in body or "deleted_messages" not in body:
-            results.fail("DELETE /api/history -- shape", f"missing keys: {list(body.keys())}")
-            return
-        results.ok(f"DELETE /api/history/... -> 200 with {{deleted_analyses:{body['deleted_analyses']}, deleted_messages:{body['deleted_messages']}}}")
-    except Exception as e:
-        results.fail("DELETE /api/history/{device}", f"{type(e).__name__}: {e}")
+    if fails:
+        record(5, "FAIL", ms, f"issues={fails}")
+        return False
+    record(5, "PASS", ms,
+           f"tlang={tlang!r} summary_len={len(summary)} polish_diacritic=YES "
+           f"reply_german=YES src={src!r}")
+    return True
 
 
-def test_retry_helper_unit():
-    print("\n[10] Retry helper unit tests -- python3 /app/backend/_test_retry.py")
-    try:
-        proc = subprocess.run(
-            ["python3", "_test_retry.py"],
-            cwd="/app/backend",
-            capture_output=True, text=True, timeout=180,
-        )
-        stdout = proc.stdout or ""
-        if proc.returncode != 0:
-            results.fail(
-                "retry helper unit test -- exit code",
-                f"rc={proc.returncode}. stdout={stdout[-500:]!r} stderr={(proc.stderr or '')[-500:]!r}",
-            )
-            return
-        if "ALL 6 TESTS PASSED" not in stdout:
-            results.fail(
-                "retry helper unit test -- banner",
-                f"'ALL 6 TESTS PASSED' missing. stdout tail:\n{stdout[-500:]}",
-            )
-            return
-        results.ok("retry helper unit test: exit=0, 'ALL 6 TESTS PASSED' present")
-    except subprocess.TimeoutExpired:
-        results.fail("retry helper unit test", "timeout 60s")
-    except Exception as e:
-        results.fail("retry helper unit test", f"{type(e).__name__}: {e}")
+# ---- Step 6: POST /api/analyses/{DE_ID}/translate (it) ----------------------
+def step6_translate_it():
+    if not DE_ID:
+        record(6, "FAIL", note="no DE_ID from step 4")
+        return False
+    payload = {"device_id": DEVICE_ID, "target_language": "it"}
+    r, ms = post(f"/analyses/{DE_ID}/translate", json=payload)
+    if r.status_code != 200:
+        record(6, "FAIL", ms, f"status={r.status_code} body={r.text[:400]}")
+        return False
+    env = r.json()
+    res = env.get("result") or {}
+    tlang = res.get("target_language")
+    summary = res.get("summary_translated") or ""
+    reply = res.get("reply_draft") or ""
 
-
-def test_privacy_log_audit(log_snapshot_start: Dict[str, int]):
-    print("\n[11] Privacy log audit -- scan backend logs for the test window")
-    try:
-        window_text = _read_logs_since(log_snapshot_start)
-    except Exception as e:
-        results.fail("privacy log audit -- log read", f"{type(e).__name__}: {e}")
-        return
-
-    ocr_matches = re.findall(r"ocr_page_ok idx=\d+ chars=\d+", window_text)
-    if ocr_matches:
-        results.ok(f"privacy log -- {len(ocr_matches)} `ocr_page_ok idx=N chars=N` line(s) found (expected)")
-    else:
-        results.fail(
-            "privacy log -- ocr_page_ok expected",
-            f"no `ocr_page_ok idx=N chars=N` lines in test window (log chars captured={len(window_text)})",
+    fails = []
+    if tlang != "Italian (Italiano)":
+        fails.append(f"target_language={tlang!r}")
+    italian_markers = ["deve", "del", "questa", "lettera", "della", "pagamento", "entro"]
+    summary_lower = summary.lower()
+    if not any(marker in summary_lower for marker in italian_markers):
+        fails.append(f"no Italian markers in summary; sample='{summary[:100]}'")
+    # Phase-3 invariant: reply_draft byte-identical to step 4
+    if reply != ORIG_REPLY_DRAFT_EN:
+        fails.append(
+            f"reply_draft NOT byte-identical: step4_len={len(ORIG_REPLY_DRAFT_EN or '')} "
+            f"step6_len={len(reply)}"
         )
 
-    leaked = []
-    for tok in PII_TOKENS:
-        if tok in window_text:
-            count = window_text.count(tok)
-            idx = window_text.find(tok)
-            start = max(0, idx - 40)
-            end = min(len(window_text), idx + len(tok) + 40)
-            leaked.append((tok, count, window_text[start:end].replace("\n", " ")))
-    if leaked:
-        detail_parts = []
-        for tok, count, preview in leaked:
-            detail_parts.append(f"{tok!r}x{count}: ...{preview}...")
-        results.fail("privacy log -- PII tokens", "; ".join(detail_parts))
-    else:
-        results.ok(f"privacy log -- zero PII leakage across {len(PII_TOKENS)} sentinel tokens")
+    if fails:
+        record(6, "FAIL", ms, f"issues={fails}")
+        return False
+    record(6, "PASS", ms,
+           f"tlang={tlang!r} summary_len={len(summary)} italian_marker=YES "
+           f"reply_byte_identical=YES (len={len(reply)})")
+    return True
 
-    tb_patterns = [
-        r'File ".+server\.py", line \d+, in ocr_pages_with_mistral',
-        r'File ".+server\.py", line \d+, in analyze_with_mistral',
-        r'File ".+server\.py", line \d+, in ocr_one',
+
+# ---- Step 7: POST /api/analyses/{DE_ID}/chat --------------------------------
+def step7_chat():
+    payload = {
+        "device_id": DEVICE_ID,
+        "message": "What is the deadline mentioned in this letter?",
+    }
+    r, ms = post(f"/analyses/{DE_ID}/chat", json=payload)
+    if r.status_code != 200:
+        record(7, "FAIL", ms, f"status={r.status_code} body={r.text[:400]}")
+        return False
+    if ms > 30000:
+        record(7, "FAIL", ms, "latency >30s")
+        return False
+    body = r.json()
+    content = body.get("content") or ""
+    role = body.get("role")
+    fails = []
+    if len(content) < 30:
+        fails.append(f"content len={len(content)}")
+    if role != "assistant":
+        fails.append(f"role={role!r}")
+    if fails:
+        record(7, "FAIL", ms, f"issues={fails} content[:80]='{content[:80]}'")
+        return False
+    record(7, "PASS", ms, f"role={role!r} content_len={len(content)} sample='{content[:80]}'")
+    return True
+
+
+# ---- Step 8: POST /api/analyses/{DE_ID}/generate-reply (no lang) -----------
+def step8_generate_reply_default():
+    payload = {"device_id": DEVICE_ID, "intent": "inquiry"}
+    r, ms = post(f"/analyses/{DE_ID}/generate-reply", json=payload)
+    if r.status_code != 200:
+        record(8, "FAIL", ms, f"status={r.status_code} body={r.text[:400]}")
+        return False
+    body = r.json()
+    reply_text = body.get("reply_text") or ""
+    reply_lang = body.get("reply_language_code")
+    reply_expl = body.get("reply_explanation") or ""
+    fails = []
+    if not reply_text:
+        fails.append("reply_text empty")
+    if reply_lang != "de":
+        fails.append(f"reply_language_code={reply_lang!r} (expected 'de')")
+    if not reply_expl:
+        fails.append("reply_explanation empty")
+    if fails:
+        record(8, "FAIL", ms, f"issues={fails}")
+        return False
+    record(8, "PASS", ms,
+           f"reply_len={len(reply_text)} reply_lang={reply_lang!r} expl_len={len(reply_expl)}")
+    return True
+
+
+# ---- Step 9: POST /api/analyses/{DE_ID}/generate-reply (en) -----------------
+def step9_generate_reply_en():
+    payload = {"device_id": DEVICE_ID, "intent": "extension", "reply_language_code": "en"}
+    r, ms = post(f"/analyses/{DE_ID}/generate-reply", json=payload)
+    if r.status_code != 200:
+        record(9, "FAIL", ms, f"status={r.status_code} body={r.text[:400]}")
+        return False
+    body = r.json()
+    reply_text = body.get("reply_text") or ""
+    reply_lang = body.get("reply_language_code")
+    fails = []
+    has_english_marker = (
+        re.search(r"\bDear\b", reply_text)
+        or re.search(r"\bSincerely\b", reply_text, re.IGNORECASE)
+        or re.search(r"\bThank you\b", reply_text, re.IGNORECASE)
+        or re.search(r"\bYours\b", reply_text)
+        or re.search(r"\bRegards\b", reply_text, re.IGNORECASE)
+        or re.search(r"\bBest\b", reply_text)
+    )
+    if not has_english_marker:
+        fails.append(f"no English greeting/closer; sample='{reply_text[:120]}'")
+    if reply_lang != "en":
+        fails.append(f"reply_language_code={reply_lang!r} (expected 'en')")
+    if fails:
+        record(9, "FAIL", ms, f"issues={fails}")
+        return False
+    record(9, "PASS", ms, f"reply_len={len(reply_text)} reply_lang={reply_lang!r}")
+    return True
+
+
+# ---- Step 10: GET /api/analyses ---------------------------------------------
+def step10_list():
+    r, ms = get("/analyses", params={"device_id": DEVICE_ID})
+    if r.status_code != 200:
+        record(10, "FAIL", ms, f"status={r.status_code} body={r.text[:200]}")
+        return False
+    body = r.json()
+    if not isinstance(body, list) or len(body) < 1:
+        record(10, "FAIL", ms, f"len={len(body) if isinstance(body, list) else 'N/A'}")
+        return False
+    ids = [it.get("id") for it in body]
+    if DE_ID not in ids:
+        record(10, "FAIL", ms, f"DE_ID={DE_ID} NOT in list ids={ids}")
+        return False
+    record(10, "PASS", ms, f"count={len(body)} DE_ID present")
+    return True
+
+
+# ---- Step 11: NEGATIVE — invalid target_language ----------------------------
+def step11_invalid_lang(b64):
+    payload = {
+        "device_id": DEVICE_ID,
+        "target_language": "xx-bogus",
+        "file_base64": b64,
+        "mime_type": "image/png",
+        "idempotency_key": str(uuid.uuid4()),
+    }
+    r, ms = post("/analyze", json=payload)
+    if r.status_code not in (400, 422):
+        record(11, "FAIL", ms, f"status={r.status_code} (expected 4xx)")
+        return False
+    body_text = r.text.lower()
+    if "unsupported" in body_text and "target" in body_text:
+        record(11, "PASS", ms, f"status={r.status_code} body={r.text[:120]}")
+        return True
+    record(11, "FAIL", ms, f"status={r.status_code} body={r.text[:200]} (expected 'Unsupported target language')")
+    return False
+
+
+# ---- Step 12: NEGATIVE — no pages and no file_base64 ------------------------
+def step12_no_content():
+    payload = {
+        "device_id": DEVICE_ID,
+        "target_language": "en",
+        "idempotency_key": str(uuid.uuid4()),
+    }
+    r, ms = post("/analyze", json=payload)
+    if r.status_code not in (400, 422):
+        record(12, "FAIL", ms, f"status={r.status_code}")
+        return False
+    body_text = r.text.lower()
+    if "no file content" in body_text or "file content" in body_text:
+        record(12, "PASS", ms, f"status={r.status_code} body={r.text[:160]}")
+        return True
+    record(12, "FAIL", ms, f"status={r.status_code} body={r.text[:200]} (expected detail mentioning missing file content)")
+    return False
+
+
+# ---- Step 13: CLEANUP -------------------------------------------------------
+def step13_cleanup():
+    r, ms = delete_(f"/history/{DEVICE_ID}")
+    if r.status_code != 200:
+        record(13, "FAIL", ms, f"status={r.status_code} body={r.text[:200]}")
+        return False
+    body = r.json()
+    da = body.get("deleted_analyses", 0)
+    dm = body.get("deleted_messages", 0)
+    if da < 1:
+        record(13, "FAIL", ms, f"deleted_analyses={da} (<1) body={body}")
+        return False
+    record(13, "PASS", ms, f"deleted_analyses={da} deleted_messages={dm}")
+    return True
+
+
+# ---- Privacy-log audit ------------------------------------------------------
+def audit_logs(start_ts):
+    print("\n--- LOG AUDIT ---")
+    log_paths = [
+        "/var/log/supervisor/backend.err.log",
+        "/var/log/supervisor/backend.out.log",
     ]
-    hits = []
-    for pat in tb_patterns:
-        hits.extend(re.findall(pat, window_text))
-    if hits:
-        results.fail("privacy log -- tracebacks in new OCR/analysis paths", f"{len(hits)} hit(s). sample: {hits[0]!r}")
-    else:
-        results.ok("privacy log -- zero tracebacks from ocr_pages_with_mistral / analyze_with_mistral / ocr_one")
+    pii_tokens = ["482,50", "27/466", "Berlin-Mitte"]
+    pii_hits = {tok: 0 for tok in pii_tokens}
+    import_errors = 0
+    mistral_calls = 0
+    for path in log_paths:
+        if not os.path.exists(path):
+            continue
+        try:
+            with open(path, "r", errors="ignore") as fh:
+                content = fh.read()
+        except Exception:
+            continue
+        for tok in pii_tokens:
+            pii_hits[tok] += content.count(tok)
+        import_errors += content.count("ImportError")
+        # count mistral chat completions calls (loose)
+        mistral_calls += len(re.findall(r"https://api\.mistral\.ai/v1", content))
+    print(f"PII token hits: {pii_hits}")
+    print(f"ImportError occurrences: {import_errors}")
+    print(f"Total api.mistral.ai/v1 lines in logs (cumulative): {mistral_calls}")
+    return pii_hits, import_errors, mistral_calls
 
 
-def main() -> int:
-    print(f"KlarPost backend regression -- targeting {BASE_URL}")
-    print(f"Started at {datetime.now(timezone.utc).isoformat()}\n")
+# ---- Main -------------------------------------------------------------------
+def main():
+    print("\n=== Phase B refactor regression — starting ===\n")
+    start_ts = time.time()
 
-    log_start = _snapshot_log_sizes()
+    # Render the synthetic letter once
+    b64 = _render_letter_png()
+    print(f"Rendered letter PNG, base64 len={len(b64)}")
 
-    test_existing_smoke()
-    test_usage_endpoint(f"qa-usage-{uuid.uuid4()}")
+    # Cleanup any stale data from previous runs first
+    try:
+        delete_(f"/history/{DEVICE_ID}")
+    except Exception:
+        pass
 
-    test_analyze_multipage()
-    test_chat_endpoint()
-    test_graceful_unreadable()
-    test_idempotency()
-    test_cleanup_delete_history()
-    test_retry_helper_unit()
-    test_privacy_log_audit(log_start)
+    step1_import()
+    step2_root()
+    step3_languages()
+    step4_analyze_en(b64)
+    step5_analyze_pl(b64)
+    step6_translate_it()
+    step7_chat()
+    step8_generate_reply_default()
+    step9_generate_reply_en()
+    step10_list()
+    step11_invalid_lang(b64)
+    step12_no_content()
+    step13_cleanup()
 
-    results.summary()
-    return 0 if not results.failed else 1
+    pii_hits, import_errors, mistral_calls = audit_logs(start_ts)
+
+    print("\n=== SUMMARY ===")
+    n_pass = sum(1 for _, s, *_ in results if s == "PASS")
+    n_fail = sum(1 for _, s, *_ in results if s == "FAIL")
+    print(f"Total: {len(results)} | PASS: {n_pass} | FAIL: {n_fail}")
+    for step, status, ms, note in results:
+        ms_str = f"{ms:.0f}ms" if ms is not None else "—"
+        print(f"  step{step:>2}: {status:<4} {ms_str:>8}  {note[:140]}")
+
+    sys.exit(0 if n_fail == 0 else 1)
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    main()
