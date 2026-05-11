@@ -371,6 +371,20 @@ export default function SettingsScreen() {
             ))}
           </View>
           <View style={styles.divider} />
+          {/* Always-visible entry that opens the IN-APP paywall (RevenueCat
+              packages: easli Plus Monthly / Yearly + Single Letter). Required
+              by Apple Review (Guideline 2.1) so the IAPs are findable from
+              launch — without it the reviewer never sees the purchase flow.
+              Distinct from "Manage Plus" below, which goes to the OS-level
+              subscription management screen and is only useful once a user
+              already has an active sub. */}
+          <ListRow
+            icon={<Crown color={colors.primary} size={18} strokeWidth={2.4} />}
+            title={t(lang, 'paywall_view_plans')}
+            onPress={() => router.push('/paywall')}
+            testID="settings-view-plans"
+          />
+          <View style={styles.divider} />
           <ListRow
             icon={<Crown color={colors.primary} size={18} strokeWidth={2.4} />}
             title={t(lang, 'manage_plus')}

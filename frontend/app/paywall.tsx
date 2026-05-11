@@ -12,6 +12,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Linking,
   Platform,
   Pressable,
   ScrollView,
@@ -309,8 +310,42 @@ export default function Paywall() {
         </Pressable>
 
         <View style={styles.legalBlock}>
+          {/* Auto-renew + cancellation disclosure required by Apple
+              Guideline 3.1.2 (subscription apps). Worded in plain B1
+              language so non-native speakers also understand. */}
+          <Text style={styles.legalText}>{t(lang, 'paywall_subscription_terms')}</Text>
           <Text style={styles.legalText}>{t(lang, 'paywall_legal_note')}</Text>
           <Text style={styles.legalText}>{t(lang, 'paywall_privacy_note')}</Text>
+
+          {/* Functional links — Apple Guideline 3.1.2(c) requires the
+              app itself to expose tappable Privacy Policy AND Terms of
+              Use (EULA) on the subscription screen. Apple's standard
+              EULA is used so we don't have to maintain a custom one. */}
+          <View style={styles.legalLinksRow}>
+            <Pressable
+              onPress={() => {
+                Linking.openURL('https://easli.app/privacy.html').catch(() => {});
+              }}
+              hitSlop={8}
+              testID="paywall-link-privacy"
+              accessibilityRole="link"
+            >
+              <Text style={styles.legalLink}>{t(lang, 'privacy_policy')}</Text>
+            </Pressable>
+            <Text style={styles.legalLinkDot}> · </Text>
+            <Pressable
+              onPress={() => {
+                Linking.openURL(
+                  'https://www.apple.com/legal/internet-services/itunes/dev/stdeula/',
+                ).catch(() => {});
+              }}
+              hitSlop={8}
+              testID="paywall-link-terms"
+              accessibilityRole="link"
+            >
+              <Text style={styles.legalLink}>{t(lang, 'paywall_terms_of_use')}</Text>
+            </Pressable>
+          </View>
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -477,5 +512,22 @@ const styles = StyleSheet.create({
     fontSize: fontSize.xs,
     color: colors.textMuted,
     lineHeight: 17,
+  },
+  legalLinksRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    marginTop: 4,
+  },
+  legalLink: {
+    fontSize: fontSize.xs,
+    color: colors.primary,
+    fontWeight: fontWeight.semibold,
+    textDecorationLine: 'underline',
+  },
+  legalLinkDot: {
+    fontSize: fontSize.xs,
+    color: colors.textMuted,
   },
 });
