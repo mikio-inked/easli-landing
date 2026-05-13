@@ -81,6 +81,8 @@
         "NSPhotoLibraryUsageDescription": "Pick a photo of a letter to analyze.",
         "NSPhotoLibraryAddUsageDescription": "Save analyzed documents to your library.",
         "NSMicrophoneUsageDescription": "Not used. Microphone access is not required.",
+        "NSFaceIDUsageDescription": "Use Face ID to unlock easli and protect your letters.",
+        "NSCalendarsUsageDescription": "Add letter deadlines to your calendar with reminders.",
         "ITSAppUsesNonExemptEncryption": false,
         "CFBundleDevelopmentRegion": "de",
         "CFBundleLocalizations": [

@@ -90,6 +90,8 @@ import {
 } from '../src/result/helpers';
 import { Accordion, SectionRow, riskMeta } from '../src/result/components';
 import { maybePromptRating } from '../src/rateApp';
+import * as haptics from '../src/haptics';
+import { addDeadlineToCalendar } from '../src/calendar';
 
 // Enable LayoutAnimation on Android (iOS supports it natively).
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
@@ -1103,6 +1105,33 @@ export default function ResultScreen() {
                             <XCircle color={colors.green.text} size={14} strokeWidth={2.4} />
                           ) : null}
                         </Pressable>
+                        {/* Add to Calendar — only render if we successfully
+                            parsed the deadline into a Date object. Apple's
+                            EventKit doesn't accept ambiguous strings, so a
+                            "—" date is filtered out at the source. */}
+                        {parsed ? (
+                          <Pressable
+                            onPress={async () => {
+                              const ok = await addDeadlineToCalendar({
+                                title: d.description || t(lang, 'deadlines'),
+                                date: parsed,
+                                notes: `${r.sender || ''}\n${r.document_type || ''}`.trim(),
+                                lang,
+                              });
+                              if (ok) haptics.success();
+                              else haptics.warning();
+                            }}
+                            style={styles.reminderBtn}
+                            testID={`calendar-add-${i}`}
+                            accessibilityRole="button"
+                            accessibilityLabel={t(lang, 'add_to_calendar')}
+                          >
+                            <CalendarClock color={colors.primary} size={14} strokeWidth={2.5} />
+                            <Text style={styles.reminderBtnLabel}>
+                              {t(lang, 'add_to_calendar')}
+                            </Text>
+                          </Pressable>
+                        ) : null}
                       </View>
                     </View>
                   </View>

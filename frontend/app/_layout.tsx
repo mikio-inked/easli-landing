@@ -1,13 +1,17 @@
 import { useEffect, useState } from 'react';
+import { AppState } from 'react-native';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import * as Sentry from '@sentry/react-native';
 import { colors, isDarkMode } from '../src/theme';
-import { ensureDeviceId } from '../src/store';
+import { ensureDeviceId, getLanguage } from '../src/store';
 import { initBilling } from '../src/billing';
 import { initSentry, isSentryEnabled, captureException } from '../src/sentry';
+import { isLockEnabled } from '../src/appLock';
+import { LockScreen } from '../src/LockScreen';
+import { LanguageCode } from '../src/i18n';
 import {
   installLargeFontPatch,
   loadLargeFontMode,
@@ -29,6 +33,11 @@ installLargeFontPatch();
 
 function RootLayout() {
   const [largeFontReady, setLargeFontReady] = useState(false);
+  // Biometric lock state. `null` while we're still loading the user's
+  // setting (so we render a blank screen instead of flashing the UI
+  // before the lock has a chance to install itself).
+  const [locked, setLocked] = useState<boolean | null>(null);
+  const [lockLang, setLockLang] = useState<LanguageCode>('en');
   // Brand typography (Inter family). Doesn't block rendering — the hook
   // returns true on either success OR error so a network glitch can't
   // freeze the splash screen.
@@ -84,6 +93,45 @@ function RootLayout() {
     };
   }, []);
 
+  // Boot biometric lock: check the persisted preference once, then re-lock
+  // whenever the app comes back to foreground (matches iOS "1Password"
+  // pattern — open from cold start OR from background → ask Face ID).
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const [enabled, l] = await Promise.all([
+          isLockEnabled(),
+          getLanguage(),
+        ]);
+        if (cancelled) return;
+        setLockLang(l ?? 'en');
+        setLocked(enabled);
+      } catch {
+        if (!cancelled) setLocked(false);
+      }
+    })();
+    // Re-lock when app returns from background (>30s away).
+    let backgroundedAt = 0;
+    const sub = AppState.addEventListener('change', async (state) => {
+      if (state === 'background' || state === 'inactive') {
+        backgroundedAt = Date.now();
+        return;
+      }
+      if (state === 'active' && backgroundedAt > 0) {
+        const awayMs = Date.now() - backgroundedAt;
+        backgroundedAt = 0;
+        if (awayMs >= 30_000 && (await isLockEnabled())) {
+          setLocked(true);
+        }
+      }
+    });
+    return () => {
+      cancelled = true;
+      sub.remove();
+    };
+  }, []);
+
   // Boot key only flips ONCE the persisted large-font flag has loaded AND
   // the Inter fonts are ready (or have failed). After that initial flip
   // we never remount the navigator — toggling large-font mode re-renders
@@ -105,14 +153,18 @@ function RootLayout() {
       <GestureHandlerRootView style={{ flex: 1, backgroundColor: colors.background }}>
         <SafeAreaProvider>
           <StatusBar style={isDarkMode ? 'light' : 'dark'} />
-          <Stack
-            key={bootKey}
-            screenOptions={{
-              headerShown: false,
-              contentStyle: { backgroundColor: colors.background },
-              animation: 'slide_from_right',
-            }}
-          />
+          {locked ? (
+            <LockScreen lang={lockLang} onUnlocked={() => setLocked(false)} />
+          ) : (
+            <Stack
+              key={bootKey}
+              screenOptions={{
+                headerShown: false,
+                contentStyle: { backgroundColor: colors.background },
+                animation: 'slide_from_right',
+              }}
+            />
+          )}
         </SafeAreaProvider>
       </GestureHandlerRootView>
     </Sentry.ErrorBoundary>

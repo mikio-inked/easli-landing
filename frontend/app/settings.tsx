@@ -47,6 +47,7 @@ import {
 import { LanguageCode, getLanguage as getLanguageMeta, t } from '../src/i18n';
 import { formatLanguageLabel, getAnyLanguage } from '../src/languages';
 import { cancelAllReminders } from '../src/notifications';
+import { isBiometricAvailable, isLockEnabled, setLockEnabled, authenticate } from '../src/appLock';
 import { deleteAllOriginals, getStorageStats, formatBytes } from '../src/originals';
 import { getSaveOriginals, setSaveOriginals } from '../src/settings';
 import { useUsage, getRemainingAnalyses } from '../src/usage';
@@ -78,6 +79,9 @@ export default function SettingsScreen() {
   const [deviceId, setDeviceId] = useState<string | null>(null);
   const [saveOriginals, setSaveOriginalsState] = useState(false);
   const [storageStatsLabel, setStorageStatsLabel] = useState<string | null>(null);
+  // App-Lock state — only show the toggle if the device supports biometrics.
+  const [lockEnabled, setLockEnabledState] = useState(false);
+  const [biometricAvailable, setBiometricAvailable] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [restoring, setRestoring] = useState(false);
 
@@ -109,6 +113,13 @@ export default function SettingsScreen() {
         setDeviceId(await ensureDeviceId());
       })();
       getSaveOriginals().then(setSaveOriginalsState);
+      // Load biometric availability + lock setting in parallel.
+      Promise.all([isBiometricAvailable(), isLockEnabled()])
+        .then(([avail, enabled]) => {
+          setBiometricAvailable(avail);
+          setLockEnabledState(enabled);
+        })
+        .catch(() => {});
       // Refresh storage stats label every time we re-focus Settings — gives
       // the user a sticky, glanceable confirmation that storage is alive.
       getStorageStats()
@@ -456,6 +467,36 @@ export default function SettingsScreen() {
         {/* ---------- Privacy & Data ---------- */}
         <SectionLabel>{t(lang, 'settings_section_privacy_data')}</SectionLabel>
         <View style={styles.groupCard}>
+          {/* Biometric App-Lock — Phase 3 polish. Only render if the device
+              has hardware AND the user has at least one biometric enrolled,
+              so we don't offer a setting that would silently fail. */}
+          {biometricAvailable ? (
+            <>
+              <ListRow
+                icon={<Lock color={colors.primary} size={18} strokeWidth={2.4} />}
+                title={t(lang, 'app_lock_setting_title')}
+                right={
+                  <Switch
+                    value={lockEnabled}
+                    onValueChange={async (next) => {
+                      // Re-authenticate before enabling OR disabling, so a
+                      // bad actor with your unlocked phone can't change it.
+                      if (next) {
+                        const ok = await authenticate(t(lang, 'app_lock_prompt'));
+                        if (!ok) return;
+                      }
+                      await setLockEnabled(next);
+                      setLockEnabledState(next);
+                    }}
+                    trackColor={{ false: colors.border, true: colors.primary }}
+                    thumbColor={colors.white}
+                    testID="settings-app-lock-toggle"
+                  />
+                }
+              />
+              <View style={styles.divider} />
+            </>
+          ) : null}
           <ListRow
             icon={<HardDrive color={colors.primary} size={18} strokeWidth={2.4} />}
             title={t(lang, 'save_originals')}
