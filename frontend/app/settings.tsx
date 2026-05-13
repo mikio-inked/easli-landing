@@ -640,27 +640,27 @@ function OtaDebugBlock() {
       const res = await Updates.checkForUpdateAsync();
       if (res.isAvailable) {
         Alert.alert(
-          'Update gefunden',
-          'Wird heruntergeladen…',
+          t(lang, 'update_found_title'),
+          t(lang, 'update_found_msg'),
         );
         await Updates.fetchUpdateAsync();
         Alert.alert(
-          'Update bereit',
-          'App startet jetzt neu, um das Update zu aktivieren.',
+          t(lang, 'update_ready_title'),
+          t(lang, 'update_ready_msg'),
           [
-            { text: 'Abbrechen', style: 'cancel' },
-            { text: 'Neu starten', onPress: () => Updates.reloadAsync() },
+            { text: t(lang, 'cancel'), style: 'cancel' },
+            { text: t(lang, 'update_restart_now'), onPress: () => Updates.reloadAsync() },
           ],
         );
       } else {
-        Alert.alert('Kein Update', 'Du nutzt bereits die neueste Version.');
+        Alert.alert(t(lang, 'update_no_update_title'), t(lang, 'update_no_update_msg'));
       }
     } catch (e: any) {
-      Alert.alert('Fehler', String(e?.message ?? e));
+      Alert.alert(t(lang, 'update_error_title'), String(e?.message ?? e));
     } finally {
       setChecking(false);
     }
-  }, []);
+  }, [lang]);
 
   const running = updates.currentlyRunning;
   const available = updates.availableUpdate;
