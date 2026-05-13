@@ -22,6 +22,7 @@ import {
 } from 'react-native';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import * as haptics from '../src/haptics';
 import {
   AlertOctagon,
   ArrowLeft,
@@ -141,6 +142,7 @@ export default function Paywall() {
           return;
         }
         await purchasePackage(pkg);
+        haptics.success();
         Alert.alert('easli', t(lang, 'paywall_purchase_success'));
         // Webhook will update server-side usage; we still refresh in case
         // the device is online and the webhook lands quickly.
@@ -152,13 +154,16 @@ export default function Paywall() {
         router.back();
       } catch (e: any) {
         if (e instanceof PurchaseCancelledError) {
+          // User intentionally backed out — neutral feedback, not an error.
           Alert.alert('easli', t(lang, 'paywall_purchase_cancelled'));
           return;
         }
         if (e instanceof PaymentsUnavailableError) {
+          haptics.warning();
           Alert.alert('easli', t(lang, 'paywall_payments_unavailable'));
           return;
         }
+        haptics.error();
         Alert.alert('easli', t(lang, 'paywall_purchase_failed'));
       } finally {
         setBusy(null);
@@ -182,12 +187,15 @@ export default function Paywall() {
       }
       await restorePurchases();
       await refreshUsage();
+      haptics.success();
       Alert.alert('easli', t(lang, 'paywall_restored'));
     } catch (e: any) {
       if (e instanceof PaymentsUnavailableError) {
+        haptics.warning();
         Alert.alert('easli', t(lang, 'paywall_payments_unavailable'));
         return;
       }
+      haptics.error();
       Alert.alert('easli', t(lang, 'paywall_purchase_failed'));
     } finally {
       setRestoring(false);

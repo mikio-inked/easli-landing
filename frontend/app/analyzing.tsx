@@ -26,6 +26,8 @@ import { saveOriginal } from '../src/originals';
 import { getSaveOriginals } from '../src/settings';
 import { compressPagesForUpload } from '../src/imageCompression';
 import { colors, fontSize, fontWeight, radius, spacing } from '../src/theme';
+import * as haptics from '../src/haptics';
+import { recordSuccessfulAnalysis } from '../src/rateApp';
 
 type Status = 'running' | 'error' | 'lang_rejected';
 
@@ -109,16 +111,22 @@ export default function Analyzing() {
       } catch {
         // saveOriginal already logs; AsyncStorage write itself shouldn't crash.
       }
+      // Success — celebrate it: a soft success haptic and bump the counter
+      // that decides when we ask the user to rate the app.
+      haptics.success();
+      recordSuccessfulAnalysis().catch(() => {});
       // Small pause so the user sees the final tick before navigating.
       setTimeout(() => router.replace(`/result?id=${encodeURIComponent(record.id)}`), 350);
     } catch (e: any) {
       if (intervalRef.current) clearInterval(intervalRef.current);
       // Backend entitlement gates — these are terminal, retry doesn't help.
       if (e instanceof TestLimitReachedError) {
+        haptics.warning();
         router.replace('/paywall?reason=test_limit_reached');
         return;
       }
       if (e instanceof PaymentRequiredError) {
+        haptics.warning();
         router.replace('/paywall?reason=payment_required');
         return;
       }
@@ -127,6 +135,7 @@ export default function Analyzing() {
       // generic error toast. No retry button — the document itself is the
       // wrong input, so the only sensible action is "scan another document".
       if (e instanceof UnsupportedDocumentLanguageError) {
+        haptics.warning();
         setStatus('lang_rejected');
         // Body is the localized string from the backend, or the i18n fallback
         // if the server didn't provide one.
@@ -139,6 +148,7 @@ export default function Analyzing() {
       // keep the analysis context cached so the user can re-fire from this
       // screen instead of going back to /scan.
       if (e instanceof RateLimitError) {
+        haptics.warning();
         const seconds = Math.max(1, Math.min(120, e.retryAfterSeconds || 8));
         setStatus('error');
         setErrorMsg(
@@ -150,6 +160,7 @@ export default function Analyzing() {
       }
       // Any other error (network, 502, parse, etc.). The user can re-fire
       // immediately — no countdown needed.
+      haptics.error();
       setStatus('error');
       setErrorMsg(e?.message || t(ctx.lang, 'error_generic'));
       setRetryable(true);

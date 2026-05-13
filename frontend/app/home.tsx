@@ -5,6 +5,7 @@ import { useCallback, useState } from 'react';
 import { Image, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View, Alert } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import * as haptics from '../src/haptics';
 import {
   Camera,
   ClipboardList,
@@ -243,7 +244,10 @@ export default function Home() {
         <Text style={styles.heroBody}>{t(lang, 'home_intro')}</Text>
 
         <Pressable
-          onPress={() => routeWithEntitlement('/scan')}
+          onPress={() => {
+            haptics.press();
+            routeWithEntitlement('/scan');
+          }}
           style={({ pressed }) => [styles.heroButton, pressed && { opacity: 0.95 }]}
           testID="home-scan-btn"
         >
@@ -259,7 +263,10 @@ export default function Home() {
         </Pressable>
 
         <Pressable
-          onPress={() => routeWithEntitlement('/upload')}
+          onPress={() => {
+            haptics.press();
+            routeWithEntitlement('/upload');
+          }}
           style={({ pressed }) => [styles.heroButtonAlt, pressed && { opacity: 0.95 }]}
           testID="home-upload-btn"
         >

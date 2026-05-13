@@ -89,6 +89,7 @@ import {
   tryParseDeadlineDate,
 } from '../src/result/helpers';
 import { Accordion, SectionRow, riskMeta } from '../src/result/components';
+import { maybePromptRating } from '../src/rateApp';
 
 // Enable LayoutAnimation on Android (iOS supports it natively).
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
@@ -156,6 +157,16 @@ export default function ResultScreen() {
     (async () => {
       const l = (await getStoredLanguage()) ?? 'en';
       setLang(l);
+
+      // Phase 1 UI Polish — after the result has had ~3.5 seconds to render
+      // and the user has actually seen something positive, ask iOS to show
+      // the rating sheet. Gated by `maybePromptRating()` so it only fires
+      // for users with ≥ 3 successful analyses and at most once per app
+      // version. Fully fire-and-forget; if anything goes wrong we never
+      // disturb the result-screen render.
+      setTimeout(() => {
+        maybePromptRating().catch(() => {});
+      }, 3500);
 
       // Pop the "Saved on this device" banner — written by analyzing.tsx —
       // exactly once per analysis. Banner survives a screen re-mount only if
