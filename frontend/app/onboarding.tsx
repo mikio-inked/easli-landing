@@ -352,6 +352,34 @@ const DEMO: Partial<Record<LanguageCode, DemoContent>> = {
     category: '政府机构',
     cta: '立即扫描第一封信',
   },
+  fr: {
+    summary: 'Redevance audiovisuelle allemande : 55,08 € à régler avant la date limite.',
+    deadline: 'Échéance : 30 nov. 2026',
+    amount: 'Montant : 55,08 €',
+    category: 'Administration',
+    cta: 'Scannez maintenant votre première lettre',
+  },
+  it: {
+    summary: 'Canone radiotelevisivo tedesco: 55,08 € da pagare entro la scadenza.',
+    deadline: 'Scadenza: 30 nov 2026',
+    amount: 'Importo: 55,08 €',
+    category: 'Ente pubblico',
+    cta: 'Scansiona ora la tua prima lettera',
+  },
+  pl: {
+    summary: 'Niemiecka opłata abonamentowa: 55,08 € do zapłaty przed terminem.',
+    deadline: 'Termin: 30 lis 2026',
+    amount: 'Kwota: 55,08 €',
+    category: 'Urząd',
+    cta: 'Zeskanuj teraz swoje pierwsze pismo',
+  },
+  ar: {
+    summary: 'رسوم البث الألمانية: 55,08 € مستحقة، يُرجى السداد قبل الموعد النهائي.',
+    deadline: 'الموعد النهائي: 30 نوفمبر 2026',
+    amount: 'المبلغ: 55,08 €',
+    category: 'جهة رسمية',
+    cta: 'امسح أول رسالة لك الآن',
+  },
 };
 
 function LiveDemoStep({ lang, onGetStarted }: { lang: LanguageCode; onGetStarted: () => void }) {
