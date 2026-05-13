@@ -11,11 +11,12 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { ArrowLeft, ClipboardList, HardDrive, ShieldAlert, Trash2 } from 'lucide-react-native';
+import { ArrowLeft, ClipboardList, HardDrive, Search, ShieldAlert, Trash2, X } from 'lucide-react-native';
 import { Badge } from '../src/ui';
 import { ensureDeviceId, getLanguage as getStoredLanguage, setLastResult } from '../src/store';
 import { AnalysisListItem, deleteAnalysis, listAnalyses } from '../src/api';
@@ -56,6 +57,10 @@ export default function HistoryScreen() {
   const [lang, setLang] = useState<LanguageCode>('en');
   const [refreshing, setRefreshing] = useState(false);
   const [filter, setFilter] = useState<CategoryCode | null>(null);
+  const [query, setQuery] = useState('');
+  // High-risk-only toggle. Cheap to compute (we already have risk_level on
+  // every item from the backend), so it's just an additional filter pass.
+  const [highRiskOnly, setHighRiskOnly] = useState(false);
 
   const load = useCallback(async () => {
     const l = (await getStoredLanguage()) ?? 'en';
@@ -119,9 +124,30 @@ export default function HistoryScreen() {
   }, [items]);
 
   const filtered = useMemo(() => {
-    if (!filter) return items;
-    return items.filter((it) => safeCategory(it.category) === filter);
-  }, [items, filter]);
+    const q = query.trim().toLowerCase();
+    return items.filter((it) => {
+      // 1) Category chip filter
+      if (filter && safeCategory(it.category) !== filter) return false;
+      // 2) High-risk-only toggle
+      if (highRiskOnly && it.risk_level !== 'red') return false;
+      // 3) Full-text search across sender, document type, summary and
+      //    target_language_label. Lowercased once for cheap repeated
+      //    .includes() — fine for a list of ≤ 1k items.
+      if (q) {
+        const hay = [
+          it.sender,
+          it.document_type,
+          it.summary_translated,
+          it.target_language_label,
+        ]
+          .filter(Boolean)
+          .join(' ')
+          .toLowerCase();
+        if (!hay.includes(q)) return false;
+      }
+      return true;
+    });
+  }, [items, filter, query, highRiskOnly]);
 
   // If the active filter no longer matches anything (e.g. last item deleted),
   // silently fall back to "All".
@@ -139,6 +165,36 @@ export default function HistoryScreen() {
         <View style={{ width: 26 }} />
       </View>
 
+      {/* Search bar — instant client-side filter across sender, document
+          type, summary and target language. Stays hidden until the user
+          has at least 2 letters in history to avoid clutter for new users. */}
+      {items.length >= 2 ? (
+        <View style={styles.searchWrap}>
+          <Search color={colors.textMuted} size={18} strokeWidth={2.4} />
+          <TextInput
+            value={query}
+            onChangeText={setQuery}
+            placeholder={t(lang, 'history_search_placeholder')}
+            placeholderTextColor={colors.textMuted}
+            style={styles.searchInput}
+            autoCorrect={false}
+            autoCapitalize="none"
+            returnKeyType="search"
+            clearButtonMode="while-editing"
+            testID="history-search-input"
+          />
+          {query.length > 0 ? (
+            <Pressable
+              onPress={() => setQuery('')}
+              hitSlop={10}
+              testID="history-search-clear"
+            >
+              <X color={colors.textMuted} size={18} strokeWidth={2.4} />
+            </Pressable>
+          ) : null}
+        </View>
+      ) : null}
+
       {visibleCategories.length > 0 ? (
         <ScrollView
           horizontal
@@ -149,17 +205,38 @@ export default function HistoryScreen() {
           <FilterChip
             label={t(lang, 'filter_all')}
             count={items.length}
-            active={filter === null}
-            onPress={() => setFilter(null)}
+            active={filter === null && !highRiskOnly}
+            onPress={() => {
+              setFilter(null);
+              setHighRiskOnly(false);
+            }}
             testID="history-filter-all"
           />
+          {/* High-risk pill — surfaces the most urgent letters in a single
+              tap. Only render the chip if there IS at least one red item,
+              otherwise the chip would always be empty. */}
+          {items.some((it) => it.risk_level === 'red') ? (
+            <FilterChip
+              label={`🔴 ${t(lang, 'filter_high_risk')}`}
+              count={items.filter((it) => it.risk_level === 'red').length}
+              active={highRiskOnly}
+              onPress={() => {
+                setHighRiskOnly((v) => !v);
+                setFilter(null);
+              }}
+              testID="history-filter-high-risk"
+            />
+          ) : null}
           {visibleCategories.map((c) => (
             <FilterChip
               key={c}
               label={`${CATEGORY_EMOJI[c]} ${categoryLabel(lang, c)}`}
               count={items.filter((it) => safeCategory(it.category) === c).length}
               active={filter === c}
-              onPress={() => setFilter(c)}
+              onPress={() => {
+                setFilter(c);
+                setHighRiskOnly(false);
+              }}
               testID={`history-filter-${c}`}
             />
           ))}
@@ -298,6 +375,26 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.sm,
     gap: 8,
     alignItems: 'center',
+  },
+  searchWrap: {
+    marginHorizontal: spacing.lg,
+    marginBottom: spacing.sm,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 10,
+    backgroundColor: colors.surface,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: colors.borderLight,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    minHeight: 44,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: fontSize.md,
+    color: colors.textPrimary,
+    paddingVertical: 0,
   },
   chip: {
     paddingHorizontal: 14,
