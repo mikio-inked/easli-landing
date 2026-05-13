@@ -205,6 +205,15 @@ class UsageRecord(BaseModel):
     translation_count: int = 0
     translated_languages: List[str] = Field(default_factory=list)
     last_usage_reset_at: Optional[str] = None
+    # ── Email-Forwarding (Phase 4) ──────────────────────────────────────────
+    # 8-char URL-safe token used to address this device's personal easli
+    # inbox: `letters-{inbox_token}@inbox.easli.app`. Generated on first
+    # GET /api/inbox/me request and never changes afterwards (rotation is
+    # a deliberate user action via DELETE /api/inbox/me). Kept on the
+    # usage record because it's effectively a per-device identifier and
+    # we already store all per-device state here.
+    inbox_token: Optional[str] = None
+    inbox_letters_received: int = 0
     created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
     updated_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
 

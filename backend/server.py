@@ -2532,6 +2532,48 @@ async def dev_simulate(device_id: str, scenario: str):
 # Include the router in the main app
 app.include_router(api_router)
 
+# ==================== EMAIL-FORWARDING (Phase 4) ====================
+# Mounts: GET /api/inbox/me, POST /api/inbox/rotate, POST /api/inbox/inbound
+# The webhook is auth'd by the X-Easli-Inbox-Secret header (env var
+# INBOX_WEBHOOK_SECRET). Without that env var set, /inbound returns 503.
+from inbox import router as inbox_router, install_dependencies as _install_inbox  # noqa: E402
+
+
+async def _inbox_analyze_callback(
+    *, device_id: str, pages: list, target_language: str, source: str
+) -> str:
+    """Thin wrapper that runs the existing /analyze flow for an inbound
+    email. Email-forwarded analyses currently bypass the per-device free
+    quota — they're billed at the user's existing tier on a future
+    revision. For now they always succeed (provided Mistral does)."""
+    # Build a minimal AnalyzeRequest-shaped dict so we can re-use the rest
+    # of the pipeline. We sidestep the FastAPI route function itself to
+    # avoid recursion through the rate limiter and the entitlement check
+    # (the email pathway has its own quotas in INBOX module).
+    fake_req = AnalyzeRequest(
+        device_id=device_id,
+        target_language=target_language if target_language in EXPLANATION_LANGUAGES else "en",
+        pages=[PageInput(**p) for p in pages],
+    )
+    # Reuse the public endpoint body — easiest way to stay byte-equivalent
+    # to a hand-scanned letter. The starlette Request object is faked just
+    # enough for slowapi to not blow up.
+    class _FakeReq:
+        client = type("c", (), {"host": "inbox-webhook"})()
+        headers: dict = {}
+        method = "POST"
+        url = type("u", (), {"path": "/api/analyze"})()
+    result = await analyze_document(_FakeReq(), fake_req)  # type: ignore[arg-type]
+    # The route returns either the AnalysisRecord or a JSONResponse for
+    # paywalled cases. For inbox we only care about the happy path.
+    if hasattr(result, "id"):
+        return result.id  # type: ignore[union-attr]
+    return ""
+
+
+_install_inbox(db=db, analyze_callback=_inbox_analyze_callback)
+app.include_router(inbox_router, prefix="/api")
+
 # ==================== ADMIN + REDEMPTION ====================
 # Loaded from a separate module to keep server.py manageable.
 # Mounts: GET /admin (HTML UI) + /api/admin/* (auth-gated) + /api/redeem (public)

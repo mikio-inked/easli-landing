@@ -28,6 +28,7 @@ import {
   HelpCircle,
   Languages as LanguagesIcon,
   Lock,
+  Mail,
   RotateCw,
   Scale,
   ShieldAlert,
@@ -394,6 +395,16 @@ export default function SettingsScreen() {
             title={t(lang, 'paywall_view_plans')}
             onPress={() => router.push('/paywall')}
             testID="settings-view-plans"
+          />
+          <View style={styles.divider} />
+          {/* Email-Forwarding — Phase 4 killer feature. Tap opens the
+              dedicated inbox screen where the user sees their personal
+              forwarding address + onboarding instructions. */}
+          <ListRow
+            icon={<Mail color={colors.primary} size={18} strokeWidth={2.4} />}
+            title={t(lang, 'inbox_settings_entry')}
+            onPress={() => router.push('/inbox')}
+            testID="settings-inbox"
           />
           <View style={styles.divider} />
           <ListRow
