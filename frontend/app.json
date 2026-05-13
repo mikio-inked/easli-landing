@@ -173,8 +173,7 @@
       ],
       "expo-web-browser",
       "expo-localization",
-      "expo-build-properties",
-      "@sentry/react-native"
+      "expo-build-properties"
     ],
     "experiments": {
       "typedRoutes": true
