@@ -27,31 +27,48 @@
 // (gradient blue → teal). The UI must therefore be QUIET, CLEAR, STRUCTURED.
 // → no decorative colour, no gradients in core UI, no illustration noise.
 
-export const colors = {
+import { Appearance } from 'react-native';
+
+// ---------------------------------------------------------------------------
+// Dark Mode strategy — "Boot-Static" pattern.
+//
+// We read the system color scheme ONCE at module load. The exported `colors`
+// object is then a frozen snapshot of either the light or dark palette.
+// This means we get full dark-mode support with ZERO changes to existing
+// `StyleSheet.create({ backgroundColor: colors.surface })` calls in the
+// ~25 app screens.
+//
+// Trade-off: if the user changes the iOS theme while the app is in the
+// background, they need to fully relaunch the app for the new theme to
+// take effect. This matches the behaviour of many production iOS apps
+// (e.g. WhatsApp on older versions) and is acceptable for a v1 release.
+// A future enhancement can swap this for a React-Context-based hook.
+
+const _scheme: 'light' | 'dark' = Appearance.getColorScheme() === 'dark' ? 'dark' : 'light';
+
+export const isDarkMode = _scheme === 'dark';
+
+const lightColors = {
   // Surfaces ----------------------------------------------------------------
   background: '#FAFAF7',
   surface: '#FFFFFF',
-  surfaceMuted: '#F5F5F1',     // subtle row-divider / hover on warm bg
+  surfaceMuted: '#F5F5F1',
   surfaceElevated: '#FFFFFF',
 
   // Primary — Deep Blue (Trust) ---------------------------------------------
   primary: '#1E3A8A',
-  primaryDark: '#172554',       // deeper for pressed state on light bg
-  primaryHover: '#2F6FED',      // hover/pressed light state
-  primarySoft: '#E8EDFF',       // chip/badge backgrounds
+  primaryDark: '#172554',
+  primaryHover: '#2F6FED',
+  primarySoft: '#E8EDFF',
   primaryBorder: '#C7D2FE',
-  primaryAccent: '#2F6FED',     // a brighter blue for hero accents
+  primaryAccent: '#2F6FED',
 
   // Secondary — Soft Teal (Accent) ------------------------------------------
-  // Use sparingly — the Brand Guide explicitly forbids using teal as a
-  // dominant colour. Reserved for: focus rings, success-positive nuance,
-  // accent CTAs (≤10% of surface area).
   accent: '#2EC4B6',
   accentSoft: '#E6FAF8',
   accentBorder: '#A8E6E0',
 
   // Trust alias — kept for components that previously used `colors.trust*`
-  // to avoid a wide-reaching rename. Maps to the new primary.
   trust: '#1E3A8A',
   trustDark: '#172554',
   trustSoft: '#E8EDFF',
@@ -75,27 +92,88 @@ export const colors = {
   overlay: 'rgba(15, 23, 42, 0.55)',
 
   // Status — refreshed to Brand-Guide values --------------------------------
-  // Risk badges (green/yellow/red) now map to the Tailwind-ish status
-  // tokens specified in the guide.
   green: {
-    bg: '#EAF7F1',         // positive badge bg
-    text: '#0F6B36',       // legible green on light bg
+    bg: '#EAF7F1',
+    text: '#0F6B36',
     border: '#BBE5CC',
-    solid: '#22C55E',      // success solid
+    solid: '#22C55E',
   },
   yellow: {
-    bg: '#FFF7ED',         // hint badge bg
-    text: '#7C4D04',       // legible amber on light bg
+    bg: '#FFF7ED',
+    text: '#7C4D04',
     border: '#FCD9A1',
-    solid: '#F59E0B',      // warning solid
+    solid: '#F59E0B',
   },
   red: {
-    bg: '#FEEDEC',         // error badge bg
-    text: '#9B2520',       // legible red on light bg
+    bg: '#FEEDEC',
+    text: '#9B2520',
     border: '#F8C5C0',
-    solid: '#EF4444',      // error solid
+    solid: '#EF4444',
   },
 };
+
+// Dark palette — designed to feel as calm and trustworthy as the light one.
+// Surfaces use slate-tinted neutrals (not pure black) to reduce contrast
+// strain. Primary blue is shifted to a lighter, brighter variant so it
+// stays legible on dark surfaces. Status colours keep their semantic
+// meaning but use softer, less-saturated bgs for accessibility.
+const darkColors: typeof lightColors = {
+  background: '#0B1220',          // slate-950 with warmth
+  surface: '#111827',              // card surface
+  surfaceMuted: '#0F172A',         // slightly darker than surface
+  surfaceElevated: '#1E293B',      // raised cards (paywall, accordions)
+
+  primary: '#60A5FA',              // lighter blue, legible on dark
+  primaryDark: '#3B82F6',
+  primaryHover: '#93C5FD',
+  primarySoft: '#1E293B',          // muted card-like primary tint
+  primaryBorder: '#1E40AF',
+  primaryAccent: '#93C5FD',
+
+  accent: '#2DD4BF',
+  accentSoft: '#0F2A2A',
+  accentBorder: '#0E5C5C',
+
+  trust: '#60A5FA',
+  trustDark: '#3B82F6',
+  trustSoft: '#1E293B',
+  trustBorder: '#1E40AF',
+  trustText: '#93C5FD',
+
+  textPrimary: '#F1F5F9',
+  textSecondary: '#94A3B8',
+  textMuted: '#64748B',
+  textInverse: '#0F172A',
+
+  border: '#1F2937',
+  borderLight: '#1E293B',
+  borderStrong: '#334155',
+
+  white: '#FFFFFF',
+  black: '#000000',
+  overlay: 'rgba(0, 0, 0, 0.65)',
+
+  green: {
+    bg: '#0E2A1B',
+    text: '#86EFAC',
+    border: '#14532D',
+    solid: '#22C55E',
+  },
+  yellow: {
+    bg: '#2A1E0A',
+    text: '#FCD34D',
+    border: '#92400E',
+    solid: '#F59E0B',
+  },
+  red: {
+    bg: '#2A0E0E',
+    text: '#FCA5A5',
+    border: '#7F1D1D',
+    solid: '#EF4444',
+  },
+};
+
+export const colors = isDarkMode ? darkColors : lightColors;
 
 // 8pt grid -------------------------------------------------------------------
 export const spacing = {

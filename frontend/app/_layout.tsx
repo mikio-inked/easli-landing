@@ -4,7 +4,7 @@ import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import * as Sentry from '@sentry/react-native';
-import { colors } from '../src/theme';
+import { colors, isDarkMode } from '../src/theme';
 import { ensureDeviceId } from '../src/store';
 import { initBilling } from '../src/billing';
 import { initSentry, isSentryEnabled, captureException } from '../src/sentry';
@@ -98,13 +98,13 @@ function RootLayout() {
         // i18n string lookups so this won't itself crash if the i18n module
         // is the failing one).
         <GestureHandlerRootView style={{ flex: 1, backgroundColor: colors.background, justifyContent: 'center', alignItems: 'center', padding: 24 }}>
-          <StatusBar style="dark" />
+          <StatusBar style={isDarkMode ? 'light' : 'dark'} />
         </GestureHandlerRootView>
       )}
     >
       <GestureHandlerRootView style={{ flex: 1, backgroundColor: colors.background }}>
         <SafeAreaProvider>
-          <StatusBar style="dark" />
+          <StatusBar style={isDarkMode ? 'light' : 'dark'} />
           <Stack
             key={bootKey}
             screenOptions={{
