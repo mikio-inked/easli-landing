@@ -111,6 +111,28 @@ export function ReplyAssistant({
   suggestedReplyLanguageCode,
   deviceId,
 }: Props) {
+  // ---- Phase 4 polish: AI returns inconsistent label-language ----
+  // The Mistral prompt asks for labels in the user's Explanation-Language
+  // but the LLM is unreliable for short 1-3 word labels (some come back
+  // in English even when target_language is German). To guarantee
+  // language consistency we IGNORE the LLM's label and ALWAYS render the
+  // hard-coded localized string for the canonical intent ids.
+  // Falls back to the LLM-provided label only for non-canonical ids.
+  const localizeIntentLabel = (opt: ReplyOption): string => {
+    const key = `intent_${opt.id}` as const;
+    // Whitelist of canonical ids — keeps TS happy and forbids accidental
+    // fallthrough to a t-key that doesn't exist.
+    const canonical: Record<string, string> = {
+      inquiry: t(uiLang, 'intent_inquiry'),
+      extension: t(uiLang, 'intent_extension'),
+      confirm: t(uiLang, 'intent_confirm'),
+      objection: t(uiLang, 'intent_objection'),
+      submit_documents: t(uiLang, 'intent_submit_documents'),
+      cancel: t(uiLang, 'intent_cancel'),
+    };
+    if (canonical[opt.id]) return canonical[opt.id];
+    return opt.label || key;
+  };
   const [draft, setDraft] = useState<DraftState | null>(null);
   const [recipientOverride, setRecipientOverride] = useState<string>('');
   const [copied, setCopied] = useState(false);
@@ -310,13 +332,13 @@ export function ReplyAssistant({
                 pressed && !isActive && { opacity: 0.7 },
               ]}
               accessibilityRole="button"
-              accessibilityLabel={opt.label}
+              accessibilityLabel={localizeIntentLabel(opt)}
               testID={`intent-${opt.id}`}
             >
               <View style={{ flex: 1 }}>
                 <View style={styles.intentTitleRow}>
                   <Text style={[styles.intentLabel, isActive && styles.intentLabelActive]}>
-                    {opt.label}
+                    {localizeIntentLabel(opt)}
                   </Text>
                   {opt.recommended ? (
                     <View style={styles.recommendedBadge}>
