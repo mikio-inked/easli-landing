@@ -20,6 +20,7 @@ import { ArrowLeft, ClipboardList, HardDrive, Search, ShieldAlert, Trash2, X } f
 import { Badge } from '../src/ui';
 import { ensureDeviceId, getLanguage as getStoredLanguage, setLastResult } from '../src/store';
 import { AnalysisListItem, deleteAnalysis, listAnalyses } from '../src/api';
+import { countryCodeToFlag } from '../src/languages';
 import {
   CATEGORY_EMOJI,
   CATEGORY_ORDER,
@@ -301,6 +302,24 @@ export default function HistoryScreen() {
                       {CATEGORY_EMOJI[cat]} {categoryLabel(lang, cat)}
                     </Text>
                   </View>
+                  {/* Phase 6 EU: country chip — flag + ISO code. Mirrors the
+                      result-screen jurisdiction badge but compact for list
+                      density. Hidden when detected_country_code is empty so
+                      legacy/pre-Phase-6 records don't show a muted stub. */}
+                  {item.detected_country_code ? (
+                    <View
+                      style={styles.countryChip}
+                      testID={`history-country-${item.detected_country_code}`}
+                      accessibilityLabel={`Country ${item.detected_country_code}`}
+                    >
+                      <Text style={styles.countryChipFlag}>
+                        {countryCodeToFlag(item.detected_country_code)}
+                      </Text>
+                      <Text style={styles.countryChipCode}>
+                        {item.detected_country_code}
+                      </Text>
+                    </View>
+                  ) : null}
                   <Badge label={label} variant={variant} />
                   {item.scam_warning ? (
                     <View style={styles.scamChip} testID={`history-scam-${item.id}`}>
@@ -515,6 +534,31 @@ const styles = StyleSheet.create({
     backgroundColor: colors.red.bg,
     borderWidth: 1,
     borderColor: colors.red.border,
+  },
+  // Phase 6 EU: country chip in list row — flag + ISO code. Compact pill
+  // designed to match `categoryChip` density. Uses primary border to mirror
+  // the result-screen jurisdiction badge so the design language stays
+  // consistent across screens.
+  countryChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 999,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.primaryBorder ?? colors.border,
+  },
+  countryChipFlag: {
+    fontSize: 13,
+    lineHeight: 16,
+  },
+  countryChipCode: {
+    fontSize: fontSize.xs,
+    fontWeight: fontWeight.semibold,
+    color: colors.textPrimary,
+    letterSpacing: 0.4,
   },
   scamChipText: {
     fontSize: fontSize.xs,

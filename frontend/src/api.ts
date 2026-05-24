@@ -105,6 +105,10 @@ export interface AnalysisListItem {
   summary_translated: string;
   category: Category;
   scam_warning: boolean;
+  /** ISO 3166-1 alpha-2 jurisdiction detected by the analyser. Empty string
+   *  when the document did not contain a confident country signal. Added in
+   *  Phase 6 (EU country packs). Legacy records pre-Phase 6 will return ''. */
+  detected_country_code?: string;
 }
 
 export interface ChatMessage {
