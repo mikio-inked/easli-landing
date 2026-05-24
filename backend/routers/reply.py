@@ -32,6 +32,14 @@ from core.prompts import (
     build_reply_generation_prompt,
     resolve_reply_language,
 )
+from services.ai_service import (
+    mistral_complete_with_retry,
+    translate_analysis_with_mistral,
+)
+from services.entitlement_service import (
+    load_or_create_usage,
+    to_usage_response,
+)
 from models import (
     AnalysisRecord,
     GenerateReplyRequest,
@@ -44,11 +52,6 @@ logger = logging.getLogger("server")
 router = APIRouter(prefix="/api", tags=["reply"])
 
 
-def _server():
-    """Late-bound import of server.py helpers (Phase 4 will replace this
-    with explicit `from services.* import …`)."""
-    import server
-    return server
 
 
 # ===========================================================================
@@ -71,8 +74,6 @@ async def translate_analysis_endpoint(analysis_id: str, req: TranslateRequest):
     id + target code + cache hit/miss). Never the source text, translations,
     sender, or amounts.
     """
-    s = _server()
-
     if req.target_language not in EXPLANATION_LANGUAGES:
         raise HTTPException(status_code=400, detail="Unsupported target language")
     if not req.device_id:
@@ -103,10 +104,10 @@ async def translate_analysis_endpoint(analysis_id: str, req: TranslateRequest):
             req.device_id, analysis_id, target_code,
         )
         rec = AnalysisRecord(**doc)
-        usage_rec = await s._load_or_create_usage(req.device_id)
+        usage_rec = await load_or_create_usage(req.device_id)
         return {
             **rec.dict(),
-            "usage": s._to_usage_response(usage_rec).dict(),
+            "usage": to_usage_response(usage_rec).dict(),
         }
 
     # ---- Cache hit: previously translated -----------------------------
@@ -123,10 +124,10 @@ async def translate_analysis_endpoint(analysis_id: str, req: TranslateRequest):
             "result": cached_result,
         }
         rec = AnalysisRecord(**rec_dict)
-        usage_rec = await s._load_or_create_usage(req.device_id)
+        usage_rec = await load_or_create_usage(req.device_id)
         return {
             **rec.dict(),
-            "usage": s._to_usage_response(usage_rec).dict(),
+            "usage": to_usage_response(usage_rec).dict(),
         }
 
     # ---- Miss: call Mistral (text-only) -------------------------------
@@ -136,7 +137,7 @@ async def translate_analysis_endpoint(analysis_id: str, req: TranslateRequest):
             "translation_blocked_per_doc_limit device=%s analysis=%s target=%s distinct=%d",
             req.device_id, analysis_id, target_code, len(distinct_translations),
         )
-        usage_rec = await s._load_or_create_usage(req.device_id)
+        usage_rec = await load_or_create_usage(req.device_id)
         return JSONResponse(
             status_code=429,
             content={
@@ -146,7 +147,7 @@ async def translate_analysis_endpoint(analysis_id: str, req: TranslateRequest):
                     "Mit easli Plus kannst du mehr Sprachen freischalten."
                 ),
                 "scope": "per_document",
-                "usage": s._to_usage_response(usage_rec).dict(),
+                "usage": to_usage_response(usage_rec).dict(),
             },
         )
 
@@ -154,7 +155,7 @@ async def translate_analysis_endpoint(analysis_id: str, req: TranslateRequest):
     source_result = doc.get("result") or {}
 
     try:
-        new_result = await s.translate_analysis_with_mistral(
+        new_result = await translate_analysis_with_mistral(
             source_result=source_result,
             current_target_label=primary_label,
             new_target_label=target_label,
@@ -211,10 +212,10 @@ async def translate_analysis_endpoint(analysis_id: str, req: TranslateRequest):
         },
     }
     rec = AnalysisRecord(**rec_dict)
-    refreshed = await s._load_or_create_usage(req.device_id)
+    refreshed = await load_or_create_usage(req.device_id)
     return {
         **rec.dict(),
-        "usage": s._to_usage_response(refreshed).dict(),
+        "usage": to_usage_response(refreshed).dict(),
     }
 
 
@@ -233,8 +234,6 @@ async def generate_reply_endpoint(analysis_id: str, req: GenerateReplyRequest):
     text in the SOURCE document's language so the user can paste it
     straight into a mailto: composer.
     """
-    s = _server()
-
     intent = (req.intent or "").strip().lower()
     if intent not in INTENT_DESCRIPTIONS:
         raise HTTPException(status_code=400, detail=f"Unsupported intent: {intent}")
@@ -262,7 +261,7 @@ async def generate_reply_endpoint(analysis_id: str, req: GenerateReplyRequest):
     ]
 
     try:
-        resp = await s.mistral_complete_with_retry(
+        resp = await mistral_complete_with_retry(
             label="generate_reply",
             model=MISTRAL_ANALYSIS_MODEL,
             messages=msgs,

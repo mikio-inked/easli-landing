@@ -20,15 +20,19 @@ from core.config import (
 )
 from core.languages import EXPLANATION_LANGUAGES, LANGUAGES
 from models import ChatMessage, ChatRequest
+from services.ai_service import chat_about_document
+from services.entitlement_service import (
+    consume_chat_question,
+    load_or_create_usage,
+    plus_currently_active,
+    to_usage_response,
+)
 
 logger = logging.getLogger("server")
 
 router = APIRouter(prefix="/api", tags=["chat"])
 
 
-def _server():
-    import server
-    return server
 
 
 # ===========================================================================
@@ -36,8 +40,6 @@ def _server():
 # ===========================================================================
 @router.post("/analyses/{analysis_id}/chat", response_model=ChatMessage)
 async def chat_endpoint(analysis_id: str, req: ChatRequest):
-    s = _server()
-
     if not req.message or not req.message.strip():
         raise HTTPException(status_code=400, detail="Message cannot be empty")
     if len(req.message) > 2000:
@@ -53,7 +55,7 @@ async def chat_endpoint(analysis_id: str, req: ChatRequest):
     # ----- Chat-quota enforcement -----
     # Per-document and total-per-tester caps. Plus subscribers bypass the
     # total cap (they paid for it) but still respect the per-document one.
-    usage_rec = await s._load_or_create_usage(req.device_id)
+    usage_rec = await load_or_create_usage(req.device_id)
     per_doc_count = (usage_rec.per_document_chat_questions or {}).get(analysis_id, 0)
     if per_doc_count >= MAX_CHAT_QUESTIONS_PER_DOCUMENT:
         logger.info(
@@ -66,11 +68,11 @@ async def chat_endpoint(analysis_id: str, req: ChatRequest):
                 "error": "test_limit_reached" if PAYWALL_MODE == "soft" else "limit_reached",
                 "message": "Du hast das Limit für Fragen zu diesem Dokument erreicht.",
                 "scope": "per_document",
-                "usage": s._to_usage_response(usage_rec).dict(),
+                "usage": to_usage_response(usage_rec).dict(),
             },
         )
     if (
-        not s._plus_currently_active(usage_rec)
+        not plus_currently_active(usage_rec)
         and usage_rec.total_chat_questions_used >= MAX_TOTAL_CHAT_QUESTIONS_PER_TESTER
     ):
         logger.info(
@@ -83,7 +85,7 @@ async def chat_endpoint(analysis_id: str, req: ChatRequest):
                 "error": "test_limit_reached" if PAYWALL_MODE == "soft" else "payment_required",
                 "message": "Dein Frage-Kontingent ist erreicht. Mit easli Plus stellst du mehr Fragen.",
                 "scope": "total",
-                "usage": s._to_usage_response(usage_rec).dict(),
+                "usage": to_usage_response(usage_rec).dict(),
             },
         )
 
@@ -131,7 +133,7 @@ async def chat_endpoint(analysis_id: str, req: ChatRequest):
     if user_turns >= 80:
         raise HTTPException(status_code=429, detail="Chat limit for this document reached")
 
-    response = await s.chat_about_document(
+    response = await chat_about_document(
         chat_doc, history, req.message.strip(), target_label, target_code,
     )
 
@@ -146,7 +148,7 @@ async def chat_endpoint(analysis_id: str, req: ChatRequest):
     )
 
     # Consume the chat-question quota only after a successful reply.
-    await s._consume_chat_question(req.device_id, analysis_id)
+    await consume_chat_question(req.device_id, analysis_id)
 
     return ChatMessage(**assistant_msg)
 

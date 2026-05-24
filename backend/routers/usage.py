@@ -32,18 +32,16 @@ from core.config import (
     db,
 )
 from models import UsageRecord, UsageResponse
+from services.entitlement_service import (
+    load_or_create_usage,
+    to_usage_response,
+)
 
 logger = logging.getLogger("server")  # keep legacy logger name for filters
 
 router = APIRouter(prefix="/api", tags=["usage"])
 
 
-def _server():
-    """Late-bound import of server.py helpers (kept lazy to avoid surfacing
-    them in the module-level import graph). Phase 4 will eliminate this
-    when the helpers move to services/."""
-    import server
-    return server
 
 
 def _require_dev_tools() -> None:
@@ -59,8 +57,8 @@ async def get_usage(device_id: str):
     """Return the public-safe usage view so the client can render meters."""
     if not device_id:
         raise HTTPException(status_code=400, detail="device_id is required")
-    rec = await _server()._load_or_create_usage(device_id)
-    return _server()._to_usage_response(rec)
+    rec = await load_or_create_usage(device_id)
+    return to_usage_response(rec)
 
 
 # ===========================================================================
@@ -139,7 +137,7 @@ async def dev_reset_usage(device_id: str):
     await db.usage_records.replace_one(
         {"device_id": device_id}, fresh.dict(), upsert=True
     )
-    return _server()._to_usage_response(fresh).dict()
+    return to_usage_response(fresh).dict()
 
 
 @router.post("/dev/usage/simulate")
@@ -159,8 +157,7 @@ async def dev_simulate(device_id: str, scenario: str):
     if not device_id:
         raise HTTPException(status_code=400, detail="device_id is required")
 
-    s = _server()
-    await s._load_or_create_usage(device_id)
+    await load_or_create_usage(device_id)
     now = datetime.now(timezone.utc)
     update: dict = {"updated_at": now.isoformat()}
 
@@ -188,8 +185,8 @@ async def dev_simulate(device_id: str, scenario: str):
             {"$inc": {"single_letter_credits": 1}, "$set": {"updated_at": now.isoformat()}},
             upsert=True,
         )
-        refreshed = await s._load_or_create_usage(device_id)
-        return s._to_usage_response(refreshed).dict()
+        refreshed = await load_or_create_usage(device_id)
+        return to_usage_response(refreshed).dict()
     elif scenario == "reset_chat":
         update["total_chat_questions_used"] = 0
         update["per_document_chat_questions"] = {}
@@ -199,6 +196,6 @@ async def dev_simulate(device_id: str, scenario: str):
     await db.usage_records.update_one(
         {"device_id": device_id}, {"$set": update}, upsert=True
     )
-    refreshed = await s._load_or_create_usage(device_id)
+    refreshed = await load_or_create_usage(device_id)
     logger.info("dev_simulate device=%s scenario=%s", device_id, scenario)
-    return s._to_usage_response(refreshed).dict()
+    return to_usage_response(refreshed).dict()

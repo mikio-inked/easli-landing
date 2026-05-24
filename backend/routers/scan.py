@@ -33,6 +33,15 @@ from core.config import (
 )
 from core.languages import EXPLANATION_LANGUAGES
 from core.security import limiter
+from services.ai_service import analyze_from_ocr_text, detect_document_language
+from services.entitlement_service import (
+    consume_after_success,
+    evaluate_entitlement,
+    load_or_create_usage,
+    to_usage_response,
+)
+from services.image_service import compress_image_for_vision, pdf_to_images_base64
+from services.ocr_service import ocr_pages_with_mistral
 from models import (
     AnalysisListItem,
     AnalysisRecord,
@@ -52,11 +61,6 @@ router = APIRouter(prefix="/api", tags=["scan"])
 # logic moves yet). We import them at call time inside each handler to keep
 # the module-level import graph linear (server.py imports nothing from
 # routers/, so we can freely import the other direction without a cycle).
-def _server():
-    """Late-bound proxy to server.py helpers. Cheap on every call (already
-    in `sys.modules` once the app booted)."""
-    import server  # local import = no circular-import risk
-    return server
 
 
 # ===========================================================================
@@ -91,7 +95,6 @@ async def analyze_document(
     # decorator wrapping AND plays nicely with `from __future__ import
     # annotations` (whereas the plain `req: AnalyzeRequest = Body(...)`
     # default-form leaves Pydantic with an unresolved ForwardRef).
-    s = _server()
 
     # Validate language — accepts the full EU-1 Explanation-Language set
     # (25 codes) since Phase 5. See `EXPLANATION_LANGUAGES` at top.
@@ -101,8 +104,8 @@ async def analyze_document(
     target_language_label = EXPLANATION_LANGUAGES[req.target_language]
 
     # ----- Entitlement gate (server-side source of truth) -----
-    usage_rec = await s._load_or_create_usage(req.device_id)
-    decision = s._evaluate_entitlement(usage_rec)
+    usage_rec = await load_or_create_usage(req.device_id)
+    decision = evaluate_entitlement(usage_rec)
     if not decision.allowed:
         if decision.reason == "test_limit_reached":
             logger.info(
@@ -156,7 +159,7 @@ async def analyze_document(
         if mime == "application/pdf" or mime == "pdf":
             try:
                 budget = MAX_TOTAL_PAGES - len(images)
-                pdf_pages = s.pdf_to_images_base64(raw_bytes, max_pages=min(MAX_TOTAL_PAGES, budget))
+                pdf_pages = pdf_to_images_base64(raw_bytes, max_pages=min(MAX_TOTAL_PAGES, budget))
             except Exception as e:
                 logger.exception("PDF conversion failed (error_type=%s)", type(e).__name__)
                 raise HTTPException(status_code=400, detail=f"Could not read PDF: {str(e)}")
@@ -172,16 +175,16 @@ async def analyze_document(
 
     # ----- Compress + OCR all pages -----
     images = [
-        s.compress_image_for_vision(idx, b64, mime)
+        compress_image_for_vision(idx, b64, mime)
         for idx, (b64, mime) in enumerate(images)
     ]
 
     try:
-        page_texts = await s.ocr_pages_with_mistral(images)
+        page_texts = await ocr_pages_with_mistral(images)
     except Exception as e:
         logger.exception(
             "Mistral OCR stage failed (model=%s, error_type=%s)",
-            s.MISTRAL_OCR_MODEL,
+            "mistral-ocr",  # label only — actual model id lives in core.config
             type(e).__name__,
         )
         raise HTTPException(status_code=502, detail="AI analysis failed.")
@@ -191,7 +194,7 @@ async def analyze_document(
         "language_gate_checked device=%s pages=%d p0_chars=%d",
         req.device_id, len(page_texts), len(page0_text or ""),
     )
-    doc_lang, det_code, conf = await s.detect_document_language(page0_text)
+    doc_lang, det_code, conf = await detect_document_language(page0_text)
 
     uncertainty_notice = None
     if doc_lang == "unknown" or conf == "low":
@@ -210,7 +213,7 @@ async def analyze_document(
         )
 
     # ----- Full analysis on OCR text -----
-    result = await s.analyze_from_ocr_text(
+    result = await analyze_from_ocr_text(
         page_texts, target_language_label, req.target_language,
     )
 
@@ -234,7 +237,7 @@ async def analyze_document(
     await db.analyses.insert_one(doc)
 
     # Consume usage only AFTER the analyse call succeeded.
-    await s._consume_after_success(
+    await consume_after_success(
         req.device_id,
         decision.source or "free",
         req.idempotency_key,
@@ -244,10 +247,10 @@ async def analyze_document(
         req.device_id, decision.source, PAYWALL_MODE,
     )
 
-    refreshed = await s._load_or_create_usage(req.device_id)
+    refreshed = await load_or_create_usage(req.device_id)
     return {
         **record.dict(),
-        "usage": s._to_usage_response(refreshed).dict(),
+        "usage": to_usage_response(refreshed).dict(),
     }
 
 
