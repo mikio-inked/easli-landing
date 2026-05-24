@@ -9,6 +9,7 @@ import {
   Alert,
   Animated,
   Easing,
+  Keyboard,
   LayoutAnimation,
   Modal,
   Platform,
@@ -16,6 +17,7 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   UIManager,
   View,
 } from 'react-native';
@@ -38,6 +40,7 @@ import {
   Copy,
   Eye,
   FileText,
+  Flag,
   Globe,
   HelpCircle,
   Info,
@@ -57,7 +60,7 @@ import {
   setLastResult,
   getLanguage as getStoredLanguage,
 } from '../src/store';
-import { AnalysisRecord, deleteAnalysis, getAnalysis, translateAnalysis } from '../src/api';
+import { AnalysisRecord, ReportReason, deleteAnalysis, getAnalysis, submitReport, translateAnalysis } from '../src/api';
 import { LanguageCode, categoryLabel, t } from '../src/i18n';
 import { shareAnalysisAsPdf, shareAnalysisAsText } from '../src/share';
 import {
@@ -141,6 +144,15 @@ export default function ResultScreen() {
   const [sheetOpen, setSheetOpen] = useState(false);
   const [translating, setTranslating] = useState(false);
   const [translateError, setTranslateError] = useState<string | null>(null);
+
+  // ---- Report flow (Apple Guideline 1.2 / 1.1.6) ----
+  // All five states reset every time the user opens the modal afresh.
+  const [reportModalOpen, setReportModalOpen] = useState(false);
+  const [reportReason, setReportReason] = useState<ReportReason | null>(null);
+  const [reportComment, setReportComment] = useState('');
+  const [reportSubmitting, setReportSubmitting] = useState(false);
+  const [reportError, setReportError] = useState<string | null>(null);
+  const [reportSent, setReportSent] = useState(false);
 
   const toggleSection = useCallback((key: string, currentlyOpen: boolean) => {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
@@ -647,6 +659,174 @@ export default function ResultScreen() {
         reason={hasScam ? (r.scam_reason || t(lang, 'scam_warning_body')) : ''}
         lang={lang}
       />
+
+      {/* ============================================================
+          REPORT MODAL (Apple Guideline 1.2 / 1.1.6 compliance)
+          Anonymous submission. Reasons are intent-stable; only the
+          comment is free-text (server-side capped to 500 chars and
+          NEVER logged in content, only as a char count).
+          ============================================================ */}
+      <Modal
+        visible={reportModalOpen}
+        animationType="fade"
+        transparent
+        onRequestClose={() => setReportModalOpen(false)}
+      >
+        <Pressable
+          style={styles.reportBackdrop}
+          onPress={() => {
+            Keyboard.dismiss();
+            if (!reportSubmitting) setReportModalOpen(false);
+          }}
+          testID="result-report-backdrop"
+        >
+          {/* Inner press-blocker so taps on the card don't close the modal. */}
+          <Pressable
+            style={styles.reportCard}
+            onPress={() => {}}
+            testID="result-report-card"
+          >
+            <View style={styles.reportCardHeader}>
+              <Text style={styles.reportCardTitle} numberOfLines={2}>
+                {reportSent
+                  ? t(lang, 'report_thanks')
+                  : t(lang, 'report_modal_title')}
+              </Text>
+              <Pressable
+                onPress={() => setReportModalOpen(false)}
+                hitSlop={12}
+                testID="result-report-close"
+              >
+                <X color={colors.textSecondary} size={20} strokeWidth={2.2} />
+              </Pressable>
+            </View>
+
+            {reportSent ? (
+              <View style={styles.reportSuccessBlock}>
+                <CheckCircle2
+                  color={colors.green.solid}
+                  size={36}
+                  strokeWidth={2.2}
+                />
+                <Text style={styles.reportSuccessText}>
+                  {t(lang, 'report_thanks')}
+                </Text>
+              </View>
+            ) : (
+              <>
+                <Text style={styles.reportSubtitle}>
+                  {t(lang, 'report_modal_subtitle')}
+                </Text>
+
+                <View style={styles.reportReasonList}>
+                  {(
+                    [
+                      ['inaccurate', 'report_reason_inaccurate'],
+                      ['translation_error', 'report_reason_translation'],
+                      ['offensive', 'report_reason_offensive'],
+                      ['scam_missed', 'report_reason_scam_missed'],
+                      ['other', 'report_reason_other'],
+                    ] as ReadonlyArray<[ReportReason, string]>
+                  ).map(([id, key]) => {
+                    const selected = reportReason === id;
+                    return (
+                      <Pressable
+                        key={id}
+                        onPress={() => {
+                          haptics.softTap();
+                          setReportReason(id);
+                          setReportError(null);
+                        }}
+                        testID={`result-report-reason-${id}`}
+                        accessibilityRole="radio"
+                        accessibilityState={{ selected }}
+                        style={({ pressed }) => [
+                          styles.reportReasonRow,
+                          selected && styles.reportReasonRowSelected,
+                          pressed && { opacity: 0.7 },
+                        ]}
+                      >
+                        <View
+                          style={[
+                            styles.reportRadio,
+                            selected && styles.reportRadioSelected,
+                          ]}
+                        >
+                          {selected ? (
+                            <View style={styles.reportRadioDot} />
+                          ) : null}
+                        </View>
+                        <Text style={styles.reportReasonText} numberOfLines={2}>
+                          {t(lang, key as Parameters<typeof t>[1])}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+
+                <TextInput
+                  value={reportComment}
+                  onChangeText={setReportComment}
+                  placeholder={t(lang, 'report_comment_placeholder')}
+                  placeholderTextColor={colors.textTertiary ?? colors.textSecondary}
+                  multiline
+                  maxLength={500}
+                  style={styles.reportCommentInput}
+                  testID="result-report-comment"
+                />
+
+                {reportError ? (
+                  <Text style={styles.reportErrorText}>{reportError}</Text>
+                ) : null}
+
+                <Button
+                  variant="primary"
+                  onPress={async () => {
+                    if (!reportReason) {
+                      setReportError(t(lang, 'report_pick_reason'));
+                      return;
+                    }
+                    setReportError(null);
+                    setReportSubmitting(true);
+                    try {
+                      await submitReport({
+                        device_id: deviceId,
+                        analysis_id: record.id,
+                        reason: reportReason,
+                        comment: reportComment.trim() || undefined,
+                        app_version: '1.0.1',
+                        ui_language: lang,
+                        detected_country_code:
+                          (r as { detected_country_code?: string })
+                            .detected_country_code || undefined,
+                      });
+                      haptics.successTap?.();
+                      setReportSent(true);
+                      // Auto-dismiss after 1.6s so the user isn't trapped.
+                      setTimeout(() => setReportModalOpen(false), 1600);
+                    } catch (e) {
+                      const code = (e as { code?: string }).code;
+                      setReportError(
+                        code === 'report_rate_limited'
+                          ? t(lang, 'report_too_many')
+                          : t(lang, 'report_failed'),
+                      );
+                    } finally {
+                      setReportSubmitting(false);
+                    }
+                  }}
+                  disabled={reportSubmitting}
+                  testID="result-report-submit"
+                >
+                  {reportSubmitting
+                    ? t(lang, 'report_sending')
+                    : t(lang, 'report_submit')}
+                </Button>
+              </>
+            )}
+          </Pressable>
+        </Pressable>
+      </Modal>
 
       <ScrollView
         contentContainerStyle={styles.content}
@@ -1290,6 +1470,39 @@ export default function ResultScreen() {
           <FileText color={colors.textSecondary} size={16} strokeWidth={2.4} />
           <Text style={styles.disclaimerText}>{r.disclaimer}</Text>
         </View>
+
+        {/* ============================================================
+            REPORT LINK (Apple Guideline 1.2 / 1.1.6 compliance)
+            A small, calm text-only link. Tapping it opens the report
+            modal where the user can flag the analysis as wrong /
+            offensive / scam-missed / etc. Always present — never relies
+            on the user discovering a hidden menu.
+            ============================================================ */}
+        <Pressable
+          onPress={() => {
+            haptics.softTap();
+            setReportError(null);
+            setReportReason(null);
+            setReportComment('');
+            setReportSent(false);
+            setReportModalOpen(true);
+          }}
+          testID="result-report-link"
+          accessibilityRole="button"
+          accessibilityLabel={t(lang, 'report_button')}
+          style={({ pressed }) => [
+            styles.reportLink,
+            pressed && { opacity: 0.55 },
+          ]}
+          hitSlop={10}
+        >
+          <Flag
+            color={colors.textSecondary}
+            size={13}
+            strokeWidth={2.2}
+          />
+          <Text style={styles.reportLinkText}>{t(lang, 'report_button')}</Text>
+        </Pressable>
 
         {/* Spacer for sticky bar */}
         <View style={{ height: spacing.xl + 56 }} />
@@ -1986,6 +2199,132 @@ const styles = StyleSheet.create({
     fontSize: fontSize.sm,
     color: colors.textSecondary,
     lineHeight: 20,
+  },
+  // ---- Report link & modal (Apple Guideline 1.2 compliance) ----
+  // Calm, text-only link at the bottom of the result. Never alarms, never
+  // shouts — but always present so the user can flag a bad analysis.
+  reportLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    alignSelf: 'center',
+    marginTop: spacing.sm,
+  },
+  reportLinkText: {
+    fontSize: fontSize.sm,
+    fontWeight: fontWeight.medium,
+    color: colors.textSecondary,
+    textDecorationLine: 'underline',
+    textDecorationStyle: 'solid',
+  },
+  reportBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(15, 23, 42, 0.55)',
+    justifyContent: 'flex-end',
+    alignItems: 'stretch',
+  },
+  reportCard: {
+    backgroundColor: colors.surface,
+    borderTopLeftRadius: radius.xl,
+    borderTopRightRadius: radius.xl,
+    padding: spacing.lg,
+    paddingTop: spacing.md,
+    gap: spacing.sm,
+    maxHeight: '90%',
+  },
+  reportCardHeader: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    gap: spacing.sm,
+  },
+  reportCardTitle: {
+    flex: 1,
+    fontSize: fontSize.lg,
+    fontWeight: fontWeight.bold,
+    color: colors.textPrimary,
+  },
+  reportSubtitle: {
+    fontSize: fontSize.sm,
+    color: colors.textSecondary,
+    lineHeight: 20,
+    marginBottom: spacing.xs,
+  },
+  reportReasonList: {
+    gap: 6,
+    marginBottom: spacing.sm,
+  },
+  reportReasonRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingVertical: 10,
+    paddingHorizontal: spacing.md,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+  },
+  reportReasonRowSelected: {
+    borderColor: colors.primary,
+    backgroundColor: colors.primarySoft ?? colors.surface,
+  },
+  reportRadio: {
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    borderWidth: 2,
+    borderColor: colors.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  reportRadioSelected: {
+    borderColor: colors.primary,
+  },
+  reportRadioDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: colors.primary,
+  },
+  reportReasonText: {
+    flex: 1,
+    fontSize: fontSize.sm,
+    fontWeight: fontWeight.medium,
+    color: colors.textPrimary,
+  },
+  reportCommentInput: {
+    minHeight: 64,
+    maxHeight: 120,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.borderLight,
+    padding: spacing.md,
+    fontSize: fontSize.sm,
+    color: colors.textPrimary,
+    textAlignVertical: 'top',
+    marginBottom: spacing.xs,
+  },
+  reportErrorText: {
+    fontSize: fontSize.sm,
+    color: colors.red.text ?? '#DC2626',
+    marginBottom: spacing.xs,
+  },
+  reportSuccessBlock: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.md,
+    paddingVertical: spacing.xl,
+  },
+  reportSuccessText: {
+    fontSize: fontSize.md,
+    fontWeight: fontWeight.medium,
+    color: colors.textPrimary,
+    textAlign: 'center',
   },
   // ---- Change-language control ----
   langSwitchRow: {

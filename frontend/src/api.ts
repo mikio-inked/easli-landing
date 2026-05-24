@@ -301,6 +301,50 @@ export async function deleteAllAnalyses(deviceId: string): Promise<void> {
   await jsonOrThrow(res);
 }
 
+// ---------------------------------------------------------------------------
+// User reports — Apple Guideline 1.2 / 1.1.6 compliance.
+// Anonymous; comment is optional, capped server-side to 500 chars.
+// 429 means the device hit today's 5-report cap.
+// ---------------------------------------------------------------------------
+export type ReportReason =
+  | 'inaccurate'
+  | 'translation_error'
+  | 'offensive'
+  | 'scam_missed'
+  | 'other';
+
+export interface ReportSubmission {
+  device_id: string;
+  analysis_id?: string;
+  reason: ReportReason;
+  comment?: string;
+  app_version?: string;
+  ui_language?: string;
+  detected_country_code?: string;
+}
+
+export interface ReportSubmissionResponse {
+  ok: boolean;
+  report_id: string;
+}
+
+export async function submitReport(
+  body: ReportSubmission,
+): Promise<ReportSubmissionResponse> {
+  const res = await fetch(`${BASE_URL}/api/report`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  // Surface 429 as a typed thrown so the UI can show "too many" copy.
+  if (res.status === 429) {
+    const err = new Error('report_rate_limited');
+    (err as { code?: string }).code = 'report_rate_limited';
+    throw err;
+  }
+  return jsonOrThrow<ReportSubmissionResponse>(res);
+}
+
 export interface ExportPayload {
   app: string;
   device_id: string;

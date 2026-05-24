@@ -98,6 +98,11 @@ from routers.webhook import router as webhook_router  # noqa: E402
 
 app.include_router(webhook_router)
 
+# 4f-bis. User reports (Phase A — Apple Guideline 1.2 / 1.1.6 compliance).
+from routers.report import router as report_router  # noqa: E402
+
+app.include_router(report_router)
+
 # 4g. Email forwarding (Phase 4 feature). Lives in its own module.
 from inbox import router as inbox_router  # noqa: E402
 
@@ -184,6 +189,20 @@ async def _startup_create_indexes() -> None:
         )
         await db.redemption_codes.create_index(
             "code", unique=True, name="code_unique_idx",
+        )
+        # Reports — TTL = same 90 days as analyses (DSGVO Art. 5(1)(e)) +
+        # index on status for the admin moderation queue.
+        if ANALYSIS_TTL_DAYS > 0:
+            await db.reports.create_index(
+                "created_at",
+                expireAfterSeconds=ANALYSIS_TTL_DAYS * 86400,
+                name="reports_ttl_idx",
+                background=True,
+            )
+        await db.reports.create_index(
+            [("status", 1), ("created_at", -1)],
+            name="reports_status_idx",
+            background=True,
         )
     except Exception as e:  # noqa: BLE001
         logger.warning("index_setup_failed error_type=%s", type(e).__name__)
