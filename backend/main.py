@@ -68,14 +68,10 @@ configure_security(app)
 # This way no router module can accidentally bypass the security setup by
 # registering middlewares earlier.
 
-# 4a. Main API routes that are still in `server.py` (translate, generate-reply,
-#     chat, messages, revenuecat-webhook). The `api_router` symbol is the
-#     APIRouter that holds the remaining /api/* endpoints — they'll move into
-#     routers/{reply,chat,webhook}.py in Phase 3b. The `install_inbox_dependencies`
-#     helper wires the inbox webhook to the local analyze pipeline.
-from server import api_router, install_inbox_dependencies  # noqa: E402
-
-app.include_router(api_router)
+# 4a. Inbox-pipeline wiring — `install_inbox_dependencies` connects the
+#     inbox webhook (defined in inbox.py) to the analyse pipeline. Lives
+#     in services/inbox_service.py since Phase 5 of the refactor.
+from services.inbox_service import install_inbox_dependencies  # noqa: E402
 
 # 4b. Scan, analyze, history endpoints (Phase 3a — extracted from server.py).
 from routers.scan import router as scan_router  # noqa: E402

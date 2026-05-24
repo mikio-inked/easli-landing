@@ -12,13 +12,17 @@ import time
 from typing import List, Tuple
 
 # Ensure backend dir is importable + .env loaded.
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-os.chdir(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+os.chdir(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from dotenv import load_dotenv
 load_dotenv()
 
-import server  # noqa: E402
+# After Phase 5 the retry helper lives in services/ai_service. We still
+# patch the Mistral client stub via core.config + services.ai_service.
+from core import config as ai_config  # noqa: E402
+from core.exceptions import MistralRateLimited  # noqa: E402
+from services import ai_service  # noqa: E402
 
 
 # ---- Fake httpx Headers / Response / SDKError lookalikes -------------------
@@ -59,11 +63,12 @@ def patch_complete_async(side_effects: List):
         return nxt
 
     # mistral_client may be None on machines without an API key — for the test
-    # we always patch into server.* directly.
+    # we always patch into core.config / services.ai_service directly.
     class Stub:
         class chat:
             complete_async = staticmethod(fake)
-    server.mistral_client = Stub()  # type: ignore[assignment]
+    ai_config.mistral_client = Stub()  # type: ignore[assignment]
+    ai_service.mistral_client = Stub()  # type: ignore[assignment]
     return calls
 
 
@@ -74,8 +79,8 @@ async def run_case(name, side_effects, expected_outcome, expected_min_wait_s, ex
     outcome = "ok"
     client_hint = None
     try:
-        await server.mistral_complete_with_retry(label="vision", model="test", messages=[])
-    except server.MistralRateLimited as rl:
+        await ai_service.mistral_complete_with_retry(label="vision", model="test", messages=[])
+    except MistralRateLimited as rl:
         outcome = "rate_limited"
         client_hint = rl.retry_after
     except Exception as e:
@@ -164,6 +169,10 @@ async def main():
     else:
         print(f"FAILED: {results.count(False)}/{len(results)}")
         sys.exit(1)
+
+
+if __name__ == "__main__":
+    asyncio.run(main())
 
 
 if __name__ == "__main__":
