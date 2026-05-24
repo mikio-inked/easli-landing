@@ -17,14 +17,12 @@ Endpoints exposed:
   DELETE /api/history/{device_id}             — DSGVO Art. 17 erasure
 """
 
-from __future__ import annotations
-
 import base64
 import logging
 from datetime import datetime, timezone
-from typing import List, Tuple
+from typing import Annotated, List, Tuple
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, Body, HTTPException, Request
 from fastapi.responses import JSONResponse
 
 from core.config import (
@@ -81,7 +79,18 @@ async def get_languages():
 # ===========================================================================
 @router.post("/analyze")
 @limiter.limit(RATE_LIMIT_ANALYZE)
-async def analyze_document(request: Request, req: AnalyzeRequest):
+async def analyze_document(
+    request: Request,
+    req: Annotated[AnalyzeRequest, Body()],
+):
+    # `Annotated[AnalyzeRequest, Body()]` is REQUIRED here — without it
+    # slowapi's `@limiter.limit` decorator shadows the handler signature
+    # so FastAPI cannot see that `req` is a Pydantic body model and
+    # reclassifies it as a query param, yielding 422 "Field required"
+    # on every valid call. The Annotated[..., Body()] form survives the
+    # decorator wrapping AND plays nicely with `from __future__ import
+    # annotations` (whereas the plain `req: AnalyzeRequest = Body(...)`
+    # default-form leaves Pydantic with an unresolved ForwardRef).
     s = _server()
 
     # Validate language — accepts the full EU-1 Explanation-Language set
