@@ -1,177 +1,67 @@
-from fastapi import FastAPI, APIRouter, HTTPException, Header, Request
-from fastapi.exceptions import RequestValidationError
+"""easli — main route module (currently still hosts every /api/* handler).
+
+Phase 1 of the refactor moved infrastructure / config / security / prompts
+into the `core/` package and the FastAPI app bootstrap into `main.py`. This
+file is now route-and-helper code only — no Sentry init, no Mongo connect,
+no Mistral client init, no app instance, no CORS, no startup hook. All of
+those live in `core/` and `main.py`.
+
+Phase 3 (planned) will move the route handlers themselves into
+`routers/analyze.py`, `routers/chat.py`, `routers/usage.py`, etc., and this
+file will shrink to ~150 lines or disappear entirely.
+
+Backward compatibility: `uvicorn server:app` still works thanks to the
+`__getattr__` shim at the bottom of this file — it lazily returns the
+`app` instance built by `main.py`.
+"""
+
+from fastapi import APIRouter, HTTPException, Header, Request
 from fastapi.responses import JSONResponse
-from dotenv import load_dotenv
-from starlette.middleware.cors import CORSMiddleware
-from motor.motor_asyncio import AsyncIOMotorClient
-import os
-import io
 import asyncio
 import json
 import base64
 import logging
 import re
-import tempfile
-from pathlib import Path
-from pydantic import BaseModel, Field
-from typing import List, Optional, Literal, Tuple, Any
-import uuid
+from pydantic import BaseModel
+from typing import List, Optional, Tuple, Any
 from datetime import datetime, timedelta, timezone
 
-# ==================== Optional Sentry ====================
-# Activated automatically when SENTRY_DSN env var is set. Uses the Logging
-# + FastAPI integrations so that all Python exceptions and any logger.error
-# call bubble up to Sentry. Designed to be a zero-cost no-op when DSN is
-# blank — perfect for local dev / CI.
-_sentry_dsn = os.environ.get("SENTRY_DSN", "").strip()
-if _sentry_dsn:
-    try:
-        import sentry_sdk
-        from sentry_sdk.integrations.logging import LoggingIntegration
-
-        sentry_sdk.init(
-            dsn=_sentry_dsn,
-            traces_sample_rate=float(
-                os.environ.get("SENTRY_TRACES_SAMPLE_RATE", "0.1")
-            ),
-            environment=os.environ.get("SENTRY_ENV", "production"),
-            release=os.environ.get("SENTRY_RELEASE") or None,
-            send_default_pii=False,  # privacy-first, never send IPs/headers
-            # CRITICAL — never attach local-variable values to stack frames.
-            # Without this, sentry_sdk would helpfully include `req.image_base64`
-            # (the user's letter as Base64!), OCR text, draft replies and so on
-            # whenever an exception bubbles up from /api/analyze. That would
-            # break our DSGVO posture entirely.
-            include_local_variables=False,
-            # Reduce breadcrumb noise + memory footprint.
-            max_breadcrumbs=30,
-            integrations=[
-                LoggingIntegration(level=logging.INFO, event_level=logging.ERROR),
-            ],
-        )
-    except Exception as _e:  # noqa: BLE001
-        # Never let a misconfigured Sentry crash the boot.
-        logging.getLogger(__name__).warning("sentry_init_failed err=%s", _e)
-
-
 import fitz  # PyMuPDF
-from mistralai import Mistral
 
-
-ROOT_DIR = Path(__file__).parent
-load_dotenv(ROOT_DIR / '.env')
-
-# MongoDB connection
-mongo_url = os.environ['MONGO_URL']
-client = AsyncIOMotorClient(mongo_url)
-db = client[os.environ['DB_NAME']]
-
-# Mistral AI — EU-hosted (Paris). DSGVO-friendly replacement for OpenAI.
-# Model IDs are pinned via env vars to dated releases so we don't silently
-# adopt new models. Mistral Large 3 (`mistral-large-2512`) is the current
-# multimodal frontier model and replaces both pixtral-large-2411 and
-# mistral-large-2411 (both deprecated, retiring Feb 27, 2026).
-MISTRAL_API_KEY = os.environ.get('MISTRAL_API_KEY', '')
-MISTRAL_VISION_MODEL = os.environ.get('MISTRAL_VISION_MODEL', 'mistral-large-2512')
-MISTRAL_ANALYSIS_MODEL = os.environ.get('MISTRAL_ANALYSIS_MODEL', 'mistral-large-2512')
-MISTRAL_CHAT_MODEL = os.environ.get('MISTRAL_CHAT_MODEL', 'mistral-large-2512')
-# Dedicated OCR model — extremely fast (0.5-1s/page) and orders of magnitude
-# cheaper than running a full multimodal model over every page. Used as the
-# first stage of the 2-stage analyze pipeline:
-#   1) OCR each page in parallel → markdown text
-#   2) Feed combined text to the analysis model (text-only call)
-# Empirical numbers on Mistral Free Tier: 4-page scan goes from ~125s (single
-# multimodal call) to ~4s (OCR+text). It also sidesteps the per-minute
-# vision-token rate limit that single-call Vision was hitting.
-MISTRAL_OCR_MODEL = os.environ.get('MISTRAL_OCR_MODEL', 'mistral-ocr-latest')
-
-mistral_client: Optional[Mistral] = (
-    # 60s per individual API call. Vision was 30s but OCR+text split is
-    # much faster (typ. 4-10s) — we still keep 60s as a safety ceiling for
-    # edge cases like Mistral warming up a cold model. Combined with our
-    # retry helper's 25s cumulative-wait budget this gives a hard ~85s
-    # upper bound per Mistral phase — well inside the iOS client's 120s
-    # upload-timeout.
-    Mistral(api_key=MISTRAL_API_KEY, timeout_ms=60_000) if MISTRAL_API_KEY else None
+# ---------------------------------------------------------------------------
+# Core infrastructure — Sentry, Mongo, Mistral, paywall config all live here.
+# ---------------------------------------------------------------------------
+from core.config import (
+    ANALYSIS_TTL_DAYS,  # noqa: F401 — re-exported for any out-of-tree caller
+    DEV_TOOLS_ENABLED,
+    FREE_ANALYSES,
+    MAX_CHAT_QUESTIONS_PER_DOCUMENT,
+    MAX_PAGES_PER_DOCUMENT,
+    MAX_TOTAL_CHAT_QUESTIONS_PER_TESTER,
+    MAX_TRANSLATIONS_PER_ANALYSIS,
+    MISTRAL_ANALYSIS_MODEL,
+    MISTRAL_CHAT_MODEL,
+    MISTRAL_OCR_MODEL,
+    MISTRAL_VISION_MODEL,  # noqa: F401 — kept for legacy imports
+    PAYWALL_MODE,
+    PLUS_MONTHLY_ANALYSES,
+    RATE_LIMIT_ANALYZE as RL_ANALYZE,
+    REVENUECAT_WEBHOOK_AUTH_HEADER,
+    SOFT_TEST_EXTRA_ANALYSES,
+    db,
+    mistral_client,
 )
+from core.exceptions import MistralRateLimited
+from core.security import limiter
 
-# ==================== PAYWALL / USAGE CONFIG ====================
-# Read once at startup so behaviour is predictable. All values are also
-# documented in /app/backend/.env. NEVER log these values together with
-# document content.
-PAYWALL_MODE = os.environ.get('PAYWALL_MODE', 'soft').strip().lower()
-if PAYWALL_MODE not in ('disabled', 'soft', 'hard'):
-    PAYWALL_MODE = 'soft'
+# Legacy-style logger name keeps every existing `2026-… - server - INFO`
+# log line stable so dashboards / Sentry filters don't break.
+logger = logging.getLogger("server")
 
-def _int_env(name: str, default: int) -> int:
-    try:
-        return max(0, int(os.environ.get(name, str(default)).strip()))
-    except (ValueError, TypeError):
-        return default
-
-FREE_ANALYSES = _int_env('FREE_ANALYSES', 3)
-SOFT_TEST_EXTRA_ANALYSES = _int_env('SOFT_TEST_EXTRA_ANALYSES', 10)
-MAX_PAGES_PER_DOCUMENT = _int_env('MAX_PAGES_PER_DOCUMENT', 5)
-MAX_CHAT_QUESTIONS_PER_DOCUMENT = _int_env('MAX_CHAT_QUESTIONS_PER_DOCUMENT', 5)
-MAX_TOTAL_CHAT_QUESTIONS_PER_TESTER = _int_env('MAX_TOTAL_CHAT_QUESTIONS_PER_TESTER', 20)
-PLUS_MONTHLY_ANALYSES = _int_env('PLUS_MONTHLY_ANALYSES', 20)
-
-# DSGVO storage minimisation: stored analyses auto-delete after this many
-# days. Enforced via a MongoDB TTL index on `analyses.created_at_dt`. Set
-# to 0 to disable auto-deletion (not recommended for production).
-ANALYSIS_TTL_DAYS = _int_env('ANALYSIS_TTL_DAYS', 90)
-
-REVENUECAT_WEBHOOK_AUTH_HEADER = os.environ.get('REVENUECAT_WEBHOOK_AUTH_HEADER', '').strip()
-DEV_TOOLS_ENABLED = os.environ.get('DEV_TOOLS_ENABLED', '0').strip() == '1' or PAYWALL_MODE != 'hard'
-# `DEV_TOOLS_ENABLED` defaults to True in soft/disabled to make TestFlight QA
-# easy. In hard production set DEV_TOOLS_ENABLED=0 (the default when PAYWALL_MODE
-# == 'hard' unless explicitly overridden) and the dev simulation endpoints
-# return 404.
-
-# Create the main app without a prefix
-app = FastAPI(title="easli API")
-
-# ==================== Rate Limiter (slowapi) ====================
-# IP-based throttling on expensive routes (/api/analyze, /api/redeem,
-# /api/admin/login). Tunable via env. Defaults are conservative for a
-# bootstrapping app — bump them after launch traffic is observed.
-from slowapi import Limiter, _rate_limit_exceeded_handler  # noqa: E402
-from slowapi.errors import RateLimitExceeded  # noqa: E402
-from slowapi.util import get_remote_address  # noqa: E402
-
-def _client_ip(request: Request) -> str:
-    """Prefer the right-most public IP from X-Forwarded-For (Railway sets
-    this), fall back to the direct peer address."""
-    fwd = request.headers.get("x-forwarded-for") or ""
-    if fwd:
-        # Railway / Cloudflare style: "client, proxy1, proxy2"
-        first = fwd.split(",")[0].strip()
-        if first:
-            return first
-    return get_remote_address(request)
-
-limiter = Limiter(
-    key_func=_client_ip,
-    default_limits=[],
-    storage_uri="memory://",  # in-process (per worker); fine for 1-3 workers
-)
-app.state.limiter = limiter
-app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
-
-# Configurable per-endpoint limits (override via env in Railway).
-# NOTE: /api/redeem and /api/admin/login limits are read directly inside
-# admin.py via the same env vars (RATE_LIMIT_REDEEM, RATE_LIMIT_ADMIN_LOGIN).
-RL_ANALYZE = os.environ.get("RATE_LIMIT_ANALYZE", "30/minute")
-
-# Create a router with the /api prefix
+# The single APIRouter that holds every /api/* endpoint defined in this file.
+# main.py picks it up via `from server import api_router` and registers it
+# on the FastAPI app.
 api_router = APIRouter(prefix="/api")
-
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
-logger = logging.getLogger(__name__)
 
 
 # ==================== MODELS ====================
@@ -442,12 +332,9 @@ def compress_image_for_vision(
 # The mistralai SDK surfaces this as `SDKError` with an .status_code attribute
 # (in modern versions) or a status string in str(e). We detect both.
 
-class MistralRateLimited(Exception):
-    """Final-attempt rate limit. The route handler maps this to HTTP 429."""
-
-    def __init__(self, retry_after: int):
-        super().__init__("rate_limited")
-        self.retry_after = retry_after
+# `MistralRateLimited` is now defined in `core.exceptions` and re-imported
+# at the top of this file. Kept the docstring / context comment above for
+# anyone diff-reviewing the refactor.
 
 
 def _is_rate_limit_error(exc: Exception) -> bool:
@@ -1336,7 +1223,9 @@ async def chat_about_document(
 # common user flows (the 7 supported languages at most, and in practice
 # users switch 1-2 times). Set to a high number on TestFlight so the soft
 # paywall never actually hits; tighten in production if needed.
-MAX_TRANSLATIONS_PER_ANALYSIS = _int_env('MAX_TRANSLATIONS_PER_ANALYSIS', 6)
+# `MAX_TRANSLATIONS_PER_ANALYSIS` is now imported from `core.config` at the
+# top of this file. The original definition lived here:
+#   MAX_TRANSLATIONS_PER_ANALYSIS = _int_env('MAX_TRANSLATIONS_PER_ANALYSIS', 6)
 
 
 
@@ -2529,14 +2418,12 @@ async def dev_simulate(device_id: str, scenario: str):
     return _to_usage_response(refreshed).dict()
 
 
-# Include the router in the main app
-app.include_router(api_router)
-
-# ==================== EMAIL-FORWARDING (Phase 4) ====================
-# Mounts: GET /api/inbox/me, POST /api/inbox/rotate, POST /api/inbox/inbound
-# The webhook is auth'd by the X-Easli-Inbox-Secret header (env var
-# INBOX_WEBHOOK_SECRET). Without that env var set, /inbound returns 503.
-from inbox import router as inbox_router, install_dependencies as _install_inbox  # noqa: E402
+# ==================== INBOX (Phase 4) — install hook ====================
+# main.py calls `install_inbox_dependencies()` after `core.security` has run,
+# so the inbox webhook can wire its dependency on `db` + the analyze callback
+# WITHOUT needing to import `app` (which would create a circular import with
+# main.py).
+from inbox import install_dependencies as _install_inbox  # noqa: E402
 
 
 async def _inbox_analyze_callback(
@@ -2546,10 +2433,6 @@ async def _inbox_analyze_callback(
     email. Email-forwarded analyses currently bypass the per-device free
     quota — they're billed at the user's existing tier on a future
     revision. For now they always succeed (provided Mistral does)."""
-    # Build a minimal AnalyzeRequest-shaped dict so we can re-use the rest
-    # of the pipeline. We sidestep the FastAPI route function itself to
-    # avoid recursion through the rate limiter and the entitlement check
-    # (the email pathway has its own quotas in INBOX module).
     fake_req = AnalyzeRequest(
         device_id=device_id,
         target_language=target_language if target_language in EXPLANATION_LANGUAGES else "en",
@@ -2571,176 +2454,28 @@ async def _inbox_analyze_callback(
     return ""
 
 
-_install_inbox(db=db, analyze_callback=_inbox_analyze_callback)
-app.include_router(inbox_router, prefix="/api")
+def install_inbox_dependencies() -> None:
+    """Wire the inbox webhook to the local analyze pipeline.
 
-# ==================== ADMIN + REDEMPTION ====================
-# Loaded from a separate module to keep server.py manageable.
-# Mounts: GET /admin (HTML UI) + /api/admin/* (auth-gated) + /api/redeem (public)
-from admin import make_admin_router  # noqa: E402
-
-app.include_router(make_admin_router(db, limiter=limiter))
-
-
-# Diagnostic request-logger middleware — added because we observed a class
-# of failures where iOS clients reported 429 errors that have no
-# corresponding entries in the access log. Logs ONE line per request with
-# enough metadata to triage where in the stack a request is being dropped:
-#   - method, path, query
-#   - source IP (X-Forwarded-For / direct)
-#   - User-Agent (truncated)
-#   - Content-Length (if present)
-#   - response status, response time, exception class (if any)
-#
-# Privacy: NEVER reads or logs the request body. Only headers + URL.
-# The User-Agent is truncated to 80 chars to avoid log spam.
-@app.middleware("http")
-async def diag_request_logger(request: Request, call_next):
-    import time as _t
-    started = _t.monotonic()
-    fwd = request.headers.get("x-forwarded-for") or request.client.host if request.client else "?"
-    ua = (request.headers.get("user-agent") or "")[:80]
-    cl = request.headers.get("content-length") or "?"
-    method = request.method
-    path = request.url.path
-    qs = request.url.query or ""
-    try:
-        response = await call_next(request)
-        dur_ms = int((_t.monotonic() - started) * 1000)
-        logger.info(
-            "diag_req method=%s path=%s qs=%s status=%s dur_ms=%s "
-            "fwd=%s cl=%s ua=%s",
-            method, path, qs[:100], response.status_code, dur_ms,
-            fwd, cl, ua,
-        )
-        return response
-    except Exception as e:
-        dur_ms = int((_t.monotonic() - started) * 1000)
-        logger.exception(
-            "diag_req method=%s path=%s qs=%s status=EXC dur_ms=%s "
-            "fwd=%s cl=%s ua=%s exc_type=%s",
-            method, path, qs[:100], dur_ms, fwd, cl, ua, type(e).__name__,
-        )
-        raise
+    Called from main.py exactly once after the FastAPI app is built. Kept
+    as a function (rather than executing on import) so unit tests can
+    import server.py without triggering Mongo writes.
+    """
+    _install_inbox(db=db, analyze_callback=_inbox_analyze_callback)
 
 
-# CORS — restrict to first-party origins. Override via ALLOWED_ORIGINS env
-# (comma-separated) for dev/staging.
-_default_origins = [
-    "https://easli.app",
-    "https://www.easli.app",
-    "https://api.easli.app",
-    "http://localhost:3000",
-    "http://localhost:8081",
-]
-_origins_env = os.environ.get("ALLOWED_ORIGINS", "").strip()
-_allowed_origins = (
-    [o.strip() for o in _origins_env.split(",") if o.strip()]
-    if _origins_env
-    else _default_origins
-)
+# ==================== Backward-compatibility ====================
+# Old deployment configs (supervisord, Procfile, Railway) launch the backend
+# with `uvicorn server:app`. The FastAPI instance has moved to `main.py`
+# but we keep this module's `app` name working via PEP 562 module-level
+# `__getattr__`. The attribute is resolved lazily so we don't trigger a
+# circular import (main.py imports `api_router` from this file).
+def __getattr__(name):  # noqa: D401
+    """Lazy resolver for backward-compatible attribute access on `server`.
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_credentials=True,
-    allow_origins=_allowed_origins,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-
-# DSGVO + privacy: never let a malformed request body end up in a stack
-# trace (the default FastAPI 422 echoes the offending body, which for
-# /api/analyze can include a base64-encoded image). This handler returns a
-# stripped-down 422 with only field paths and the error type — no body, no
-# values, no document content.
-@app.exception_handler(RequestValidationError)
-async def safe_validation_exception_handler(request: Request, exc: RequestValidationError):
-    safe_errors = []
-    for err in exc.errors():
-        safe_errors.append({
-            "loc": list(err.get("loc", [])),
-            "type": err.get("type", "value_error"),
-            "msg": err.get("msg", "Invalid input"),
-        })
-    logger.info(
-        "request_validation_error path=%s n_errors=%s",
-        request.url.path, len(safe_errors),
-    )
-    return JSONResponse(status_code=422, content={"detail": safe_errors})
-
-
-@app.on_event("startup")
-async def easli_startup():
-    """Bootstrap MongoDB indexes on every backend start. Idempotent."""
-    # 1. TTL on analyses for storage minimisation (DSGVO Art. 5(1)(e)).
-    if ANALYSIS_TTL_DAYS > 0:
-        try:
-            await db.analyses.create_index(
-                "created_at_dt",
-                expireAfterSeconds=ANALYSIS_TTL_DAYS * 86400,
-                name="ttl_created_at_dt",
-                background=True,
-            )
-            # Backfill `created_at_dt` (BSON Date) for legacy docs that only
-            # carry the ISO-string `created_at`. Done in chunks so a large
-            # collection doesn't block startup.
-            backfilled = 0
-            cursor = db.analyses.find(
-                {"created_at_dt": {"$exists": False}},
-                {"_id": 1, "created_at": 1},
-            ).limit(500)
-            async for legacy in cursor:
-                ts = legacy.get("created_at")
-                if not ts:
-                    continue
-                try:
-                    parsed = datetime.fromisoformat(ts.replace("Z", "+00:00"))
-                except (ValueError, AttributeError):
-                    parsed = datetime.now(timezone.utc)
-                await db.analyses.update_one(
-                    {"_id": legacy["_id"]},
-                    {"$set": {"created_at_dt": parsed}},
-                )
-                backfilled += 1
-            logger.info(
-                "ttl_index_ready collection=analyses ttl_days=%s backfilled=%s",
-                ANALYSIS_TTL_DAYS, backfilled,
-            )
-        except Exception as e:
-            # Non-fatal: index creation can fail on read-only secondaries or
-            # if Mongo is busy. Surface as a warning so it shows up in logs.
-            logger.warning(
-                "ttl_index_setup_failed error_type=%s",
-                type(e).__name__,
-            )
-
-    # 2. Helpful indexes for hot read paths (idempotent).
-    try:
-        await db.analyses.create_index([("device_id", 1), ("created_at", -1)], name="device_created_idx")
-        await db.usage_records.create_index("device_id", unique=True, name="device_unique_idx")
-        # Phase D — analytics indices for the admin dashboard aggregations.
-        # Sparse + background: zero impact on existing writes, only docs that
-        # have the field get indexed.
-        await db.analyses.create_index(
-            "target_language",
-            name="target_language_idx",
-            sparse=True,
-            background=True,
-        )
-        await db.analyses.create_index(
-            "detected_country_code",
-            name="detected_country_idx",
-            sparse=True,
-            background=True,
-        )
-        await db.redemption_codes.create_index(
-            "code", unique=True, name="code_unique_idx"
-        )
-    except Exception as e:
-        logger.warning("index_setup_failed error_type=%s", type(e).__name__)
-
-
-@app.on_event("shutdown")
-async def shutdown_db_client():
-    client.close()
+    Currently used for: `from server import app`  →  delegates to main.app.
+    """
+    if name == "app":
+        from main import app as _app  # local import avoids circular load
+        return _app
+    raise AttributeError(f"module 'server' has no attribute {name!r}")
