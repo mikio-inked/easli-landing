@@ -68,21 +68,32 @@ configure_security(app)
 # This way no router module can accidentally bypass the security setup by
 # registering middlewares earlier.
 
-# 4a. Main API routes — currently still in `server.py` (will move to
-#     `routers/` in Phase 3). The `api_router` symbol is the single
-#     APIRouter that holds every /api/* endpoint of the analyze / chat /
-#     translate / paywall / dev / history flow.
+# 4a. Main API routes that are still in `server.py` (translate, generate-reply,
+#     chat, messages, revenuecat-webhook). The `api_router` symbol is the
+#     APIRouter that holds the remaining /api/* endpoints — they'll move into
+#     routers/{reply,chat,webhook}.py in Phase 3b. The `install_inbox_dependencies`
+#     helper wires the inbox webhook to the local analyze pipeline.
 from server import api_router, install_inbox_dependencies  # noqa: E402
 
 app.include_router(api_router)
 
-# 4b. Email forwarding (Phase 4 feature). Lives in its own module.
+# 4b. Scan, analyze, history endpoints (Phase 3a — extracted from server.py).
+from routers.scan import router as scan_router  # noqa: E402
+
+app.include_router(scan_router)
+
+# 4c. Usage, paywall, export, dev tools (Phase 3a — extracted from server.py).
+from routers.usage import router as usage_router  # noqa: E402
+
+app.include_router(usage_router)
+
+# 4d. Email forwarding (Phase 4 feature). Lives in its own module.
 from inbox import router as inbox_router  # noqa: E402
 
 install_inbox_dependencies()
 app.include_router(inbox_router, prefix="/api")
 
-# 4c. Admin web UI + redemption codes. Lives in its own module since
+# 4e. Admin web UI + redemption codes. Lives in its own module since
 #     before the refactor; only the include site has moved here.
 from admin import make_admin_router  # noqa: E402
 from core.security import limiter as _limiter  # noqa: E402

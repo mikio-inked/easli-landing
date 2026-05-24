@@ -127,7 +127,6 @@ def pdf_to_images_base64(pdf_bytes: bytes, max_pages: int = 5) -> List[Tuple[str
     return pages
 
 
-
 def extract_json_from_text(text: str) -> Optional[dict]:
     """Try to find a JSON object in the LLM response."""
     if not text:
@@ -945,9 +944,6 @@ async def detect_document_language(
     return (dl, code, conf)
 
 
-
-
-
 # ==================== USAGE / ENTITLEMENT HELPERS ====================
 
 # Ring-buffer cap for stored idempotency keys per device — keeps the doc
@@ -1226,7 +1222,6 @@ async def chat_about_document(
 # `MAX_TRANSLATIONS_PER_ANALYSIS` is now imported from `core.config` at the
 # top of this file. The original definition lived here:
 #   MAX_TRANSLATIONS_PER_ANALYSIS = _int_env('MAX_TRANSLATIONS_PER_ANALYSIS', 6)
-
 
 
 async def translate_analysis_with_mistral(
@@ -1579,8 +1574,6 @@ async def translate_analysis_endpoint(analysis_id: str, req: TranslateRequest):
     }
 
 
-
-
 # ============================================================================
 # Reply Assistant — interactive intent-based reply generation (Phase R5)
 # ============================================================================
@@ -1610,9 +1603,6 @@ class GenerateReplyResponse(BaseModel):
     # when Mistral couldn't produce one — callers should gracefully hide
     # the explainer UI in that case rather than show a blank box.
     reply_explanation: str = ""
-
-
-
 
 
 @api_router.post("/analyses/{analysis_id}/generate-reply", response_model=GenerateReplyResponse)
@@ -1706,9 +1696,6 @@ async def generate_reply_endpoint(analysis_id: str, req: GenerateReplyRequest):
         reply_language_code=resolved_code,
         reply_explanation=reply_explanation,
     )
-
-
-
 
 
 @api_router.post("/analyses/{analysis_id}/chat", response_model=ChatMessage)
@@ -1851,369 +1838,6 @@ async def clear_messages(analysis_id: str, device_id: str):
         {"$set": {"messages": []}},
     )
     return {"cleared": res.modified_count}
-
-
-@api_router.get("/")
-async def root():
-    return {"app": "easli", "status": "ok"}
-
-
-@api_router.get("/languages")
-async def get_languages():
-    # Since Phase EU-1 this returns the full 25-language Explanation set,
-    # not just the 7 UI-translated legacy ones.
-    return [{"code": k, "label": v} for k, v in EXPLANATION_LANGUAGES.items()]
-
-
-@api_router.post("/analyze")
-@limiter.limit(RL_ANALYZE)
-async def analyze_document(request: Request, req: AnalyzeRequest):
-    # Validate language — accepts the full EU-1 Explanation-Language set
-    # (25 codes) since Phase 5. See `EXPLANATION_LANGUAGES` at top.
-    if req.target_language not in EXPLANATION_LANGUAGES:
-        raise HTTPException(status_code=400, detail="Unsupported target language")
-
-    target_language_label = EXPLANATION_LANGUAGES[req.target_language]
-
-    # ----- Entitlement gate (server-side source of truth) -----
-    # Computed BEFORE we touch Mistral or burn any tokens, so a paywalled or
-    # test-limit-reached user gets an instant 402/429 with structured payload.
-    usage_rec = await _load_or_create_usage(req.device_id)
-    decision = _evaluate_entitlement(usage_rec)
-    if not decision.allowed:
-        # Privacy-safe event log: only event name + device + mode.
-        if decision.reason == 'test_limit_reached':
-            logger.info(
-                "test_limit_reached device=%s mode=%s",
-                req.device_id, PAYWALL_MODE,
-            )
-            status_code = 429
-        else:
-            logger.info(
-                "analysis_blocked_payment_required device=%s mode=%s",
-                req.device_id, PAYWALL_MODE,
-            )
-            status_code = 402
-        return JSONResponse(
-            status_code=status_code,
-            content={
-                "error": decision.reason,
-                "message": decision.message,
-                "usage": decision.usage.dict(),
-            },
-        )
-
-    # Normalise input pages — accept either the legacy single-file shape or
-    # the new `pages` array. We always end up with a list of (base64, mime).
-    raw_pages: List[Tuple[str, str]] = []
-    if req.pages:
-        for p in req.pages:
-            raw_pages.append((p.file_base64, p.mime_type))
-    elif req.file_base64 and req.mime_type:
-        raw_pages.append((req.file_base64, req.mime_type))
-    else:
-        raise HTTPException(status_code=400, detail="No file content provided")
-
-    if len(raw_pages) == 0:
-        raise HTTPException(status_code=400, detail="No file content provided")
-
-    # MAX_PAGES_PER_DOCUMENT is configured via env. We also keep a hard cap
-    # for safety so a misconfigured env can't accidentally enable 1000-page
-    # documents.
-    MAX_TOTAL_PAGES = max(1, min(MAX_PAGES_PER_DOCUMENT, 20))
-    images: List[Tuple[str, str]] = []
-    for raw_b64, raw_mime in raw_pages:
-        if len(images) >= MAX_TOTAL_PAGES:
-            break
-        try:
-            raw_bytes = base64.b64decode(raw_b64, validate=False)
-        except Exception:
-            raise HTTPException(status_code=400, detail="Invalid base64 file content")
-        if not raw_bytes:
-            raise HTTPException(status_code=400, detail="Empty file content")
-        if len(raw_bytes) > 25 * 1024 * 1024:
-            raise HTTPException(status_code=413, detail="File too large. Please use a file under 25MB.")
-        mime = (raw_mime or "").lower().strip()
-        if mime == "application/pdf" or mime == "pdf":
-            try:
-                budget = MAX_TOTAL_PAGES - len(images)
-                pdf_pages = pdf_to_images_base64(raw_bytes, max_pages=min(MAX_TOTAL_PAGES, budget))
-            except Exception as e:
-                logger.exception("PDF conversion failed (error_type=%s)", type(e).__name__)
-                raise HTTPException(status_code=400, detail=f"Could not read PDF: {str(e)}")
-            images.extend(pdf_pages)
-        elif mime in ("image/jpeg", "image/jpg", "image/png", "image/webp", "image/heic", "image/heif"):
-            image_mime = "image/jpeg" if mime == "image/jpg" else mime
-            images.append((raw_b64, image_mime))
-        else:
-            raise HTTPException(status_code=400, detail=f"Unsupported file type: {raw_mime}. Use JPEG, PNG, WEBP or PDF.")
-
-    if not images:
-        raise HTTPException(status_code=400, detail="No readable pages found")
-
-    # ----- Language gate ---------------------------------------------------
-    # Compress first (needed for OCR anyway — costs a few ms but saves upload
-    # bandwidth to Mistral), then OCR just enough to classify.
-    images = [
-        compress_image_for_vision(idx, b64, mime)
-        for idx, (b64, mime) in enumerate(images)
-    ]
-
-    # OCR all pages now so we can reuse the extracted text in the analysis
-    # step if the gate passes. The gate itself only looks at page 1.
-    try:
-        page_texts = await ocr_pages_with_mistral(images)
-    except Exception as e:
-        logger.exception(
-            "Mistral OCR stage failed (model=%s, error_type=%s)",
-            MISTRAL_OCR_MODEL,
-            type(e).__name__,
-        )
-        raise HTTPException(status_code=502, detail="AI analysis failed.")
-
-    page0_text = page_texts[0] if page_texts else ""
-    logger.info(
-        "language_gate_checked device=%s pages=%d p0_chars=%d",
-        req.device_id, len(page_texts), len(page0_text or ""),
-    )
-    doc_lang, det_code, conf = await detect_document_language(page0_text)
-
-    uncertainty_notice: Optional[str] = None
-    # Phase-3 (multi-source-language): We no longer hard-reject non-German
-    # documents. The analysis model handles any European language directly
-    # and `reply_draft` is produced in the sender's language. The old gate
-    # still runs in detection-only mode so the user can be told when the
-    # language could not be determined confidently — helpful UX, no block.
-    if doc_lang == "unknown" or conf == "low":
-        logger.info(
-            "language_gate_unknown device=%s detected=%s confidence=%s",
-            req.device_id, det_code or "?", conf,
-        )
-        uncertainty_notice = (
-            "Die Sprache konnte nicht sicher erkannt werden. "
-            "Die Analyse kann ungenau sein."
-        )
-    else:
-        logger.info(
-            "language_gate_passed device=%s detected=%s confidence=%s doc_lang=%s",
-            req.device_id, det_code or "?", conf, doc_lang,
-        )
-
-    # ----- Full analysis ---------------------------------------------------
-    # Run analysis on the already-OCR'd text. If this raises, no usage is
-    # consumed (the `_consume_after_success` call below is skipped).
-    result = await analyze_from_ocr_text(
-        page_texts, target_language_label, req.target_language,
-    )
-
-    # Prepend the language-uncertainty note to `uncertainties` if we set one.
-    if uncertainty_notice:
-        existing = list(result.uncertainties or [])
-        if uncertainty_notice not in existing:
-            existing.insert(0, uncertainty_notice)
-            result.uncertainties = existing
-
-    record = AnalysisRecord(
-        device_id=req.device_id,
-        target_language=req.target_language,
-        target_language_label=target_language_label,
-        mime_type=(req.pages[0].mime_type if req.pages else (req.mime_type or "")),
-        result=result,
-    )
-
-    # Store analysis result only — never the original document.
-    # Add a BSON Date field for the MongoDB TTL index (auto-deletes after
-    # ANALYSIS_TTL_DAYS). The ISO-string `created_at` is kept for the API.
-    doc = record.dict()
-    doc["created_at_dt"] = datetime.now(timezone.utc)
-    await db.analyses.insert_one(doc)
-
-    # Now — and only now — consume usage. If the analyze call had failed
-    # above, we'd have raised before reaching this line.
-    await _consume_after_success(
-        req.device_id,
-        decision.source or 'free',
-        req.idempotency_key,
-    )
-    logger.info(
-        "analysis_allowed device=%s source=%s mode=%s",
-        req.device_id, decision.source, PAYWALL_MODE,
-    )
-
-    # Re-load updated usage so the frontend can refresh its meter without
-    # an extra round-trip. Backward-compatible: the AnalysisRecord fields
-    # remain at the top level so existing clients keep working.
-    refreshed = await _load_or_create_usage(req.device_id)
-    return {
-        **record.dict(),
-        "usage": _to_usage_response(refreshed).dict(),
-    }
-
-
-@api_router.get("/analyses", response_model=List[AnalysisListItem])
-async def list_analyses(device_id: str):
-    if not device_id:
-        raise HTTPException(status_code=400, detail="device_id is required")
-    cursor = db.analyses.find(
-        {"device_id": device_id},
-        {
-            "_id": 0,
-            "id": 1,
-            "created_at": 1,
-            "target_language": 1,
-            "target_language_label": 1,
-            "result.document_type": 1,
-            "result.sender": 1,
-            "result.risk_level": 1,
-            "result.summary_translated": 1,
-            "result.category": 1,
-            "result.scam_warning": 1,
-        },
-    ).sort("created_at", -1).limit(200)
-    items: List[AnalysisListItem] = []
-    async for doc in cursor:
-        result = doc.get("result", {}) or {}
-        items.append(AnalysisListItem(
-            id=doc.get("id", ""),
-            created_at=doc.get("created_at", ""),
-            target_language=doc.get("target_language", ""),
-            target_language_label=doc.get("target_language_label", ""),
-            document_type=result.get("document_type", ""),
-            sender=result.get("sender", ""),
-            risk_level=result.get("risk_level", "green"),
-            summary_translated=result.get("summary_translated", ""),
-            category=result.get("category", "other"),
-            scam_warning=bool(result.get("scam_warning", False)),
-        ))
-    return items
-
-
-@api_router.get("/analyses/{analysis_id}", response_model=AnalysisRecord)
-async def get_analysis(analysis_id: str, device_id: str):
-    doc = await db.analyses.find_one(
-        {"id": analysis_id, "device_id": device_id},
-        {"_id": 0, "created_at_dt": 0}
-    )
-    if not doc:
-        raise HTTPException(status_code=404, detail="Analysis not found")
-    return AnalysisRecord(**doc)
-
-
-@api_router.delete("/analyses/{analysis_id}")
-async def delete_analysis(analysis_id: str, device_id: str):
-    res = await db.analyses.delete_one({"id": analysis_id, "device_id": device_id})
-    return {"deleted": res.deleted_count}
-
-
-@api_router.delete("/analyses")
-async def delete_all_analyses(device_id: str):
-    if not device_id:
-        raise HTTPException(status_code=400, detail="device_id is required")
-    res = await db.analyses.delete_many({"device_id": device_id})
-    return {"deleted": res.deleted_count}
-
-
-@api_router.delete("/history/{device_id}")
-async def delete_history_for_device(device_id: str):
-    """DSGVO Art. 17 — right to erasure.
-
-    Wipes every analysis and every chat message for the given anonymous
-    device_id. This is the explicit "Delete my data" endpoint called from the
-    Settings screen. Backed by the same MongoDB collections as the legacy
-    `DELETE /api/analyses?device_id=...`, but uses a clearer REST shape.
-
-    Note on the message counter: chat messages are stored embedded inside the
-    analyses doc as `messages: [...]` (not in a separate collection in this
-    build), so we sum their length BEFORE deleting the parent docs to give
-    the user an accurate "deleted_messages" number. We also clean any rows
-    that may exist in the legacy `chat_messages` collection just in case.
-    """
-    if not device_id:
-        raise HTTPException(status_code=400, detail="device_id is required")
-
-    # Count embedded messages BEFORE delete so we can return an honest total.
-    embedded_count = 0
-    cursor = db.analyses.find(
-        {"device_id": device_id},
-        {"messages": 1, "_id": 0},
-    )
-    async for doc in cursor:
-        msgs = doc.get("messages")
-        if isinstance(msgs, list):
-            embedded_count += len(msgs)
-
-    analyses_res = await db.analyses.delete_many({"device_id": device_id})
-    legacy_res = await db.chat_messages.delete_many({"device_id": device_id})
-
-    return {
-        "deleted_analyses": analyses_res.deleted_count,
-        "deleted_messages": embedded_count + legacy_res.deleted_count,
-    }
-
-
-@api_router.get("/export")
-async def export_my_data(device_id: str):
-    """DSGVO Art. 15 — let the user download all data we hold for them.
-
-    Returns a single JSON document with every analysis (no MongoDB internal
-    fields). The frontend hands this to the share sheet so the user can save
-    it to Files / iCloud Drive / send by email.
-    """
-    if not device_id:
-        raise HTTPException(status_code=400, detail="device_id is required")
-    cursor = db.analyses.find(
-        {"device_id": device_id},
-        {"_id": 0, "created_at_dt": 0},  # strip TTL helper field
-    ).sort("created_at", -1)
-    records: List[dict] = []
-    async for doc in cursor:
-        records.append(doc)
-    usage_doc = await db.usage_records.find_one({"device_id": device_id}, {"_id": 0}) or {}
-    return {
-        "app": "easli",
-        "device_id": device_id,
-        "exported_at": datetime.now(timezone.utc).isoformat(),
-        "data_residency": "EU (Mistral AI, Paris)",
-        "count": len(records),
-        "analyses": records,
-        "usage": usage_doc,
-    }
-
-
-# ==================== USAGE / PAYWALL ROUTES ====================
-
-@api_router.get("/usage/{device_id}", response_model=UsageResponse)
-async def get_usage(device_id: str):
-    """Return the public-safe usage view so the client can render meters."""
-    if not device_id:
-        raise HTTPException(status_code=400, detail="device_id is required")
-    rec = await _load_or_create_usage(device_id)
-    return _to_usage_response(rec)
-
-
-@api_router.get("/paywall/config")
-async def get_paywall_config():
-    """Lightweight endpoint the client polls on startup.
-
-    Returns ONLY mode + limits + product IDs — never any keys.
-    """
-    return {
-        "paywall_mode": PAYWALL_MODE,
-        "free_analyses": FREE_ANALYSES,
-        "soft_test_extra_analyses": SOFT_TEST_EXTRA_ANALYSES,
-        "max_pages_per_document": MAX_PAGES_PER_DOCUMENT,
-        "max_chat_questions_per_document": MAX_CHAT_QUESTIONS_PER_DOCUMENT,
-        "max_total_chat_questions_per_tester": MAX_TOTAL_CHAT_QUESTIONS_PER_TESTER,
-        "plus_monthly_analyses": PLUS_MONTHLY_ANALYSES,
-        "products": {
-            "single_letter": "easli_single_letter",
-            "plus_monthly": "easli_plus_monthly",
-            "plus_yearly": "easli_plus_yearly",
-        },
-        "entitlements": {"plus": "plus"},
-    }
-
-
 @api_router.post("/revenuecat/webhook")
 async def revenuecat_webhook(request: Request, authorization: Optional[str] = Header(None)):
     """RevenueCat → server webhook.
@@ -2328,94 +1952,6 @@ async def revenuecat_webhook(request: Request, authorization: Optional[str] = He
 
     # Other events (BILLING_ISSUE, SUBSCRIPTION_PAUSED, REFUND, ...) — log only.
     return {"ok": True, "ignored": event_type.lower() or "unknown"}
-
-
-# ----- Developer / QA simulation endpoints -----
-# Disabled when DEV_TOOLS_ENABLED is False (i.e. PAYWALL_MODE=hard without the
-# explicit DEV_TOOLS_ENABLED=1 flag). When disabled, these routes return 404.
-
-def _require_dev_tools():
-    if not DEV_TOOLS_ENABLED:
-        raise HTTPException(status_code=404, detail="Not found")
-
-
-@api_router.post("/dev/usage/reset")
-async def dev_reset_usage(device_id: str):
-    _require_dev_tools()
-    if not device_id:
-        raise HTTPException(status_code=400, detail="device_id is required")
-    fresh = UsageRecord(
-        device_id=device_id,
-        last_usage_reset_at=datetime.now(timezone.utc).isoformat(),
-    )
-    await db.usage_records.replace_one(
-        {"device_id": device_id}, fresh.dict(), upsert=True
-    )
-    return _to_usage_response(fresh).dict()
-
-
-@api_router.post("/dev/usage/simulate")
-async def dev_simulate(device_id: str, scenario: str):
-    """Quick scenarios for QA & TestFlight.
-
-    Supported scenarios:
-        free_limit             → free_analyses_used = FREE_ANALYSES
-        soft_limit             → soft_extra_analyses_used = SOFT_TEST_EXTRA_ANALYSES (and free_limit)
-        plus_active            → plus_active=true, period_end = +30 days, monthly_used=0
-        plus_expired           → plus_active=false, period_end in the past
-        plus_monthly_limit     → plus_active=true, monthly_used=PLUS_MONTHLY_ANALYSES
-        add_single_letter      → single_letter_credits += 1
-        reset_chat             → total_chat_questions_used=0, per_document_chat_questions={}
-    """
-    _require_dev_tools()
-    if not device_id:
-        raise HTTPException(status_code=400, detail="device_id is required")
-
-    rec = await _load_or_create_usage(device_id)
-    now = datetime.now(timezone.utc)
-    update: dict = {"updated_at": now.isoformat()}
-
-    if scenario == "free_limit":
-        update["free_analyses_used"] = FREE_ANALYSES
-    elif scenario == "soft_limit":
-        update["free_analyses_used"] = FREE_ANALYSES
-        update["soft_extra_analyses_used"] = SOFT_TEST_EXTRA_ANALYSES
-    elif scenario == "plus_active":
-        update["plus_active"] = True
-        update["plus_current_period_start"] = now.isoformat()
-        update["plus_current_period_end"] = (now + timedelta(days=30)).isoformat()
-        update["plus_monthly_analyses_used"] = 0
-    elif scenario == "plus_expired":
-        update["plus_active"] = False
-        update["plus_current_period_end"] = (now - timedelta(days=1)).isoformat()
-    elif scenario == "plus_monthly_limit":
-        update["plus_active"] = True
-        update["plus_current_period_start"] = now.isoformat()
-        update["plus_current_period_end"] = (now + timedelta(days=30)).isoformat()
-        update["plus_monthly_analyses_used"] = PLUS_MONTHLY_ANALYSES
-    elif scenario == "add_single_letter":
-        await db.usage_records.update_one(
-            {"device_id": device_id},
-            {"$inc": {"single_letter_credits": 1}, "$set": {"updated_at": now.isoformat()}},
-            upsert=True,
-        )
-        refreshed = await _load_or_create_usage(device_id)
-        return _to_usage_response(refreshed).dict()
-    elif scenario == "reset_chat":
-        update["total_chat_questions_used"] = 0
-        update["per_document_chat_questions"] = {}
-    else:
-        raise HTTPException(status_code=400, detail=f"Unknown scenario '{scenario}'")
-
-    await db.usage_records.update_one(
-        {"device_id": device_id}, {"$set": update}, upsert=True
-    )
-    refreshed = await _load_or_create_usage(device_id)
-    logger.info(
-        "dev_simulate device=%s scenario=%s",
-        device_id, scenario,
-    )
-    return _to_usage_response(refreshed).dict()
 
 
 # ==================== INBOX (Phase 4) — install hook ====================
