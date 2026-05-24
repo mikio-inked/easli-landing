@@ -87,13 +87,28 @@ from routers.usage import router as usage_router  # noqa: E402
 
 app.include_router(usage_router)
 
-# 4d. Email forwarding (Phase 4 feature). Lives in its own module.
+# 4d. Reply assistant + translate (Phase 3b — extracted from server.py).
+from routers.reply import router as reply_router  # noqa: E402
+
+app.include_router(reply_router)
+
+# 4e. Chat + per-document message log (Phase 3b — extracted from server.py).
+from routers.chat import router as chat_router  # noqa: E402
+
+app.include_router(chat_router)
+
+# 4f. RevenueCat webhook (Phase 3b — extracted from server.py).
+from routers.webhook import router as webhook_router  # noqa: E402
+
+app.include_router(webhook_router)
+
+# 4g. Email forwarding (Phase 4 feature). Lives in its own module.
 from inbox import router as inbox_router  # noqa: E402
 
 install_inbox_dependencies()
 app.include_router(inbox_router, prefix="/api")
 
-# 4e. Admin web UI + redemption codes. Lives in its own module since
+# 4h. Admin web UI + redemption codes. Lives in its own module since
 #     before the refactor; only the include site has moved here.
 from admin import make_admin_router  # noqa: E402
 from core.security import limiter as _limiter  # noqa: E402
