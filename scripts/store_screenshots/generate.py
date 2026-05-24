@@ -54,6 +54,43 @@ ACCENT_GREEN = "#17B26A"
 ACCENT_AMBER = "#F59E0B"
 ACCENT_RED = "#EF4444"
 
+# ─────────────────────────────────────────────────────────────────────────
+#  Phase 6 EU country expansion — country chip on the result screen.
+#  Each locale picks the country its sample document represents + the
+#  localised country name to show in the chip. The narrative:
+#   - DE/EN/AR/TR/RU/VI/ZH samples are all "Tax Office Munich" / Finanzamt
+#     letters → country chip is Germany (best showcase of "easli reads
+#     your German letter in your language" for immigrants).
+#   - FR/IT/ES/PL samples are native tax letters → country chip is the
+#     locale's own country (best showcase of EU multi-jurisdiction).
+# ─────────────────────────────────────────────────────────────────────────
+RESULT_COUNTRY_BY_LOCALE = {
+    "de": ("DE", "Deutschland"),
+    "en": ("DE", "Germany"),
+    "fr": ("FR", "France"),
+    "it": ("IT", "Italia"),
+    "es": ("ES", "España"),
+    "pl": ("PL", "Polska"),
+    "ar": ("DE", "ألمانيا"),
+    "tr": ("DE", "Almanya"),
+    "ru": ("DE", "Германия"),
+    "vi": ("DE", "Đức"),
+    "zh": ("DE", "德国"),
+}
+COUNTRY_CHIP_LABEL = {  # localised "COUNTRY" kicker text above the value
+    "de": "LAND",
+    "en": "COUNTRY",
+    "fr": "PAYS",
+    "it": "PAESE",
+    "es": "PAÍS",
+    "pl": "KRAJ",
+    "ar": "البلد",
+    "tr": "ÜLKE",
+    "ru": "СТРАНА",
+    "vi": "QUỐC GIA",
+    "zh": "国家",
+}
+
 # Font paths
 F_LATIN_BOLD = "/usr/share/fonts/truetype/noto/NotoSans-Bold.ttf"
 F_LATIN_REG = "/usr/share/fonts/truetype/noto/NotoSans-Regular.ttf"
@@ -534,11 +571,68 @@ def render_scene_3_scan(img, locale, script):
 
 
 def render_scene_4_result(img, locale, script):
-    """Result — doc title + AI summary bullets + deadline callout."""
+    """Result — country chip + doc title + AI summary bullets + deadline callout."""
     ui = MOCK_UI[4][locale]
     y = _draw_app_header(img, locale, script, ui["summary"])
     draw = ImageDraw.Draw(img)
     cx, _, cxr, _ = content_box()
+
+    # ── Phase 6 EU: country chip — drawn ABOVE the document card so the
+    # detected jurisdiction is the first thing the eye lands on. Mirrors
+    # the in-app `langChipCountry` design: primary-tinted bg, primary
+    # border, country name on the right, small green dot for high
+    # confidence (the on-device default for our Finanzamt/DGFiP fixtures).
+    cc_iso, cc_name = RESULT_COUNTRY_BY_LOCALE.get(locale, ("DE", "Germany"))
+    cc_kicker = COUNTRY_CHIP_LABEL.get(locale, "COUNTRY")
+    chip_h = 96
+    chip_w = 460
+    chip_x = cx
+    chip_y = y
+    rounded_rect(
+        draw,
+        (chip_x, chip_y, chip_x + chip_w, chip_y + chip_h),
+        radius=22,
+        fill="#EEF3FF",          # ≈ colors.primarySoft
+        outline=BRAND,
+        width=2,
+    )
+    # Kicker (small uppercase "COUNTRY")
+    f_kicker = font(20, bold=True, script=script)
+    f_value = font(34, bold=True, script=script)
+    kicker_t = text_for(cc_kicker, script)
+    value_t = text_for(cc_name, script)
+    inner_pad = 22
+    if script == "arabic":
+        # RTL: kicker + value right-aligned, flag on the left side.
+        kw, _ = measure(kicker_t, f_kicker)
+        draw.text((chip_x + chip_w - kw - inner_pad, chip_y + 14),
+                  kicker_t, font=f_kicker, fill=TEXT_MUTED)
+        vw, _ = measure(value_t, f_value)
+        draw.text((chip_x + chip_w - vw - inner_pad, chip_y + 44),
+                  value_t, font=f_value, fill=TEXT_DARK)
+        # Flag at far left
+        draw_flag(draw, (chip_x + inner_pad, chip_y + 34),
+                  cc_iso.lower(), size=(56, 40))
+        # Confidence dot next to the flag
+        dot_x = chip_x + inner_pad + 56 + 12
+        draw.ellipse((dot_x, chip_y + chip_h // 2 - 8,
+                      dot_x + 16, chip_y + chip_h // 2 + 8),
+                     fill=ACCENT_GREEN)
+    else:
+        # LTR: flag on the far left, kicker top-right of flag, value below.
+        draw_flag(draw, (chip_x + inner_pad, chip_y + 28),
+                  cc_iso.lower(), size=(56, 40))
+        text_x = chip_x + inner_pad + 56 + 18
+        draw.text((text_x, chip_y + 14),
+                  kicker_t, font=f_kicker, fill=TEXT_MUTED)
+        draw.text((text_x, chip_y + 40),
+                  value_t, font=f_value, fill=TEXT_DARK)
+        # Confidence dot at the right end (green = high)
+        dot_x = chip_x + chip_w - inner_pad - 16
+        dot_y = chip_y + chip_h // 2 - 8
+        draw.ellipse((dot_x, dot_y, dot_x + 16, dot_y + 16),
+                     fill=ACCENT_GREEN)
+    y += chip_h + 22
 
     # Document header card (doc title + from)
     card_h = 180

@@ -13,62 +13,71 @@ Alle Texte respektieren beide Limits (kürzeres Apple-Subtitle gewinnt).
 
 **Name (30):** `easli — Briefe verstehen`
 
-**Subtitle / Short desc (30/80):** `KI erklärt jeden Brief klar`
+**Subtitle / Short desc (30/80):** `KI für Briefe aus ganz Europa`
 
 **Promotional Text (170):**
-> Behördenbrief, Rechnung, Steuerbescheid? easli fotografiert, übersetzt und erklärt — in deiner Sprache. In Sekunden verstehen, was drin steht und was zu tun ist.
+> Mahnung, Steuerbescheid, Avis d'imposition, Cartella esattoriale? easli erkennt das Land, erklärt klar in deiner Sprache und schreibt die Antwort in korrekter Form.
 
 **Keywords (100):**
-`brief,übersetzen,scannen,pdf,ocr,steuer,finanzamt,bescheid,ki,einspruch,frist,behörde,rechnung`
+`brief,übersetzen,scan,steuer,finanzamt,mahnung,bescheid,einspruch,frist,behörde,eu,dgfip,inps,aeat`
 
-**Full Description (≈2100):**
+**Full Description (≈2400):**
 
-Behördenbriefe, Rechnungen, Steuerbescheide, Versicherungsschreiben — auf Deutsch und voller Amtsprache. easli macht Schluss mit Übersetzungs-Stress.
+Behördenbriefe, Steuerbescheide, Mahnungen, Versicherungs- und Arztpost — in **15 europäischen Ländern**, voller Amtssprache. easli macht Schluss mit dem Übersetzungs-Stress.
+
+🇪🇺 **Echte Europa-Abdeckung**
+easli erkennt automatisch, aus welchem Land dein Brief stammt:
+🇩🇪 Deutschland · 🇦🇹 Österreich · 🇨🇭 Schweiz · 🇳🇱 Niederlande · 🇧🇪 Belgien · 🇱🇺 Luxemburg · 🇫🇷 Frankreich · 🇪🇸 Spanien · 🇮🇹 Italien · 🇵🇹 Portugal · 🇵🇱 Polen · 🇨🇿 Tschechien · 🇸🇪 Schweden · 🇩🇰 Dänemark · 🇫🇮 Finnland
 
 📸 **Foto machen**
-Kamera auf den Brief, oder PDF aus der Galerie öffnen. Mehrseitig? Kein Problem — easli erkennt alle Seiten automatisch.
+Kamera auf den Brief — oder PDF aus der Galerie. Mehrseitig? Kein Problem.
 
 🧠 **KI erklärt klar**
 Eine europäische KI (Mistral AI, Paris) liest deinen Brief und liefert eine verständliche Zusammenfassung:
 • Worum geht's?
-• Wer schickt den Brief?
+• Wer schickt den Brief (Finanzamt? DGFiP? Belastingdienst? Agenzia Entrate?)
 • Was musst du tun?
 • Welche Fristen sind wichtig?
 • Welche Beträge stehen drin?
 
+🛡️ **Regionale Betrugs-Warnung**
+easli kennt die typischen Betrugsmaschen pro Land — von gefälschten BZSt-Anrufen über Ameli-Phishing-SMS bis zu falschen INPS-WhatsApp-Nachrichten — und warnt dich, bevor du Schaden nimmst.
+
 🌍 **In deiner Sprache**
-easli erklärt Briefe in einer von 25 Sprachen — auch wenn das Original Deutsch, Französisch oder jede andere europäische Sprache ist. Perfekt für Migranten, Expats und alle, die mit Behördensprache kämpfen.
+easli erklärt Briefe in **25 Sprachen** — auch wenn das Original Deutsch, Französisch, Italienisch oder jede andere europäische Sprache ist. Perfekt für Migranten, Expats und alle, die mit Behördensprache kämpfen.
 
-✉️ **Antwort in Sekunden**
-Brauchst du einen Einspruch? Fristverlängerung? easli schreibt einen formell korrekten Antwortentwurf — du prüfst und sendest.
+✉️ **Korrekte Antwort, korrekte Anrede**
+easli schreibt einen ready-to-send Antwortentwurf in der **Sprache des Absenders** — mit der **kulturell korrekten Anrede pro Land**:
+• Deutschland: „Sehr geehrte Frau Schmidt, … Mit freundlichen Grüßen"
+• Frankreich: „Madame, Monsieur, … Je vous prie d'agréer …"
+• Italien: „Egregio Signor Rossi, … Distinti saluti"
+• Spanien: „Estimado Sr. García, … Atentamente"
+Du prüfst, drückst Senden, fertig.
 
-📅 **Fristen im Blick**
-Wichtige Termine werden automatisch erkannt und in Kürze direkt in deinen Kalender übertragbar.
+📅 **Fristen direkt in den Kalender**
+Wichtige Termine erkennt easli automatisch — ein Tap legt sie in deinem iOS- oder Android-Kalender an.
 
 🇪🇺 **Datenschutz nach EU-Standard**
 • KI-Anbieter Mistral AI: Hauptsitz Paris, Server in der EU
 • Originaldokumente werden NICHT gespeichert
 • Keine Werbung. Kein Tracking. Kein externes Analytics.
 • Anonyme Gerätekennung — kein Login nötig
-• Alle Daten jederzeit löschbar
+• Alle Daten jederzeit löschbar (Art. 17 DSGVO)
+• Datenexport jederzeit möglich (Art. 15 DSGVO)
 
 🔧 **Was kann easli?**
-• Steuerbescheide entschlüsseln
-• Mahnungen und Rechnungen verstehen
-• Versicherungsbriefe zusammenfassen
-• Miet- und Kündigungsschreiben erklären
-• Arztbriefe alltagstauglich übersetzen
-• Gerichtspost und Mahnbescheide klären
-• Behörden- und Einwanderungspost interpretieren
+• Steuerbescheide (Steuerbescheid, Avis d'imposition, Cartella, Liquidación)
+• Mahnungen, Mahnbescheide, Pfändungen
+• Versicherungsbriefe und Beitragsbescheide
+• Miet- und Kündigungsschreiben
+• Arztbriefe und Hospital-Rechnungen
+• Gerichtspost, Bußgeldbescheide, Strafverfügungen
+• Behörden- und Einwanderungspost
 
-🗣️ **UI in 11 Sprachen**
-Deutsch, English, Français, Italiano, Español, Polski, العربية, Türkçe, Русский, Tiếng Việt, 简体中文
-
-📄 **Erklärungen in 25 Sprachen**
-Jedes Dokument lässt sich in einer von 25 Sprachen zusammenfassen.
+🗣️ **App in 11 Sprachen** · 📄 **Erklärungen in 25 Sprachen**
 
 💡 **Für wen ist easli?**
-• Menschen ohne deutsche Muttersprache
+• Menschen ohne lokale Muttersprache
 • Ältere, die mit Behördendeutsch kämpfen
 • Auswanderer und Expats in der EU
 • Geflüchtete und Zugewanderte
@@ -82,59 +91,68 @@ Kostenlos starten. Kein Konto. Kein Login. Keine Werbung.
 
 **Name (30):** `easli — Understand Letters`
 
-**Subtitle / Short desc (30/80):** `AI explains every letter`
+**Subtitle / Short desc (30/80):** `AI for European paperwork`
 
 **Promotional Text (170):**
-> Government letter, invoice, tax notice? easli scans, translates and explains — in your language. Understand in seconds what it means and what you need to do.
+> Tax notice, debt-collection letter, Finanzamt or DGFiP? easli detects the country, explains it in your language, and drafts a culturally-correct reply for you to send.
 
 **Keywords (100):**
-`letter,translate,scan,pdf,ocr,tax,bill,invoice,deadline,ai,reply,bureaucracy,immigration,legal`
+`letter,translate,scan,tax,bill,deadline,reply,immigration,eu,finanzamt,dgfip,inps,aeat,europe`
 
-**Full Description (≈2100):**
+**Full Description (≈2400):**
 
-Government letters, invoices, tax notices, insurance correspondence — full of bureaucratic language. easli ends the translation stress.
+Government letters, tax notices, debt-collection letters, insurance and medical mail — across **15 European countries**, all full of bureaucratic language. easli ends the translation stress.
+
+🇪🇺 **Real European coverage**
+easli automatically detects which country your letter comes from:
+🇩🇪 Germany · 🇦🇹 Austria · 🇨🇭 Switzerland · 🇳🇱 Netherlands · 🇧🇪 Belgium · 🇱🇺 Luxembourg · 🇫🇷 France · 🇪🇸 Spain · 🇮🇹 Italy · 🇵🇹 Portugal · 🇵🇱 Poland · 🇨🇿 Czechia · 🇸🇪 Sweden · 🇩🇰 Denmark · 🇫🇮 Finland
 
 📸 **Take a photo**
-Point your camera at the letter, or pick a PDF from your gallery. Multi-page? No problem — easli detects every page automatically.
+Point your camera at the letter — or pick a PDF. Multi-page? No problem.
 
 🧠 **AI explains clearly**
 A European AI (Mistral AI, Paris) reads your letter and gives you a plain-language summary:
 • What's it about?
-• Who sent it?
+• Who sent it (Finanzamt? DGFiP? Belastingdienst? Agenzia Entrate?)
 • What do you need to do?
 • What deadlines matter?
 • What amounts are mentioned?
 
+🛡️ **Regional scam detection**
+easli knows the country-specific scams — fake BZSt phone calls in Germany, Ameli phishing SMS in France, INPS WhatsApp impersonations in Italy — and warns you before you fall for them.
+
 🌍 **In your language**
-easli explains letters in one of 25 languages — even when the original is German, French or any other European language. Perfect for immigrants, expats and anyone who struggles with officialese.
+easli explains letters in **25 languages** — even when the original is German, French, Italian or any other European language. Perfect for immigrants, expats and anyone who struggles with officialese.
 
-✉️ **Reply in seconds**
-Need to object? Request a deadline extension? easli drafts a formally correct reply — you just review and send.
+✉️ **Correct reply, correct salutation**
+easli drafts a ready-to-send reply in the **sender's language** — with the **culturally-correct salutation per country**:
+• Germany: "Sehr geehrte Frau Schmidt, … Mit freundlichen Grüßen"
+• France: "Madame, Monsieur, … Je vous prie d'agréer …"
+• Italy: "Egregio Signor Rossi, … Distinti saluti"
+• Spain: "Estimado Sr. García, … Atentamente"
+You review, hit send, done.
 
-📅 **Deadlines at a glance**
-Key dates are detected automatically, with direct calendar export coming soon.
+📅 **Deadlines straight to your calendar**
+Important dates are detected automatically — one tap adds them to your iOS or Android calendar.
 
 🇪🇺 **EU-grade privacy**
 • AI provider Mistral AI: headquartered in Paris, servers in the EU
 • Original documents are NOT stored
 • No ads. No tracking. No external analytics.
 • Anonymous device ID — no login required
-• Delete all your data anytime
+• Delete all your data anytime (GDPR Art. 17)
+• Export all your data anytime (GDPR Art. 15)
 
 🔧 **What can easli do?**
-• Decode tax notices
-• Make sense of bills and reminders
-• Summarize insurance letters
-• Explain rental and termination letters
-• Translate doctor's letters into everyday language
-• Clarify court mail and payment orders
-• Interpret government and immigration mail
+• Tax notices (Steuerbescheid, Avis d'imposition, Cartella, Liquidación)
+• Reminders, payment orders, attachment notices
+• Insurance and contribution notices
+• Rental and termination letters
+• Doctor's letters and hospital bills
+• Court mail, fines, criminal-procedure letters
+• Government and immigration mail
 
-🗣️ **UI in 11 languages**
-Deutsch, English, Français, Italiano, Español, Polski, العربية, Türkçe, Русский, Tiếng Việt, 简体中文
-
-📄 **Explanations in 25 languages**
-Every document can be summarized in one of 25 languages.
+🗣️ **App UI in 11 languages** · 📄 **Explanations in 25 languages**
 
 💡 **Who is easli for?**
 • People whose native language isn't the local one
@@ -149,48 +167,61 @@ Free to start. No account. No login. No ads.
 
 ## 🇫🇷 Français (FR)
 
-**Name (30):** `easli — Comprendre les lettres`
+**Name (30):** `easli — Comprendre vos lettres`
 
-**Subtitle / Short desc (30/80):** `L'IA explique chaque courrier`
+**Subtitle / Short desc (30/80):** `IA pour les courriers UE`
 
 **Promotional Text (170):**
-> Courrier administratif, facture, avis d'imposition ? easli scanne, traduit et explique — dans votre langue. Comprenez en quelques secondes ce qu'il faut faire.
+> Avis d'imposition, mise en demeure, courrier de la CAF ou de la CPAM ? easli détecte le pays, explique en français et rédige la réponse formellement correcte.
 
 **Keywords (100):**
-`courrier,traduire,scanner,pdf,ocr,impôts,facture,délai,ia,réclamation,administration,expat`
+`courrier,traduire,scanner,impôts,dgfip,caf,cpam,délai,ia,réclamation,administration,expat,europe`
 
-**Full Description (≈1800):**
+**Full Description (≈2200):**
 
-Courriers administratifs, factures, avis d'imposition, lettres d'assurance — pleines de jargon officiel. easli met fin au stress de la traduction.
+Courriers administratifs, avis d'imposition, mises en demeure, lettres d'assurance et de médecin — dans **15 pays européens**, tous remplis de jargon officiel. easli met fin au stress de la traduction.
+
+🇪🇺 **Une vraie couverture européenne**
+easli détecte automatiquement le pays d'origine de votre courrier :
+🇫🇷 France · 🇩🇪 Allemagne · 🇦🇹 Autriche · 🇨🇭 Suisse · 🇧🇪 Belgique · 🇱🇺 Luxembourg · 🇳🇱 Pays-Bas · 🇪🇸 Espagne · 🇮🇹 Italie · 🇵🇹 Portugal · 🇵🇱 Pologne · 🇨🇿 Tchéquie · 🇸🇪 Suède · 🇩🇰 Danemark · 🇫🇮 Finlande
 
 📸 **Prenez une photo**
-Visez avec votre caméra ou importez un PDF. Plusieurs pages ? Pas de souci — easli détecte chaque page automatiquement.
+Visez avec votre caméra ou importez un PDF. Plusieurs pages ? Pas de souci.
 
 🧠 **L'IA explique clairement**
 Une IA européenne (Mistral AI, Paris) lit votre courrier et vous donne un résumé clair :
 • De quoi s'agit-il ?
-• Qui a envoyé la lettre ?
+• Qui a envoyé la lettre (DGFiP ? CAF ? CPAM ? URSSAF ? ANTAI ?)
 • Que devez-vous faire ?
 • Quels délais sont importants ?
 • Quels montants sont mentionnés ?
 
+🛡️ **Détection régionale des arnaques**
+easli connaît les arnaques typiques de chaque pays — faux SMS Ameli, faux avis Antai, faux appels DGFiP, WhatsApp INPS frauduleux — et vous prévient avant que vous ne tombiez dans le piège.
+
 🌍 **Dans votre langue**
-easli explique les courriers dans 25 langues — même quand l'original est en allemand, français ou toute autre langue européenne. Parfait pour les immigrants, expats et quiconque lutte avec le langage administratif.
+easli explique les courriers dans **25 langues** — même si l'original est en allemand, italien, espagnol ou toute autre langue européenne. Idéal pour les immigrés, les expatriés et toute personne qui se débat avec le langage administratif.
 
-✉️ **Réponse en quelques secondes**
-Besoin de faire une réclamation ? Demander un report ? easli rédige une réponse formellement correcte — vous vérifiez et envoyez.
+✉️ **Réponse correcte, formule de politesse correcte**
+easli rédige une réponse prête à envoyer dans la **langue de l'expéditeur** — avec la **formule de politesse culturellement correcte par pays** :
+• France : « Madame, Monsieur, … Je vous prie d'agréer … »
+• Allemagne : « Sehr geehrte Frau Schmidt, … Mit freundlichen Grüßen »
+• Italie : « Egregio Signor Rossi, … Distinti saluti »
+• Espagne : « Estimado Sr. García, … Atentamente »
+Vous vérifiez, vous envoyez, c'est fini.
 
-📅 **Délais en un coup d'œil**
-Les dates clés sont détectées automatiquement.
+📅 **Délais directement dans votre agenda**
+Les dates clés sont détectées automatiquement — un tap les ajoute à votre calendrier iOS ou Android.
 
 🇪🇺 **Confidentialité au standard UE**
 • Fournisseur IA Mistral AI : siège à Paris, serveurs dans l'UE
 • Les documents originaux NE sont PAS stockés
 • Pas de publicités. Pas de tracking. Pas d'analytique externe.
 • Identifiant anonyme — pas de connexion requise
-• Supprimez toutes vos données à tout moment
+• Supprimez toutes vos données à tout moment (RGPD Art. 17)
+• Exportez toutes vos données à tout moment (RGPD Art. 15)
 
-🗣️ **Interface en 11 langues** · **Explications en 25 langues**
+🗣️ **App en 11 langues** · 📄 **Explications en 25 langues**
 
 Gratuit. Sans compte. Sans connexion. Sans publicité.
 
