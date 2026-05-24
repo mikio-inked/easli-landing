@@ -682,10 +682,10 @@ export default function ResultScreen() {
 
         {/* ============================================================
             0. LANGUAGE CONTEXT STRIP (Phase EU-1)
-            Shows: source language + country (if detected) + explanation
-            language + reply language. Only renders when at least the
-            source language is known. Calm, single-line, scrollable on
-            very narrow screens.
+            Shows: country (if detected, with jurisdiction-confidence dot)
+            + source language + explanation language + reply language.
+            Only renders when at least the source language is known.
+            Calm, single-line, scrollable on very narrow screens.
             ============================================================ */}
         {hasSourceLang ? (
           <ScrollView
@@ -694,6 +694,55 @@ export default function ResultScreen() {
             contentContainerStyle={styles.langStripRow}
             testID="result-lang-strip"
           >
+            {/* Country chip — Phase 6 EU expansion. Renders FIRST so users
+                immediately see easli detected the jurisdiction. Confidence
+                is a coloured dot (green/yellow/orange), no extra label, so
+                the chip stays glanceable on small screens. */}
+            {langCtx.countryCode ? (
+              <View
+                style={[styles.langChip, styles.langChipCountry]}
+                testID="result-lang-chip-country"
+              >
+                <Text style={styles.langChipKicker} numberOfLines={1}>
+                  {t(lang, 'lang_country_label')}
+                </Text>
+                <View style={styles.langChipCountryRow}>
+                  {langCtx.countryFlag ? (
+                    <Text style={styles.langChipCountryFlag}>{langCtx.countryFlag}</Text>
+                  ) : null}
+                  <Text style={styles.langChipValue} numberOfLines={1}>
+                    {langCtx.countryName || langCtx.countryCode}
+                  </Text>
+                  {langCtx.jurisdictionConfidence ? (
+                    <View
+                      style={[
+                        styles.confidenceDot,
+                        langCtx.jurisdictionConfidence === 'high' && styles.confidenceDotHigh,
+                        langCtx.jurisdictionConfidence === 'medium' && styles.confidenceDotMedium,
+                        langCtx.jurisdictionConfidence === 'low' && styles.confidenceDotLow,
+                      ]}
+                      testID={`result-jurisdiction-dot-${langCtx.jurisdictionConfidence}`}
+                      accessibilityLabel={`Jurisdiction confidence ${langCtx.jurisdictionConfidence}`}
+                    />
+                  ) : null}
+                </View>
+              </View>
+            ) : (
+              /* Soft "country unclear" hint when no jurisdiction was detected.
+                 Stays calm — easli never invents a country. */
+              <View
+                style={[styles.langChip, styles.langChipMuted]}
+                testID="result-lang-chip-country-unclear"
+              >
+                <Text style={styles.langChipKicker} numberOfLines={1}>
+                  {t(lang, 'lang_country_label')}
+                </Text>
+                <Text style={styles.langChipValueMuted} numberOfLines={1}>
+                  {t(lang, 'lang_country_unclear')}
+                </Text>
+              </View>
+            )}
+
             <View style={styles.langChip} testID="result-lang-chip-source">
               <Text style={styles.langChipKicker} numberOfLines={1}>
                 {t(lang, 'source_language_detected')}
@@ -701,11 +750,6 @@ export default function ResultScreen() {
               <Text style={styles.langChipValue} numberOfLines={1}>
                 {langCtx.srcFlag ? langCtx.srcFlag + ' ' : ''}
                 {langCtx.srcLabel}
-                {langCtx.countryFlag && langCtx.countryName
-                  ? '  ·  ' + langCtx.countryFlag + ' ' + langCtx.countryName
-                  : langCtx.countryFlag
-                  ? '  ·  ' + langCtx.countryFlag
-                  : ''}
               </Text>
             </View>
             {/* Explanation language only when different from source */}
@@ -730,21 +774,6 @@ export default function ResultScreen() {
                 <Text style={styles.langChipValue} numberOfLines={1}>
                   {langCtx.replyFlag ? langCtx.replyFlag + ' ' : ''}
                   {langCtx.replyLabel}
-                </Text>
-              </View>
-            ) : null}
-            {/* Soft "country unclear" hint only when we have source lang but
-                no jurisdiction. Stays calm, never alarms. */}
-            {!langCtx.countryCode && !langCtx.explainEqualsSrc ? (
-              <View
-                style={[styles.langChip, styles.langChipMuted]}
-                testID="result-lang-chip-country-unclear"
-              >
-                <Text style={styles.langChipKicker} numberOfLines={1}>
-                  {t(lang, 'lang_country_label')}
-                </Text>
-                <Text style={styles.langChipValueMuted} numberOfLines={1}>
-                  {t(lang, 'lang_country_unclear')}
                 </Text>
               </View>
             ) : null}
@@ -1476,6 +1505,39 @@ const styles = StyleSheet.create({
     fontWeight: fontWeight.medium,
     color: colors.textSecondary,
     fontStyle: 'italic',
+  },
+
+  // ---- Phase 6 EU expansion: Country chip + jurisdiction-confidence dot ----
+  // Slightly more prominent than the sibling lang chips: a tinted background
+  // makes the detected jurisdiction immediately glanceable in the strip.
+  langChipCountry: {
+    backgroundColor: colors.primarySoft ?? colors.surface,
+    borderColor: colors.primary,
+  },
+  langChipCountryRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  langChipCountryFlag: {
+    fontSize: 18,
+    lineHeight: 20,
+  },
+  confidenceDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    marginLeft: 2,
+    backgroundColor: colors.textSecondary,
+  },
+  confidenceDotHigh: {
+    backgroundColor: colors.green?.solid ?? '#22C55E',
+  },
+  confidenceDotMedium: {
+    backgroundColor: colors.yellow?.solid ?? '#F59E0B',
+  },
+  confidenceDotLow: {
+    backgroundColor: colors.red?.solid ?? '#EF4444',
   },
 
   // ---- Phase EU-1: Safety disclaimer card (for high-risk legal docs) ----
