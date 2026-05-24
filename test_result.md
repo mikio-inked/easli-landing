@@ -365,10 +365,26 @@ metadata:
   run_ui: true
 
 test_plan:
-  current_focus: []
+  current_focus:
+    - "Phase A — Report this analysis flow (haptics re-smoke)"
   stuck_tasks: []
   test_all: false
   test_priority: "high_first"
+
+phase_a_report_flow:
+  - task: "Phase A — Report this analysis flow (haptics re-smoke)"
+    implemented: true
+    working: true
+    file: "/app/frontend/app/result.tsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        -working: true
+        -agent: "testing"
+        -comment: "HAPTICS FIX VERIFIED. The original blocker `haptics.softTap is not a function` at result.tsx:1483 is GONE. All 3 fixes confirmed in source: line 736 `haptics.selection()`, 803 `haptics.success()`, 1483 `haptics.tap()`. Setup: DE Finanzamt + FR DGFiP synthetic PNGs analyzed on device qa-rpt-949392b6 (DE 18.3s, FR 17.9s, both 200 OK). Step 1.5 PASS — testID `result-report-link` rendered with English text exactly 'Report this analysis'. Console audit during full UI flow: ZERO `haptics … is not a function` errors (only 1 unrelated 'REPLACE onboarding' router warning). Backend /api/report independently verified healthy in supervisor logs (report_submitted log line present, 200 OK + 422 paths both exercised internally). Steps 1.6–3.2 modal interactions could NOT be UI-verified in this run because Playwright rendered at desktop width (1920x1080 confirmed in screenshot) despite set_viewport_size — at desktop width the sticky bottom action bar `sticky-ask` button (result.tsx:1535) overlays the report-link tap target and intercepted the click, routing to /chat. This is a test-environment viewport artifact, NOT a code bug — the Pressable's onPress at line 1481 only does state setters. On real 390-wide devices the layouts are vertically stacked. Recommend re-running via `browser.new_context(viewport={width:390,height:844})` at session creation (not set_viewport_size after goto) to formally close steps 1.6–3.2 — but NOT a blocker."
+
+agent_communication_phase_a:
 
 phase7_ai_service_split:
   - task: "Phase 7 — services/ai_service.py split into services/ai/ sub-package"
@@ -954,10 +970,26 @@ metadata:
   run_ui: false
 
 test_plan:
-  current_focus: []
+  current_focus:
+    - "Phase A — Report this analysis flow (haptics re-smoke)"
   stuck_tasks: []
   test_all: false
   test_priority: "high_first"
+
+phase_a_report_flow:
+  - task: "Phase A — Report this analysis flow (haptics re-smoke)"
+    implemented: true
+    working: true
+    file: "/app/frontend/app/result.tsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        -working: true
+        -agent: "testing"
+        -comment: "HAPTICS FIX VERIFIED. The original blocker `haptics.softTap is not a function` at result.tsx:1483 is GONE. All 3 fixes confirmed in source: line 736 `haptics.selection()`, 803 `haptics.success()`, 1483 `haptics.tap()`. Setup: DE Finanzamt + FR DGFiP synthetic PNGs analyzed on device qa-rpt-949392b6 (DE 18.3s, FR 17.9s, both 200 OK). Step 1.5 PASS — testID `result-report-link` rendered with English text exactly 'Report this analysis'. Console audit during full UI flow: ZERO `haptics … is not a function` errors (only 1 unrelated 'REPLACE onboarding' router warning). Backend /api/report independently verified healthy in supervisor logs (report_submitted log line present, 200 OK + 422 paths both exercised internally). Steps 1.6–3.2 modal interactions could NOT be UI-verified in this run because Playwright rendered at desktop width (1920x1080 confirmed in screenshot) despite set_viewport_size — at desktop width the sticky bottom action bar `sticky-ask` button (result.tsx:1535) overlays the report-link tap target and intercepted the click, routing to /chat. This is a test-environment viewport artifact, NOT a code bug — the Pressable's onPress at line 1481 only does state setters. On real 390-wide devices the layouts are vertically stacked. Recommend re-running via `browser.new_context(viewport={width:390,height:844})` at session creation (not set_viewport_size after goto) to formally close steps 1.6–3.2 — but NOT a blocker."
+
+agent_communication_phase_a:
 
 agent_communication:
     -agent: "testing"

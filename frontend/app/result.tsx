@@ -733,7 +733,7 @@ export default function ResultScreen() {
                       <Pressable
                         key={id}
                         onPress={() => {
-                          haptics.softTap();
+                          haptics.selection();
                           setReportReason(id);
                           setReportError(null);
                         }}
@@ -800,7 +800,7 @@ export default function ResultScreen() {
                           (r as { detected_country_code?: string })
                             .detected_country_code || undefined,
                       });
-                      haptics.successTap?.();
+                      haptics.success();
                       setReportSent(true);
                       // Auto-dismiss after 1.6s so the user isn't trapped.
                       setTimeout(() => setReportModalOpen(false), 1600);
@@ -1480,7 +1480,7 @@ export default function ResultScreen() {
             ============================================================ */}
         <Pressable
           onPress={() => {
-            haptics.softTap();
+            haptics.tap();
             setReportError(null);
             setReportReason(null);
             setReportComment('');
