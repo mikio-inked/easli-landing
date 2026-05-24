@@ -18,8 +18,10 @@ os.chdir(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from dotenv import load_dotenv
 load_dotenv()
 
-# After Phase 5 the retry helper lives in services/ai_service. We still
-# patch the Mistral client stub via core.config + services.ai_service.
+# Phase 7 refactor: the retry helper moved into services/ai/client.py;
+# `ai_service` is now a thin façade. The canonical patch point for the
+# Mistral client is `core.config.mistral_client` — the helper reads it
+# late-bound, so patching just `ai_config.mistral_client` is enough.
 from core import config as ai_config  # noqa: E402
 from core.exceptions import MistralRateLimited  # noqa: E402
 from services import ai_service  # noqa: E402
