@@ -365,10 +365,28 @@ metadata:
   run_ui: true
 
 test_plan:
-  current_focus: []
+  current_focus:
+    - "Phase 3a regression — slowapi decorator breaks /api/analyze body parsing"
   stuck_tasks: []
   test_all: false
   test_priority: "high_first"
+
+phase3a_regression:
+  - task: "Phase 3a regression — slowapi decorator breaks /api/analyze body parsing"
+    implemented: true
+    working: false
+    file: "/app/backend/routers/scan.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+        -working: false
+        -agent: "testing"
+        -comment: "CRITICAL REGRESSION introduced by Phase 3a — only 3/13 steps PASS (step1 import, step2 GET /api/, step3 GET /api/languages). Steps 4-13 ALL fail because POST /api/analyze rejects every valid JSON body with HTTP 422 `{detail:[{loc:['query','req'],type:'missing',msg:'Field required'}]}`. ROOT CAUSE: at /app/backend/routers/scan.py:82-84 the handler signature is `async def analyze_document(request: Request, req: AnalyzeRequest)` decorated with `@router.post('/analyze')` + `@limiter.limit(RATE_LIMIT_ANALYZE)`. The slowapi `@limiter.limit` decorator wraps the function and hides the original signature from FastAPI's body-parameter introspector. Result: FastAPI cannot tell that `req: AnalyzeRequest` is a Pydantic body model and falls back to treating it as a query parameter (hence `loc: ['query','req']`). Confirmed directly: `curl -X POST https://paperwork-eu.preview.emergentagent.com/api/analyze -H 'Content-Type: application/json' -d '{...valid AnalyzeRequest JSON...}'` → 422 with the query-param error. Cascade: every downstream step needing an analysis ID (steps 6-10) returns 404, step11/step12 expected 400 'Unsupported target language' / 'No file content provided' get 422 instead because they never reach the validation logic, step13 cleanup returns deleted_analyses=0 because nothing was stored. Risk Point A from review request was explicitly flagged ('Does @limiter.limit still throttle correctly?') — answer: no, it actively breaks the endpoint. FIX FOR MAIN AGENT: the standard slowapi+FastAPI body-model fix is to either (a) add an explicit Body default: `req: AnalyzeRequest = Body(...)` so FastAPI marks it as a body even through the wrapper, or (b) apply slowapi via Depends() instead of the decorator. Risk Point B/C/E (late-bound _server() helper, byte-identical response shape, dev-tools simulate) were NOT REACHABLE because /api/analyze fails before any usage is created. Risk Point D (GET /api/languages — 27 codes) PASSED. Privacy-log audit: clean — 0 PII tokens (482,50/27/466/Berlin-Mitte) in backend logs across the run (the endpoint never reached the OCR/Mistral stage). Test run: /app/backend_test.py."
+
+agent_communication:
+    -agent: "testing"
+    -message: "Phase 3a regression: 3/13 PASS, 10/13 FAIL. ONE root-cause blocks everything past GET /languages: the slowapi @limiter.limit decorator on /app/backend/routers/scan.py:83 corrupts FastAPI's signature introspection of the analyze_document handler, so the `req: AnalyzeRequest` body parameter is reclassified as a query parameter. Every POST /api/analyze now returns 422 `{detail:[{loc:['query','req'],type:'missing',msg:'Field required'}]}` regardless of body validity. This is exactly Risk Point A from the review request. PASS: step1 import (27 langs), step2 GET /api/ returns {app:'easli',status:'ok'}, step3 GET /api/languages returns 27 codes with all 11 required (de_simple,en,fr,it,pl,ar,hi,zh-Hans,vi,tr,ru). FAIL: step4 analyze_en, step5 analyze_pl, step6 translate_it (needs DE_ID), step7 chat, step8/9 generate-reply, step10 list (empty because nothing persisted), step11 invalid-lang negative test (422 instead of 400), step12 no-content negative test (422 instead of 400), step13 cleanup (deleted_analyses=0). Dev-tools spot checks NOT EXECUTED — they require a successful /api/analyze first or are unrelated (paywall/config, simulate, reset). FIX needed by main agent: change `routers/scan.py:84` signature from `async def analyze_document(request: Request, req: AnalyzeRequest):` to `async def analyze_document(request: Request, req: AnalyzeRequest = Body(...)):` (and add `Body` to the fastapi import). Re-run /app/backend_test.py after the fix — should restore 13/13 PASS."
 
 backend_multi_source_language:
   - task: "Phase-3 multi-source-language expansion — /api/analyze accepts any European language"
