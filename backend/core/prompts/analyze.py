@@ -2,6 +2,38 @@
 
 from __future__ import annotations
 
+from core.prompts._country_packs import COUNTRY_PACKS
+
+
+def _build_country_anchors_block() -> str:
+    """Build the COUNTRY ANCHORS block from COUNTRY_PACKS.
+
+    Each pack contributes one bullet listing its most distinctive authority
+    names + its IBAN prefix. We deliberately only include packs that have
+    real authority names — placeholder stubs (empty `authorities`) are
+    skipped so the prompt stays focused.
+    """
+    lines: list[str] = []
+    for code, pack in COUNTRY_PACKS.items():
+        auths = pack.get("authorities") or {}
+        names: list[str] = []
+        for bucket in ("tax", "social", "health_insurance", "court", "municipality"):
+            for n in auths.get(bucket, []) or []:
+                if n and n not in names:
+                    names.append(n)
+        if not names:
+            continue
+        # Cap to 6 most distinctive names — keeps the prompt under control.
+        sample = names[:6]
+        iban = pack.get("iban_prefix") or ""
+        joined = ", ".join(f'"{n}"' for n in sample)
+        iban_hint = f" / IBAN prefix {iban}" if iban else ""
+        lines.append(f"- {joined}{iban_hint}  →  {code}")
+    return "\n".join(lines)
+
+
+_COUNTRY_ANCHORS_BLOCK = _build_country_anchors_block()
+
 
 def build_system_prompt(target_language_label: str, target_language_code: str = "") -> str:
     extra = ""
@@ -57,6 +89,16 @@ Risk levels:
 - green: informational only, no urgent action detected
 - yellow: may require action, review, payment, appointment, document submission, or follow-up
 - red: contains a deadline, payment demand, warning, cancellation, legal/official consequence, missing document request, health-related urgency, or other time-sensitive issue
+
+COUNTRY ANCHORS — set `detected_country_code` (ISO 3166-1 alpha-2) with HIGH confidence when the sender field, postal address, or letterhead contains ANY of these well-known authority names. These are stable, country-specific anchors — do NOT overwrite them with weaker signals like currency alone (EUR is shared across 20+ countries).
+{_COUNTRY_ANCHORS_BLOCK}
+
+Rules for using country anchors:
+- A single matching authority name in the sender is enough for HIGH confidence.
+- IBAN prefix alone (without language match) is MEDIUM confidence at most.
+- Currency alone is NEVER enough (EUR is shared across 20+ countries).
+- If the document is in a language that maps to multiple countries (e.g. German → DE/AT/CH, French → FR/BE/CH/LU, Dutch → NL/BE) and NO authority anchor is present, leave `detected_country_code` empty and set `jurisdiction_confidence` to "" — do NOT guess.
+- If anchors from two different countries appear (rare), pick the one in the SENDER address, not the recipient address.
 
 Category — pick the SINGLE best match for `category`:
 - "tax": tax authority letters, tax assessments, payroll-tax notices.

@@ -118,7 +118,7 @@ def delete_(path, **kw):
 def step1_import():
     proc = subprocess.run(
         ["python3", "-c",
-         "import server, prompts, models, languages, admin; "
+         "import server, core.prompts, models.schemas, core.languages, admin; "
          "print('OK', len(languages.EXPLANATION_LANGUAGES), 'langs')"],
         cwd="/app/backend",
         capture_output=True, text=True, timeout=30,
