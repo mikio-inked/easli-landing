@@ -32,7 +32,108 @@ def _build_country_anchors_block() -> str:
     return "\n".join(lines)
 
 
+def _build_doc_type_anchors_block() -> str:
+    """Build the DOCUMENT-TYPE ANCHORS block.
+
+    For each country pack with `specific_doc_types`, list the country-specific
+    vocabulary words that, when present in the document, strongly anchor both
+    the `category` and (combined with country anchors) the `detected_country_code`.
+    These are language-specific terms — they exist in only one country/region
+    and rarely appear elsewhere, so a single match is strong evidence.
+    """
+    # Mapping of doc type → suggested category. Curated per common usage.
+    # Anything not listed here is left to the model's general judgement.
+    cat_map = {
+        # Tax / fiscal
+        "Steuerbescheid": "tax", "Einkommensteuerbescheid": "tax",
+        "Umsatzsteuerbescheid": "tax", "Beitragsbescheid": "tax",
+        "Avis d'imposition": "tax", "Avis d'échéance": "tax",
+        "Avertissement-extrait": "tax",
+        "Aanslag": "tax",
+        "Liquidación provisional": "tax", "Acta de inspección": "tax",
+        "Avviso di accertamento": "tax",
+        "Veranlagungsverfügung": "tax",
+        # Court / debt
+        "Mahnung": "court", "Zahlungserinnerung": "court",
+        "Mahnbescheid": "court", "Vollstreckungsbescheid": "court",
+        "Pfändungs- und Überweisungsbeschluss": "court",
+        "Mahnklage": "court", "Zahlungsbefehl": "court",
+        "Betreibung": "court",
+        "Aanmaning": "court", "Dwangbevel": "court",
+        "Mise en demeure": "court", "Commandement de payer": "court",
+        "Avis à tiers détenteur": "court", "Saisie sur compte": "court",
+        "Notificación de embargo": "court", "Providencia de apremio": "court",
+        "Requerimiento": "court",
+        "Cartella esattoriale": "court", "Ingiunzione di pagamento": "court",
+        "Decreto ingiuntivo": "court",
+        "Citação": "court", "Notificação": "court",
+        "Wezwanie": "court", "Nakaz zapłaty": "court",
+        "Krav": "court", "Rykker": "court", "Inkasso": "court",
+        "Påkrav": "court", "Maksumuistutus": "court", "Perintäkirje": "court",
+        # Fines / administrative
+        "Bußgeldbescheid": "government", "Verwarngeld": "government",
+        "Kostenbescheid": "government", "Gebührenbescheid": "government",
+        "Strafverfügung": "government",
+        "Boete": "government", "Beschikking": "government",
+        "Procès-verbal": "government", "Contravention": "government",
+        "Multa de tráfico": "government", "Multa": "government",
+        "Verbale": "government",
+        "Mandat": "government", "Decyzja": "government",
+        "Bötesföreläggande": "government", "Beslut": "government",
+        "Sakko": "government", "Coima": "government",
+        "Pokuta": "government", "Platëbní výměr": "government",
+        "Vyměření": "government",
+        # Employment
+        "Kündigung": "work", "Abmahnung": "work",
+    }
+
+    lines: list[str] = []
+    for code, pack in COUNTRY_PACKS.items():
+        doctypes = pack.get("specific_doc_types") or []
+        if not doctypes:
+            continue
+        # Group doctypes by suggested category so the LLM gets pre-clustered hints.
+        # Items without an explicit category go to "*" and are listed last.
+        clusters: dict[str, list[str]] = {}
+        for d in doctypes:
+            cat = cat_map.get(d, "*")
+            clusters.setdefault(cat, []).append(d)
+        parts: list[str] = []
+        for cat in ("tax", "court", "government", "work", "*"):
+            items = clusters.get(cat)
+            if not items:
+                continue
+            joined = ", ".join(f'"{x}"' for x in items)
+            if cat == "*":
+                parts.append(f"{joined}")
+            else:
+                parts.append(f"{joined} → category={cat}")
+        if parts:
+            lines.append(f"- [{code}] " + " | ".join(parts))
+    return "\n".join(lines)
+
+
+def _build_regional_scam_block() -> str:
+    """Build the REGIONAL SCAM PATTERNS block from COUNTRY_PACKS.
+
+    Lists the typical country-specific scam/phishing patterns. The LLM is
+    instructed to ONLY consider these once `detected_country_code` has been
+    set with HIGH confidence — to avoid false positives when the country is
+    unknown.
+    """
+    lines: list[str] = []
+    for code, pack in COUNTRY_PACKS.items():
+        patterns = pack.get("scam_patterns") or []
+        if not patterns:
+            continue
+        for p in patterns:
+            lines.append(f"- [{code}] {p}")
+    return "\n".join(lines)
+
+
 _COUNTRY_ANCHORS_BLOCK = _build_country_anchors_block()
+_DOC_TYPE_ANCHORS_BLOCK = _build_doc_type_anchors_block()
+_REGIONAL_SCAM_BLOCK = _build_regional_scam_block()
 
 
 def build_system_prompt(target_language_label: str, target_language_code: str = "") -> str:
@@ -115,6 +216,15 @@ Category — pick the SINGLE best match for `category`:
 - "other": anything that does not clearly fit the above (advertising, donation request, package notification, neighbour/community letter, personal mail).
 If multiple categories apply, pick the strongest one. NEVER invent a new category.
 
+DOCUMENT-TYPE ANCHORS — country-specific vocabulary that, when present in the document text or title, strongly anchors `category` (and, combined with a country authority match, anchors `detected_country_code`). A single literal match of a term below is enough to lock the suggested category in.
+{_DOC_TYPE_ANCHORS_BLOCK}
+
+Rules for using document-type anchors:
+- Match is case-insensitive but otherwise literal (do NOT translate them — they are language-specific terms).
+- If a term from country X appears, that is also a HIGH-confidence signal for `detected_country_code` = X (combine with the country anchors above).
+- If terms from two different countries appear (very rare, e.g. a Belgian bilingual letter), prefer the country whose authority is named in the SENDER block.
+- Do not let a translated equivalent influence the category — only the exact native term anchors. Generic English words like "fine" or "reminder" do NOT anchor anything.
+
 Scam / phishing detection — set `scam_warning` to true ONLY when at least ONE strong red flag is present:
 - Asks the user to send money to a foreign IBAN that does NOT match the supposed sender, or to a personal account when the sender claims to be a public authority, bank, or large company.
 - Threatens arrest, deportation, account closure, public shaming, or other extreme consequences within hours/days unless payment is made.
@@ -126,6 +236,9 @@ Scam / phishing detection — set `scam_warning` to true ONLY when at least ONE 
 - Phishing links that mimic banking/authority domains (typosquatting).
 Do NOT mark as scam just because a letter is uncomfortable, demanding, or full of legalese. Real dunning letters, debt-collection, and tax letters are usually NOT scams.
 When `scam_warning` is true, set `scam_reason` to a short calm sentence in {target_language_label} explaining WHY. When false, leave `scam_reason` empty.
+
+REGIONAL SCAM PATTERNS — apply ONLY when `detected_country_code` is set with HIGH confidence. These are known, recurring scam/phishing patterns observed in specific countries; matching one of them is a STRONG additional signal (combine with the general red flags above). If `detected_country_code` is empty or low-confidence, IGNORE this section — do NOT mark a letter as scam based on these regional patterns alone.
+{_REGIONAL_SCAM_BLOCK}
 
 If the text is unreadable, empty, or clearly NOT a real letter/document (e.g. a photo of a face, a blank page, a product photo):
 - Set document_type to "Unknown"
