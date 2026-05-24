@@ -1,16 +1,27 @@
 # easli landing page
 
-Static 4-page site for `https://easli.app`. Plain HTML + CSS, no JavaScript, total bundle size ~25 KB. Hostable anywhere — IONOS Webhosting, GitHub Pages, Vercel, Netlify, Cloudflare Pages.
+Static multi-locale site for `https://easli.app`. Plain HTML + CSS, no JavaScript. **11 locales** (de, en, fr, es, it, pl, nl, tr, ru, zh-Hans, vi) — total bundle ~280 KB. Hostable anywhere — IONOS, GitHub Pages, Vercel, Netlify, Cloudflare Pages.
 
 ## Files
 
 ```
 landing/
-├── index.html      ← Marketing landing (https://easli.app/)
-├── privacy.html    ← Datenschutzerklärung (https://easli.app/privacy)
-├── imprint.html    ← Impressum (https://easli.app/imprint)
-├── support.html    ← Support / FAQ (https://easli.app/support)
-├── style.css       ← Shared stylesheet (5 KB)
+├── index.html      ← Marketing landing DE (https://easli.app/)
+├── en/index.html   ← English      (https://easli.app/en/)
+├── fr/index.html   ← Français     (https://easli.app/fr/)
+├── es/index.html   ← Español      (https://easli.app/es/)
+├── it/index.html   ← Italiano     (https://easli.app/it/)
+├── pl/index.html   ← Polski       (https://easli.app/pl/)
+├── nl/index.html   ← Nederlands   (https://easli.app/nl/) — NEW 2.0
+├── tr/index.html   ← Türkçe       (https://easli.app/tr/) — NEW 2.0
+├── ru/index.html   ← Русский      (https://easli.app/ru/) — NEW 2.0
+├── zh/index.html   ← 简体中文      (https://easli.app/zh/) — NEW 2.0
+├── vi/index.html   ← Tiếng Việt   (https://easli.app/vi/) — NEW 2.0
+├── privacy.html    ← Datenschutzerklärung (shared, no locale variants yet)
+├── imprint.html    ← Impressum (shared)
+├── support.html    ← Support / FAQ (shared)
+├── style.css       ← Shared stylesheet
+├── _migrate_v2.py  ← One-shot migration script for 2.0 release
 └── README.md       ← This file
 ```
 
