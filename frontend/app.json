@@ -2,7 +2,7 @@
   "expo": {
     "name": "easli",
     "slug": "easli",
-    "version": "1.0.1",
+    "version": "2.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "easli",
@@ -20,6 +20,7 @@
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.easli.app",
+      "buildNumber": "2",
       "privacyManifests": {
         "NSPrivacyTracking": false,
         "NSPrivacyTrackingDomains": [],
@@ -109,6 +110,7 @@
     },
     "android": {
       "package": "com.easli.app",
+      "versionCode": 2,
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#FAFAF7"

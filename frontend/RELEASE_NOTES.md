@@ -1,6 +1,7 @@
 # easli 2.0 — Release Notes
 
-**Version**: 2.0 (Marketing) / 1.0.1 (`app.json`)
+**Version**: 2.0.0 (`app.json`)
+**iOS buildNumber**: 2 · **Android versionCode**: 2
 **Codename**: EU-Upgrade
 **Release Date**: TBD (Submission-Ready)
 **Platforms**: iOS (App Store) · Android (Google Play)
